@@ -1,28 +1,9 @@
-[package]
-name = "shopify-payment-gateway"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+resolver = "2"
+members = [
+    "tari_payment_engine",
+    "tari_payment_server",
+    "tpg_common"
+]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-actix = { version = "0.13.0" }
-actix-web = "4.1.0"
-chrono = { version = "0.4.31", features = ["serde"] }
-dotenvy = "0.15.0"
-env_logger = "0.10.0"
-futures = "0.3.21"
-log = "0.4.17"
-rand = "0.8.4"
-serde = { version = "1.0.130", features = ["derive"] }
-serde_json = "1.0.68"
-sqlx = { version = "0.7.3", features = ["runtime-tokio", "chrono"] }
-
-thiserror = "1.0.32"
-tokio = { version = "1.20.1", features = ["full"] }
-
-[features]
-default = ["sqlite"]
-sqlite = ["sqlx/sqlite"]
-postgres = ["sqlx/postgres"]
 

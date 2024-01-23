@@ -10,7 +10,19 @@ if [[ -z "$DATABASE_TYPE" ]]; then
   exit 1
 fi
 
+echo "Running migrations for $DATABASE_TYPE"
+# If DATABASE_TYPE is 'sqlite', then check if $DATABASE_URL exists
+if [[ "$DATABASE_TYPE" == "sqlite" ]]; then
+  DATABASE_FILE="${DATABASE_URL/sqlite:\/\/}"
+  if [[ ! -f "$DATABASE_FILE" ]]; then
+    echo "Creating database: $DATABASE_FILE"
+    touch $DATABASE_FILE
+  fi
+fi
+
+
 CMD=${1:-run}
 shift;
 
-sqlx migrate $CMD --source ./src/db/$DATABASE_TYPE/migrations $@
+sqlx migrate $CMD --source ./tari_payment_engine/src/db/$DATABASE_TYPE/migrations $@
+echo "Ok"
