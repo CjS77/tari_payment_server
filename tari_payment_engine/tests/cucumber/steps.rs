@@ -6,9 +6,10 @@ use std::str::FromStr;
 use std::time::Duration;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::db_types::{
-    MicroTari, NewOrder, NewPayment, OrderId, OrderStatusType, TransferStatus, UserAccount,
+    MicroTari, NewOrder, NewPayment, OrderId, OrderStatusType, OrderUpdate, TransferStatus,
+    UserAccount,
 };
-use tari_payment_engine::AccountManagement;
+use tari_payment_engine::{AccountManagement, PaymentGatewayDatabase};
 
 #[given("a fresh install")]
 async fn fresh_database(world: &mut ShopifyWorld) {
@@ -206,15 +207,50 @@ async fn check_account_current_balance(world: &mut ShopifyWorld, pubkey: String,
     );
 }
 
-#[then(expr = "the order with id {word} has status '{word}'")]
-async fn order_status(world: &mut ShopifyWorld, order_id: OrderId, status: OrderStatusType) {
+#[then(expr = "the order with id {word} has {word} of '{word}'")]
+async fn order_status(world: &mut ShopifyWorld, order_id: OrderId, field: String, value: String) {
     let order = world
         .api()
         .db()
         .order_by_order_id(&order_id)
         .await
+        .expect("Error fetching order")
         .expect("Order {order_id} does not exist");
-    assert_eq!(order.unwrap().status, status);
+    match field.as_str() {
+        "status" => assert_eq!(
+            order.status,
+            OrderStatusType::from(value),
+            "Status is incorrect"
+        ),
+        "customer_id" => assert_eq!(order.customer_id, value, "Customer ID is incorrect"),
+        "total_price" => {
+            let price = value.parse::<i64>().expect("Invalid price") * 1_000_000;
+            let price = MicroTari::from(price);
+            assert_eq!(order.total_price, price, "Total price is incorrect")
+        }
+        "currency" => assert_eq!(order.currency, value, "Currency is incorrect"),
+        _ => panic!("Unknown field {field}"),
+    }
+}
+
+#[when(expr = "order {word} is updated with {word} of '{word}'")]
+async fn update_order(world: &mut ShopifyWorld, oid: OrderId, field: String, value: String) {
+    let mut update = OrderUpdate::default();
+    match field.as_str() {
+        "status" => update = update.with_status(OrderStatusType::from(value)),
+        "memo" => update = update.with_memo(value),
+        "total_price" => {
+            let price = value.parse::<i64>().expect("Invalid price") * 1_000_000;
+            update = update.with_total_price(MicroTari::from(price));
+        }
+        "currency" => update = update.with_currency(value),
+        _ => panic!("Unknown field {field}"),
+    }
+    let db = world.api().db();
+    let _ = db
+        .update_order(&oid, update)
+        .await
+        .expect("Error updating order");
 }
 
 #[then(expr = "the confirmation status for payment #{int} is {string}")]

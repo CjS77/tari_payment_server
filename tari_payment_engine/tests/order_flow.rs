@@ -8,6 +8,8 @@ use ::cucumber::event::ScenarioFinished;
 use ::cucumber::{gherkin, writer, World};
 use futures_util::FutureExt;
 use log::*;
+use sqlx::migrate::MigrateDatabase;
+use sqlx::Sqlite;
 use tari_payment_engine::PaymentGatewayDatabase;
 use tokio::runtime::Runtime;
 
@@ -39,15 +41,10 @@ fn post_test_hook<'a>(
                 }
                 ScenarioFinished::StepPassed => {
                     debug!("🚀️ Scenario complete, removing database: {db_path}");
-                    match sys.api.db_mut().close().await {
-                        Ok(_) => {
-                            let filename = db_path.replace("sqlite://", "./");
-                            std::fs::remove_file(filename).expect("Error removing test database");
-                        }
-                        Err(e) => {
-                            error!("🚀️ Error closing database: {:?}", e);
-                        }
+                    if let Err(e) = sys.api.db_mut().close().await {
+                        error!("🚀️ Failed to close database: {e}");
                     }
+                    Sqlite::drop_database(&db_path).await.unwrap();
                 }
                 _ => trace!("🚀️ Unhandled event: {ev:?}"),
             }

@@ -1,7 +1,7 @@
 use crate::db::common::InsertOrderResult;
 use crate::db::sqlite::SqliteDatabaseError;
-use crate::db_types::{NewOrder, Order, OrderId, OrderStatusType};
-use log::trace;
+use crate::db_types::{NewOrder, Order, OrderId, OrderStatusType, OrderUpdate};
+use log::{debug, trace};
 use sqlx::{QueryBuilder, SqliteConnection};
 
 pub async fn idempotent_insert(
@@ -177,7 +177,6 @@ pub async fn fetch_orders(
     builder.push(" ORDER BY created_at ASC");
 
     trace!("📝️ Executing query: {}", builder.sql());
-    // let query = builder.build_query_as();
     let query = builder.build_query_as::<Order>();
     let orders = query.fetch_all(conn).await?;
     trace!("Result of fetch_orders: {:?}", orders.len());
@@ -197,5 +196,40 @@ pub(crate) async fn update_order_status(
     )
     .execute(conn)
     .await?;
+    Ok(())
+}
+
+pub(crate) async fn update_order(
+    id: &OrderId,
+    update: OrderUpdate,
+    conn: &mut SqliteConnection,
+) -> Result<(), SqliteDatabaseError> {
+    if update.is_empty() {
+        debug!("📝️ No fields to update for order {id}. Update request skipped.");
+        return Ok(());
+    }
+    let mut builder = QueryBuilder::new("UPDATE orders SET updated_at = CURRENT_TIMESTAMP,");
+    let mut set_clause = builder.separated(", ");
+    if let Some(status) = update.status {
+        set_clause.push("status = ");
+        set_clause.push_bind_unseparated(status.to_string());
+    }
+    if let Some(memo) = update.memo {
+        set_clause.push("memo = ");
+        set_clause.push_bind_unseparated(memo);
+    }
+    if let Some(total_price) = update.total_price {
+        set_clause.push("total_price = ");
+        set_clause.push_bind_unseparated(total_price);
+    }
+    if let Some(currency) = update.currency {
+        set_clause.push("currency = ");
+        set_clause.push_bind_unseparated(currency);
+    }
+    builder.push(" WHERE order_id = ");
+    builder.push_bind(id.as_str());
+    trace!("📝️ Executing query: {}", builder.sql());
+    let res = builder.build().execute(conn).await?;
+    trace!("📝️ Result of update_order: {res:?}");
     Ok(())
 }

@@ -19,9 +19,15 @@ Feature: Order matching
     Then the account for address '🏦🍟🎵🐸🏁🔭📝👠🍈🌻🐚🍞🐓🌝👞🐢📌🍔🎤🚨🍣🐀😿💸💡🎁😉🍉🎃🐳🌷🎢👓' has total received of 100 XTR
     Then the account for address '🏦🍟🎵🐸🏁🔭📝👠🍈🌻🐚🍞🐓🌝👞🐢📌🍔🎤🚨🍣🐀😿💸💡🎁😉🍉🎃🐳🌷🎢👓' has current balance of 100 XTR
     Then the account for address '🏦🍟🎵🐸🏁🔭📝👠🍈🌻🐚🍞🐓🌝👞🐢📌🍔🎤🚨🍣🐀😿💸💡🎁😉🍉🎃🐳🌷🎢👓' has total pending of 0 XTR
-#
-#  Scenario: An order update changing the total price will update the user's total_orders balance
-#
+
+  Scenario: An order update changing the total price will update the user's total_orders balance
+    When I receive an order with id 200 from customer 'charlie101' for 25 XTR
+    When I receive an order with id 201 from customer 'charlie101' for 15 XTR
+    Then the account for customer 'charlie101' has total orders of 40 XTR
+    When order 200 is updated with total_price of '30'
+    Then the account for customer 'charlie101' has total orders of 45 XTR
+    Then the order with id 200 has total_price of '30'
+
 #  Scenario: Cancelling an order will update the user's total_orders balance
 #
 #  Scenario: Cancelling a payment will update the user's total_received balance
@@ -38,5 +44,5 @@ Feature: Order matching
     Then the account for customer 'bob' has total received of 65 XTR
     Then the account for customer 'bob' has current balance of 3 XTR
     Then the account for customer 'bob' has total pending of 0 XTR
-    Then the order with id 200 has status 'Paid'
+    Then the order with id 200 has status of 'Paid'
 

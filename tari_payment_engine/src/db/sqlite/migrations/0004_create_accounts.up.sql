@@ -43,3 +43,10 @@ CREATE INDEX IF NOT EXISTS user_account_public_keys_public_key ON user_account_p
 CREATE INDEX IF NOT EXISTS user_account_customer_ids_customer_id ON user_account_customer_ids (customer_id);
 CREATE INDEX IF NOT EXISTS user_account_customer_ids_user_account_id ON user_account_customer_ids (user_account_id);
 
+CREATE TRIGGER order_updated_trigger AFTER UPDATE OF total_price ON orders
+BEGIN
+  UPDATE user_accounts
+  SET total_orders = total_orders + (NEW.total_price - OLD.total_price)
+  WHERE id = (SELECT user_account_id FROM user_account_customer_ids WHERE customer_id = NEW.customer_id);
+END;
+

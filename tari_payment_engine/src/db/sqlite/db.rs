@@ -3,7 +3,8 @@ use crate::db::common::{AccountManagement, PaymentGatewayDatabase};
 use crate::db::sqlite::orders::OrderQueryFilter;
 
 use crate::db_types::{
-    MicroTari, NewOrder, NewPayment, Order, OrderId, OrderStatusType, TransferStatus, UserAccount,
+    MicroTari, NewOrder, NewPayment, Order, OrderId, OrderStatusType, OrderUpdate, TransferStatus,
+    UserAccount,
 };
 use crate::{InsertOrderResult, InsertPaymentResult};
 use log::*;
@@ -207,6 +208,14 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         debug!("🗃️ Payment [{txid}] is now {status}. Balances have been updated.");
         tx.commit().await?;
         Ok(Some(acc_id))
+    }
+
+    async fn update_order(&self, id: &OrderId, update: OrderUpdate) -> Result<(), Self::Error> {
+        let mut tx = self.pool.acquire().await?;
+        trace!("🗃️ Order {id} updating with new values: {update:?}");
+        orders::update_order(id, update, &mut tx).await?;
+        trace!("🗃️ Order {id} has been updated.");
+        Ok(())
     }
 
     async fn close(&mut self) -> Result<(), Self::Error> {

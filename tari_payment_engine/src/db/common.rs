@@ -1,4 +1,6 @@
-use crate::db_types::{NewOrder, NewPayment, Order, OrderId, TransferStatus, UserAccount};
+use crate::db_types::{
+    NewOrder, NewPayment, Order, OrderId, OrderUpdate, TransferStatus, UserAccount,
+};
 use tari_common_types::tari_address::TariAddress;
 
 pub enum InsertOrderResult {
@@ -70,6 +72,10 @@ pub trait PaymentGatewayDatabase: Clone {
         tx_id: &str,
         status: TransferStatus,
     ) -> Result<Option<i64>, Self::Error>;
+
+    /// Updates the order details for the given order id. Not all fields are permitted to be updated, so
+    /// `OrderUpdate` only exposes those that can be changed.
+    async fn update_order(&self, id: &OrderId, update: OrderUpdate) -> Result<(), Self::Error>;
 
     /// Closes the database connection.
     async fn close(&mut self) -> Result<(), Self::Error> {

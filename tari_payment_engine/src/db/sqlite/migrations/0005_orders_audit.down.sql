@@ -1,3 +1,4 @@
+DROP TRIGGER IF EXISTS order_updated_trigger;
 DROP TRIGGER IF EXISTS orders_log_insert;
 DROP TRIGGER IF EXISTS orders_log_update;
 
