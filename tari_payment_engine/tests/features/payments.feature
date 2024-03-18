@@ -40,8 +40,3 @@ Feature: Order matching
     Then the account for customer 'bob' has total pending of 0 XTR
     Then the order with id 200 has status 'Paid'
 
-
-#  Scenario: Receiving a new order with no payments will result in a balance due
-#    When I receive order 0 for Alice with a total price of 420
-#    When I pause for 100ms
-#    Then the balance for order #100 is 420

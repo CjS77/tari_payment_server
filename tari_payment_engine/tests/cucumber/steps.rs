@@ -1,6 +1,6 @@
 use crate::cucumber::shopify_world::OrderManagementSystem;
 use crate::cucumber::ShopifyWorld;
-use cucumber::{given, then, when, World};
+use cucumber::{given, then, when};
 
 use std::str::FromStr;
 use std::time::Duration;
