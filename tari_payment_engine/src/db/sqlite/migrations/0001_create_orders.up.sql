@@ -16,3 +16,9 @@ CREATE INDEX orders_cid_oid_idx ON orders (customer_id, order_id);
 
 CREATE INDEX orders_status_idx ON orders (status);
 CREATE INDEX orders_customer_idx ON orders (customer_id);
+
+-- Do not allow deletes on the orders table
+CREATE TRIGGER orders_no_delete BEFORE DELETE ON orders
+BEGIN
+    SELECT RAISE(FAIL, 'Delete not allowed on orders table. Set status to Cancelled instead');
+END;

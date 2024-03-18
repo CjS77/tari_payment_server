@@ -71,7 +71,7 @@ BEGIN
             NEW.updated_at);
 END;
 
-CREATE TRIGGER orders_log_create
+CREATE TRIGGER orders_log_insert
     AFTER INSERT
     ON orders
 BEGIN
@@ -94,4 +94,6 @@ BEGIN
             NEW.status,
             NEW.updated_at);
 END;
+
+
 

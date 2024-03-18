@@ -1,3 +1,4 @@
+DROP TRIGGER IF EXISTS orders_log_insert;
 DROP TRIGGER IF EXISTS orders_log_update;
 
 DROP INDEX IF EXISTS orders_log_columns_changed;
