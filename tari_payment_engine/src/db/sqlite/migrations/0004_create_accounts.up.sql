@@ -43,10 +43,20 @@ CREATE INDEX IF NOT EXISTS user_account_public_keys_public_key ON user_account_p
 CREATE INDEX IF NOT EXISTS user_account_customer_ids_customer_id ON user_account_customer_ids (customer_id);
 CREATE INDEX IF NOT EXISTS user_account_customer_ids_user_account_id ON user_account_customer_ids (user_account_id);
 
+-- Adjust the total orders received total when an order amount is updated.
 CREATE TRIGGER order_updated_trigger AFTER UPDATE OF total_price ON orders
 BEGIN
   UPDATE user_accounts
   SET total_orders = total_orders + (NEW.total_price - OLD.total_price)
-  WHERE id = (SELECT user_account_id FROM user_account_customer_ids WHERE customer_id = NEW.customer_id);
+  WHERE id = (SELECT user_account_id FROM user_account_customer_ids WHERE customer_id = OLD.customer_id);
+END;
+
+-- Adjust total orders received balance down if an order is expired or cancelled.
+CREATE TRIGGER order_cancelled_trigger AFTER UPDATE OF status ON orders
+WHEN OLD.status = 'New' AND NEW.status in ('Cancelled', 'Expired')
+BEGIN
+    UPDATE user_accounts
+    SET total_orders = total_orders - OLD.total_price
+    WHERE id = (SELECT user_account_id FROM user_account_customer_ids WHERE customer_id = OLD.customer_id);
 END;
 
