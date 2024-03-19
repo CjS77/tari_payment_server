@@ -1,8 +1,9 @@
 use crate::address_extractor::{extract_order_number_from_memo, extract_public_key_from_memo};
-use crate::db::sqlite::SqliteDatabaseError;
+use crate::db::sqlite::{transfers, SqliteDatabaseError};
 use crate::db_types::{MicroTari, NewOrder, NewPayment, OrderId, UserAccount};
 use log::{debug, error, trace};
-use sqlx::SqliteConnection;
+use sqlx::pool::PoolConnection;
+use sqlx::{Sqlite, SqliteConnection};
 use tari_common_types::tari_address::TariAddress;
 
 pub async fn user_account_by_id(
@@ -37,6 +38,7 @@ pub async fn user_account_for_order(
     order_id: &OrderId,
     conn: &mut SqliteConnection,
 ) -> Result<Option<UserAccount>, SqliteDatabaseError> {
+    trace!("🧑️ Fetching user account for order [{order_id}]");
     let result = sqlx::query_as!(UserAccount,
         r#"
         SELECT
@@ -301,11 +303,18 @@ async fn try_match_order_to_payments(
     order: Option<NewOrder>,
     conn: &mut SqliteConnection,
 ) -> Result<Option<i64>, SqliteDatabaseError> {
+    trace!("🧑️ Trying to match order {order:?} to existing payments.");
     if order.is_none() {
         return Ok(None);
     }
     let order = order.unwrap();
-    // Currently, the only way to match an order to a payment is by memo.
+    let match_str = format!("%order id: [{}]%", order.order_id.as_str());
+    if let Some(acc_id) = search_for_user_account_by_order_id_in_memo(&match_str, conn).await? {
+        trace!("🧑️ Order matched to payment. Account id: {acc_id}");
+        return Ok(Some(acc_id));
+    }
+    // If there is a memo on the order, try link a payment. TODO -- should include a signature, otherwise guys could
+    // add someone else's public key to the memo and get free stuff.
     if order.memo.is_none() {
         return Ok(None);
     }
@@ -322,6 +331,7 @@ async fn try_match_payment_to_orders(
     payment: Option<NewPayment>,
     conn: &mut SqliteConnection,
 ) -> Result<Option<i64>, SqliteDatabaseError> {
+    trace!("🧑️ Trying to match payment {payment:?} to existing orders.");
     if payment.is_none() {
         return Ok(None);
     }
@@ -407,4 +417,22 @@ pub async fn incr_total_orders(
     .await?;
     let new_total = MicroTari::from(result.total_orders);
     Ok(new_total)
+}
+
+pub(crate) async fn search_for_user_account_by_order_id_in_memo(
+    memo: &str,
+    conn: &mut SqliteConnection,
+) -> Result<Option<i64>, SqliteDatabaseError> {
+    let result = sqlx::query!(
+        r#"
+    SELECT user_account_id from user_account_public_keys
+    WHERE public_key = (
+        SELECT sender from payments WHERE memo LIKE $1
+    ) LIMIT 1"#,
+        memo
+    )
+    .fetch_optional(conn)
+    .await?;
+    let acc_id = result.map(|r| r.user_account_id);
+    Ok(acc_id)
 }

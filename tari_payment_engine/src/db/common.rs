@@ -90,11 +90,25 @@ pub trait AccountManagement {
     async fn fetch_user_account(&self, account_id: i64)
         -> Result<Option<UserAccount>, Self::Error>;
 
-    /// Fetches the user account associated with the given order id. If no account exists, `None` is returned.
+    /// Fetches the user account for the given order id. A user account must have already been created for this account.
+    /// If no account is found, `None` will be returned.
+    ///
+    /// Alternatively, you can search through the memo fields of payments to find a matching order id by calling
+    /// [`search_for_user_account_by_memo`].
     async fn fetch_user_account_for_order(
         &self,
         order_id: &OrderId,
     ) -> Result<Option<UserAccount>, Self::Error>;
+
+    /// Searches through the memo fields of payments to find an account matching the memo string.
+    /// If no account is found, `None` will be returned.
+    ///
+    /// The `memo_match` is a string that is used to search for a matching order id using `LIKE`.
+    /// For example, `format!("%Order id: [{order_id}]%)` will match any memo that contains the order id."
+    async fn search_for_user_account_by_memo(
+        &self,
+        memo_match: &str,
+    ) -> Result<Option<i64>, Self::Error>;
 
     async fn fetch_user_account_for_customer_id(
         &self,

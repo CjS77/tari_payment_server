@@ -40,14 +40,20 @@ where
             .process_new_order_for_customer(order.clone())
             .await
             .map_err(|e| OrderManagerError::DatabaseError(e))?;
-        let paid_orders = self
+        let payable = self
             .db
             .fetch_payable_orders(account_id)
             .await
             .map_err(|e| OrderManagerError::DatabaseError(e))?;
+        let paid_orders = self
+            .db
+            .try_pay_orders(account_id, &payable)
+            .await
+            .map_err(|e| OrderManagerError::DatabaseError(e))?;
         debug!(
-            "🔄️ {} orders marked as paid for account #{account_id}",
-            paid_orders.len()
+            "🔄️📦️ Order [{}] processing complete. {} orders are paid for account #{account_id}",
+            order.order_id,
+            payable.len()
         );
         Ok(paid_orders)
     }
@@ -126,6 +132,15 @@ where
             }
         };
         Ok(paid_orders)
+    }
+
+    pub async fn cancel_transaction(&self, txid: String) -> Result<(), OrderManagerError<B>> {
+        trace!("🔄️❌️ Payment {txid} is being marked as cancelled");
+        self.db
+            .update_payment_status(&txid, TransferStatus::Cancelled)
+            .await
+            .map_err(|e| OrderManagerError::DatabaseError(e))?;
+        Ok(())
     }
 
     /// Update an existing order in the order manager.

@@ -85,6 +85,15 @@ async fn confirm_payment(world: &mut ShopifyWorld, txid: String) {
         .expect("Error confirming payment");
 }
 
+#[when(expr = "payment [{word}] is cancelled")]
+async fn cancel_payment(world: &mut ShopifyWorld, txid: String) {
+    let _ = world
+        .api()
+        .cancel_transaction(txid)
+        .await
+        .expect("Error cancelling payment");
+}
+
 #[when(expr = "I pause for {int}ms")]
 async fn pause(_world: &mut ShopifyWorld, ms: u64) {
     let delay = Duration::from_millis(ms);

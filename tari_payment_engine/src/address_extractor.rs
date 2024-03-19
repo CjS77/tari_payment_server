@@ -1,8 +1,9 @@
 use crate::db_types::OrderId;
-use log::warn;
+use log::{error, warn};
 use tari_common_types::tari_address::TariAddress;
 
 pub fn extract_public_key_from_memo(memo: &str) -> Option<TariAddress> {
+    error!("Add in a signature check here to avoid order hijacking");
     // Search for an emoji id in the memo
     let hex_address = regex::Regex::new(r"[a-zA-Z0-9]{66}").unwrap();
     let emoji_id = regex::Regex::new(r"(\p{Emoji}){33}").unwrap();

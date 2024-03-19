@@ -136,7 +136,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         let mut new_balance = account.current_balance;
         let mut result = Vec::with_capacity(orders.len());
         for order in orders {
-            if new_balance > order.total_price {
+            if new_balance >= order.total_price {
                 new_balance -= order.total_price;
                 orders::update_order_status(order.id, OrderStatusType::Paid, &mut tx).await?;
                 trace!(
@@ -235,12 +235,30 @@ impl AccountManagement for SqliteDatabase {
         user_accounts::user_account_by_id(account_id, &mut conn).await
     }
 
+    /// Fetches the user account for the given order id. A user account must have already been created for this account.
+    /// If no account is found, `None` will be returned.
+    ///
+    /// Alternatively, you can search through the memo fields of payments to find a matching order id by calling
+    /// [`search_for_user_account_by_memo`].
     async fn fetch_user_account_for_order(
         &self,
         order_id: &OrderId,
     ) -> Result<Option<UserAccount>, Self::Error> {
         let mut conn = self.pool.acquire().await?;
         user_accounts::user_account_for_order(order_id, &mut conn).await
+    }
+
+    /// Searches through the memo fields of payments to find a matching order id. If no account is found, `None` will be
+    /// returned.
+    ///
+    /// The `memo_match` is a string that is used to search for a matching order id using `LIKE`.
+    /// For example, `format!("%Order id: [{order_id}]%)` will match any memo that contains the order id."
+    async fn search_for_user_account_by_memo(
+        &self,
+        memo_match: &str,
+    ) -> Result<Option<i64>, Self::Error> {
+        let mut conn = self.pool.acquire().await?;
+        user_accounts::search_for_user_account_by_order_id_in_memo(memo_match, &mut conn).await
     }
 
     async fn fetch_user_account_for_customer_id(
