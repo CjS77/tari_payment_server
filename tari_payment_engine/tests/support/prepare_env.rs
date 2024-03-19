@@ -1,19 +1,14 @@
 use log::*;
 use sqlx::{migrate, migrate::MigrateDatabase, Sqlite};
-use std::env;
 use std::path::Path;
 use tari_payment_engine::SqliteDatabase;
 
 pub async fn prepare_test_env(url: &str) {
     dotenvy::from_filename(".env.test").ok();
-    env_logger::init();
+    let _ = env_logger::try_init();
     debug!("🚀️ Logging initialised");
     create_database(url).await;
     run_migrations(url).await;
-}
-
-pub fn default_db_path() -> String {
-    env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://../data/test.db".to_string())
 }
 
 pub fn random_db_path() -> String {

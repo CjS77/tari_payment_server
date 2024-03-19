@@ -3,9 +3,15 @@ use crate::order_manager::OrderManagerError;
 use crate::{InsertOrderResult, PaymentGatewayDatabase};
 use log::*;
 use std::fmt::Debug;
+use futures_util::future::{LocalBoxFuture};
 
+
+pub type OrderCreatedHookFn = Box<dyn Fn(NewOrder) -> LocalBoxFuture<'static, ()>  + Sync >;
+pub type PaymentCreatedHookFn = Box<dyn Fn(NewPayment) -> LocalBoxFuture<'static, ()>  + Sync >;
 pub struct OrderManagerApi<B> {
     db: B,
+    on_order_created: Option<OrderCreatedHookFn>,
+    on_payment_created: Option<PaymentCreatedHookFn>,
 }
 
 impl<B> Debug for OrderManagerApi<B> {
@@ -16,7 +22,31 @@ impl<B> Debug for OrderManagerApi<B> {
 
 impl<B> OrderManagerApi<B> {
     pub fn new(db: B) -> Self {
-        Self { db }
+        Self {
+            db,
+            on_order_created: None,
+            on_payment_created: None,
+        }
+    }
+
+    /// Add a hook that is called when a new order is created.
+    ///
+    /// The hook is called with the new order as an argument.
+    /// Example:
+    /// ```rust,ignore
+    ///    let mut api = OrderManagerApi::new(db);
+    ///    api.add_order_created_hook(Box::new(move |order| {
+    ///      let fut = Box::pin( async { /* async code codes here */ });
+    ///      fut.boxed_local()
+    /// }));
+    pub fn add_order_created_hook(&mut self, hook: OrderCreatedHookFn) {
+        self.on_order_created = Some(hook);
+    }
+
+    /// Add a hook that is called when a new payment is created.
+    /// See [`add_order_created_hook`] for an example.
+    pub fn add_payment_created_hook(&mut self, hook: PaymentCreatedHookFn) {
+        self.on_payment_created = Some(hook);
     }
 }
 
@@ -40,6 +70,10 @@ where
             .process_new_order_for_customer(order.clone())
             .await
             .map_err(|e| OrderManagerError::DatabaseError(e))?;
+        if  let Some(hook) = &self.on_order_created {
+            trace!("🔄️📦️ Executing OnOrderCreated hook for [{}].", order.order_id);
+            hook(order.clone()).await;
+        }
         let payable = self
             .db
             .fetch_payable_orders(account_id)
@@ -76,6 +110,10 @@ where
             .await
             .map_err(|e| OrderManagerError::DatabaseError(e))?;
         trace!("🔄️💰️ Payment [{txid}] for account #{account_id} processed.");
+        if  let Some(hook) = &self.on_payment_created {
+            trace!("🔄️💰️ Executing OnPayment hook for [{txid}].");
+            hook(payment.clone()).await;
+        }
         let payable = self
             .db
             .fetch_payable_orders(account_id)

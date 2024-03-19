@@ -16,6 +16,10 @@ pub enum InsertPaymentResult {
 #[allow(async_fn_in_trait)]
 pub trait PaymentGatewayDatabase: Clone {
     type Error: std::error::Error;
+
+    /// The URL of the database
+    fn url(&self) -> &str;
+
     /// Fetches the user account for the given customer_id and/or public key. If both customer_id and public_key are
     /// provided, the resulting account id must match, otherwise an error is returned.
     ///
@@ -81,6 +85,13 @@ pub trait PaymentGatewayDatabase: Clone {
     async fn close(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
+}
+
+#[allow(async_fn_in_trait)]
+pub trait OrderManagement {
+    type Error: std::error::Error;
+
+    async fn order_by_id(&self, order_id: &OrderId) -> Result<Option<Order>, Self::Error>;
 }
 
 #[allow(async_fn_in_trait)]

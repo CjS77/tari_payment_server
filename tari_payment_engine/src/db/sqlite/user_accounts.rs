@@ -1,9 +1,8 @@
 use crate::address_extractor::{extract_order_number_from_memo, extract_public_key_from_memo};
-use crate::db::sqlite::{transfers, SqliteDatabaseError};
+use crate::db::sqlite::{SqliteDatabaseError};
 use crate::db_types::{MicroTari, NewOrder, NewPayment, OrderId, UserAccount};
 use log::{debug, error, trace};
-use sqlx::pool::PoolConnection;
-use sqlx::{Sqlite, SqliteConnection};
+use sqlx::{SqliteConnection};
 use tari_common_types::tari_address::TariAddress;
 
 pub async fn user_account_by_id(

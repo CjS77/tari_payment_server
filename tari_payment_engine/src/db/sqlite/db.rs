@@ -1,5 +1,5 @@
 use super::{db_url, new_pool, orders, transfers, user_accounts, SqliteDatabaseError};
-use crate::db::common::{AccountManagement, PaymentGatewayDatabase};
+use crate::db::common::{AccountManagement, OrderManagement, PaymentGatewayDatabase};
 use crate::db::sqlite::orders::OrderQueryFilter;
 
 use crate::db_types::{
@@ -14,6 +14,7 @@ use tari_common_types::tari_address::TariAddress;
 
 #[derive(Clone)]
 pub struct SqliteDatabase {
+    url: String,
     pool: SqlitePool,
 }
 
@@ -25,6 +26,10 @@ impl Debug for SqliteDatabase {
 
 impl PaymentGatewayDatabase for SqliteDatabase {
     type Error = SqliteDatabaseError;
+
+    fn url(&self) -> &str {
+        self.url.as_str()
+    }
 
     async fn fetch_or_create_account(
         &self,
@@ -278,6 +283,15 @@ impl AccountManagement for SqliteDatabase {
     }
 }
 
+impl OrderManagement for SqliteDatabase {
+    type Error = SqliteDatabaseError;
+
+    async fn order_by_id(&self, oid: &OrderId) -> Result<Option<Order>, Self::Error> {
+        let mut conn = self.pool.acquire().await?;
+        orders::fetch_order_by_order_id(oid, &mut conn).await
+    }
+}
+
 impl SqliteDatabase {
     /// Creates a new database API object
     pub async fn new() -> Result<Self, SqliteDatabaseError> {
@@ -288,7 +302,8 @@ impl SqliteDatabase {
     pub async fn new_with_url(url: &str) -> Result<Self, SqliteDatabaseError> {
         trace!("Creating new database connection pool with url {url}");
         let pool = new_pool(url).await?;
-        Ok(Self { pool })
+        let url = url.to_string();
+        Ok(Self { url, pool })
     }
 
     /// Retrieve the last entry for the corresponding `order_id` from the orders table. If no entry
