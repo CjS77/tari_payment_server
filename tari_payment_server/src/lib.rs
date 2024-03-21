@@ -13,9 +13,8 @@
 //! * `/webhook/checkout_create`: The webhook route for receiving checkout create events from Shopify.
 pub mod cli;
 pub mod config;
-pub mod dto;
 pub mod errors;
 pub mod routes;
 pub mod server;
 
-pub mod new_order;
+pub mod shopify_order;

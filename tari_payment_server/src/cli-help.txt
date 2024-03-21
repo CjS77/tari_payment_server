@@ -1,11 +1,18 @@
-Shopify Payments Gateway server
+Tari Payments Gateway Server
 Copyright (C) 2024 Tari Development community
 Licenced under BSD 3-Clause Licence
+
 This is free software: you are free to change and redistribute it.
 There is NO WARRANTY, to the extent permitted by law.
 
+Tari Payments Gateway server is a server that listens for incoming requests from a store
+provider (e.g. Shopify) and a Tari Wallet. It provides authentication and authorization,
+and forwards commands onto Tari Payment Engine for matching and fulfillment.
+
 The server is run without command line parameters. But the following environment variables
 are read to configure the server:
+
+ENVIRONMENT VARIABLES:
 
 SPG_HOST: The host name to listen on. Defaults to 127.0.0.1
 SPG_PORT: The port to listen on. Defaults to 8360

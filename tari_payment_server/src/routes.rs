@@ -21,10 +21,10 @@
 //!         tokio::time::sleep(Duration::from_secs(5)).await; // <-- Ok. Worker thread will handle other requests here
 //!     }
 //! ```
-use crate::dto::ShopifyOrder;
 use crate::errors::ServerError;
 use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use log::*;
+use crate::shopify_order::ShopifyOrder;
 
 #[get("/health")]
 pub async fn health() -> impl Responder {

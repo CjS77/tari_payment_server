@@ -18,10 +18,12 @@ pub enum ServerError {
     MailboxClosed,
     #[error("An I/O error happened in the server. {0}")]
     IOError(#[from] std::io::Error),
-    #[error("UnspecifiedError. {0}")]
-    Unspecified(String),
     #[error("Order conversion error. {0}")]
     OrderConversionError(#[from] OrderConversionError),
+    #[error("Invalid server configuration. {0}")]
+    ConfigurationError(String),
+    #[error("UnspecifiedError. {0}")]
+    Unspecified(String),
 }
 
 impl ResponseError for ServerError {
