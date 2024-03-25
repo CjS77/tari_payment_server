@@ -21,15 +21,67 @@
 //!         tokio::time::sleep(Duration::from_secs(5)).await; // <-- Ok. Worker thread will handle other requests here
 //!     }
 //! ```
+use crate::auth::{check_login_token_signature, TokenIssuer};
 use crate::errors::ServerError;
+use crate::shopify_order::ShopifyOrder;
 use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use log::*;
-use crate::shopify_order::ShopifyOrder;
+use std::marker::PhantomData;
+use tari_payment_engine::{AuthApi, AuthManagement};
 
 #[get("/health")]
 pub async fn health() -> impl Responder {
     trace!("💻️ Received health check request");
-    HttpResponse::Ok().body("👍\n")
+    HttpResponse::Ok().body("👍️\n")
+}
+
+// Web-actix cannot handle generics in handlers, so it's implemented manually using `AuthRoute`
+//#[post("/auth")]
+pub async fn auth<A>(
+    req: HttpRequest,
+    api: web::Data<AuthApi<A>>,
+    signer: web::Data<TokenIssuer>,
+) -> Result<HttpResponse, ServerError>
+where
+    A: AuthManagement,
+{
+    trace!("💻️ Received auth request");
+    let payload = req
+        .headers()
+        .get("Authorization")
+        .ok_or(ServerError::CouldNotDeserializeAuthToken)?;
+    let login_token = payload.to_str().map_err(|e| {
+        debug!("💻️ Could not read auth token. {e}");
+        ServerError::CouldNotDeserializeAuthToken
+    })?;
+    let token = check_login_token_signature(login_token)?;
+    debug!("💻️ Login token was validated for {token:?}");
+    let cust_id = api
+        .update_nonce_for_address(&token.address, token.nonce)
+        .await?;
+    let access_token = signer.issue_token(cust_id, token, None)?;
+    Ok(HttpResponse::Ok()
+        .content_type("application/json")
+        .body(access_token))
+}
+
+pub struct AuthRoute<A>(PhantomData<fn() -> A>);
+impl<A> AuthRoute<A> {
+    pub fn new() -> Self {
+        Self(PhantomData::<fn() -> A>)
+    }
+}
+impl<A> actix_web::dev::HttpServiceFactory for AuthRoute<A>
+where
+    A: AuthManagement + 'static,
+{
+    fn register(self, config: &mut actix_web::dev::AppService) {
+        let res = actix_web::Resource::new("/auth")
+            .name("auth")
+            .guard(actix_web::guard::Post())
+            .to(auth::<A>);
+        actix_web::dev::HttpServiceFactory::register(res, config);
+    }
 }
 
 #[post("/webhook/checkout_create")]

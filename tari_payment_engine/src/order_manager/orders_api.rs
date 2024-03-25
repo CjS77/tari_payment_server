@@ -1,13 +1,12 @@
 use crate::db_types::{NewOrder, NewPayment, Order, TransferStatus};
 use crate::order_manager::OrderManagerError;
 use crate::{InsertOrderResult, PaymentGatewayDatabase};
+use futures_util::future::LocalBoxFuture;
 use log::*;
 use std::fmt::Debug;
-use futures_util::future::{LocalBoxFuture};
 
-
-pub type OrderCreatedHookFn = Box<dyn Fn(NewOrder) -> LocalBoxFuture<'static, ()>  + Sync >;
-pub type PaymentCreatedHookFn = Box<dyn Fn(NewPayment) -> LocalBoxFuture<'static, ()>  + Sync >;
+pub type OrderCreatedHookFn = Box<dyn Fn(NewOrder) -> LocalBoxFuture<'static, ()> + Sync>;
+pub type PaymentCreatedHookFn = Box<dyn Fn(NewPayment) -> LocalBoxFuture<'static, ()> + Sync>;
 pub struct OrderManagerApi<B> {
     db: B,
     on_order_created: Option<OrderCreatedHookFn>,
@@ -70,8 +69,11 @@ where
             .process_new_order_for_customer(order.clone())
             .await
             .map_err(|e| OrderManagerError::DatabaseError(e))?;
-        if  let Some(hook) = &self.on_order_created {
-            trace!("🔄️📦️ Executing OnOrderCreated hook for [{}].", order.order_id);
+        if let Some(hook) = &self.on_order_created {
+            trace!(
+                "🔄️📦️ Executing OnOrderCreated hook for [{}].",
+                order.order_id
+            );
             hook(order.clone()).await;
         }
         let payable = self
@@ -110,7 +112,7 @@ where
             .await
             .map_err(|e| OrderManagerError::DatabaseError(e))?;
         trace!("🔄️💰️ Payment [{txid}] for account #{account_id} processed.");
-        if  let Some(hook) = &self.on_payment_created {
+        if let Some(hook) = &self.on_payment_created {
             trace!("🔄️💰️ Executing OnPayment hook for [{txid}].");
             hook(payment.clone()).await;
         }

@@ -21,9 +21,12 @@ pub mod events;
 mod order_manager;
 
 pub use db::common::{
-    AccountManagement, InsertOrderResult, InsertPaymentResult, PaymentGatewayDatabase,
+    AccountManagement, AuthManagement, InsertOrderResult, InsertPaymentResult, OrderManagement,
+    PaymentGatewayDatabase,
 };
-pub use order_manager::{api::OrderManagerApi, errors::OrderManagerError};
+pub use order_manager::{
+    auth_api::AuthApi, errors::AuthApiError, errors::OrderManagerError, orders_api::OrderManagerApi,
+};
 
 #[cfg(feature = "sqlite")]
 pub use db::sqlite::db::SqliteDatabase;

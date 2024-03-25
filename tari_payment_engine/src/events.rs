@@ -1,8 +1,7 @@
-use crate::db_types::{OrderStatus};
+use crate::db_types::OrderStatus;
 
 use crate::db_types::{MicroTari, PublicKey};
 use chrono::{DateTime, Utc};
-
 
 #[derive(Debug, Clone)]
 pub struct OrderStatusMessage(pub OrderStatus);

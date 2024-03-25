@@ -1,12 +1,14 @@
 use super::{db_url, new_pool, orders, transfers, user_accounts, SqliteDatabaseError};
-use crate::db::common::{AccountManagement, OrderManagement, PaymentGatewayDatabase};
+use crate::db::common::{
+    AccountManagement, AuthManagement, OrderManagement, PaymentGatewayDatabase,
+};
 use crate::db::sqlite::orders::OrderQueryFilter;
 
 use crate::db_types::{
     MicroTari, NewOrder, NewPayment, Order, OrderId, OrderStatusType, OrderUpdate, TransferStatus,
     UserAccount,
 };
-use crate::{InsertOrderResult, InsertPaymentResult};
+use crate::{AuthApiError, InsertOrderResult, InsertPaymentResult};
 use log::*;
 use sqlx::SqlitePool;
 use std::fmt::Debug;
@@ -280,6 +282,16 @@ impl AccountManagement for SqliteDatabase {
     ) -> Result<Option<UserAccount>, Self::Error> {
         let mut conn = self.pool.acquire().await?;
         user_accounts::user_account_for_public_key(pubkey, &mut conn).await
+    }
+}
+
+impl AuthManagement for SqliteDatabase {
+    async fn update_nonce_for_address(
+        &self,
+        _pubkey: &TariAddress,
+        _nonce: u64,
+    ) -> Result<Option<i64>, AuthApiError> {
+        todo!()
     }
 }
 

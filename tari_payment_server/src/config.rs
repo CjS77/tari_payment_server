@@ -1,13 +1,13 @@
+use crate::errors::ServerError;
 use log::*;
-use std::env;
-use std::io::Write;
 use rand::thread_rng;
 use serde_json::json;
-use crate::errors::ServerError;
-use tari_jwt::{Ristretto256SigningKey, Ristretto256VerifyingKey};
-use tari_jwt::tari_crypto::keys::{PublicKey};
+use std::env;
+use std::io::Write;
+use tari_jwt::tari_crypto::keys::PublicKey;
 use tari_jwt::tari_crypto::ristretto::{RistrettoPublicKey, RistrettoSecretKey};
 use tari_jwt::tari_crypto::tari_utilities::hex::Hex;
+use tari_jwt::{Ristretto256SigningKey, Ristretto256VerifyingKey};
 use tempfile::NamedTempFile;
 
 const DEFAULT_TPG_HOST: &str = "127.0.0.1";
@@ -17,6 +17,7 @@ pub struct ServerConfig {
     pub host: String,
     pub port: u16,
     pub shopify_api_key: String,
+    pub database_url: String,
     pub auth: AuthConfig,
 }
 
@@ -26,6 +27,7 @@ impl Default for ServerConfig {
             host: DEFAULT_TPG_HOST.to_string(),
             port: DEFAULT_TPG_PORT,
             shopify_api_key: String::default(),
+            database_url: String::default(),
             auth: AuthConfig::default(),
         }
     }
@@ -63,20 +65,22 @@ impl ServerConfig {
                 String::default()
             });
         let auth = AuthConfig::try_from_env().unwrap_or_default();
+        let database_url = env::var("TPG_DATABASE_URL").ok().unwrap_or_else(|| {
+            error!("TPG_DATABASE_URL is not set. Please set it to the URL for the TPG database.");
+            String::default()
+        });
         Self {
             host,
             port,
             shopify_api_key,
             auth,
+            database_url,
         }
-    }
-
-    fn auth(&self) -> &AuthConfig {
-        &self.auth
     }
 }
 
 //-------------------------------------------------  AuthConfig  -------------------------------------------------------
+#[derive(Clone)]
 pub struct AuthConfig {
     /// This is the secret key used to sign JWTs. It must be in hex format and be a valid Tari secret key.
     pub jwt_signing_key: Ristretto256SigningKey,
@@ -97,7 +101,8 @@ impl Default for AuthConfig {
                 let key_data = json!({
                     "jwt_signing_key": sk.to_hex(),
                     "jwt_verification_key": pk.to_hex(),
-                }).to_string();
+                })
+                .to_string();
                 match writeln!(f, "{key_data}") {
                     Ok(()) => warn!("🚨🚨🚨 The JWT signing key for this session was written to {}. If this is a \
                     production instance, you are doing it wrong! Set the TPG_JWT_SIGNING_KEY and \
@@ -124,13 +129,22 @@ impl AuthConfig {
             .map_err(|e| ServerError::ConfigurationError(e.to_string()))?;
         // Why have users specify the public key if we can just derive it from the private key?
         // The reason is that it's easy to share and/or look up the public key if it is stored in the configuration.
-        let sk = RistrettoSecretKey::from_hex(&jwt_sk_hex)
-            .map_err(|e| ServerError::ConfigurationError(format!("Invalid signing key in TPG_JWT_SIGNING_KEY: {e}")))?;
+        let sk = RistrettoSecretKey::from_hex(&jwt_sk_hex).map_err(|e| {
+            ServerError::ConfigurationError(format!(
+                "Invalid signing key in TPG_JWT_SIGNING_KEY: {e}"
+            ))
+        })?;
         let expected = RistrettoPublicKey::from_secret_key(&sk);
-        let vk = RistrettoPublicKey::from_hex(&jwt_pk_hex)
-            .map_err(|e| ServerError::ConfigurationError(format!("Invalid verification key in TPG_JWT_VERIFICATION_KEY: {e}")))?;
+        let vk = RistrettoPublicKey::from_hex(&jwt_pk_hex).map_err(|e| {
+            ServerError::ConfigurationError(format!(
+                "Invalid verification key in TPG_JWT_VERIFICATION_KEY: {e}"
+            ))
+        })?;
         if vk != expected {
-            Err(ServerError::ConfigurationError("The verification key does not match the signing key. Check you configuration.".to_string()))
+            Err(ServerError::ConfigurationError(
+                "The verification key does not match the signing key. Check you configuration."
+                    .to_string(),
+            ))
         } else {
             Ok(Self {
                 jwt_signing_key: Ristretto256SigningKey(sk),

@@ -11,10 +11,21 @@
 //! The server exposes the following routes:
 //! * `/health`: A health check route that returns a 200 OK response.
 //! * `/webhook/checkout_create`: The webhook route for receiving checkout create events from Shopify.
+
+#![feature(type_alias_impl_trait)]
+
+extern crate core;
+
+pub mod auth;
 pub mod cli;
 pub mod config;
 pub mod errors;
+
+pub mod helpers;
 pub mod routes;
 pub mod server;
 
 pub mod shopify_order;
+
+#[cfg(test)]
+mod test;

@@ -1,6 +1,7 @@
 use crate::db_types::{
     NewOrder, NewPayment, Order, OrderId, OrderUpdate, TransferStatus, UserAccount,
 };
+use crate::AuthApiError;
 use tari_common_types::tari_address::TariAddress;
 
 pub enum InsertOrderResult {
@@ -129,6 +130,15 @@ pub trait AccountManagement {
         &self,
         pubkey: &TariAddress,
     ) -> Result<Option<UserAccount>, Self::Error>;
+}
+
+#[allow(async_fn_in_trait)]
+pub trait AuthManagement {
+    async fn update_nonce_for_address(
+        &self,
+        pubkey: &TariAddress,
+        nonce: u64,
+    ) -> Result<Option<i64>, AuthApiError>;
 }
 
 #[macro_export]
