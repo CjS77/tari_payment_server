@@ -1,3 +1,6 @@
 .env
 /target
 /data
+
+/cov_raw
+/coverage_report

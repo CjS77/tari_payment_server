@@ -7,7 +7,7 @@ use log::debug;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tari_common_types::tari_address::TariAddress;
-use tari_jwt::jwt_compact::{AlgorithmExt, Claims, UntrustedToken};
+use tari_jwt::jwt_compact::{AlgorithmExt, Claims, Header, UntrustedToken};
 use tari_jwt::{Ristretto256, Ristretto256SigningKey, Ristretto256VerifyingKey};
 use tari_payment_engine::db_types::Roles;
 
@@ -31,9 +31,11 @@ pub type TpsAuthority =
 fn build_jwt_signer(
     jwt_signing_key: Ristretto256SigningKey,
 ) -> TokenSigner<JwtClaims, Ristretto256> {
+    let header = Header::empty().with_token_type("JWT");
     let token_signer = TokenSigner::new()
         .signing_key(jwt_signing_key)
         .algorithm(Ristretto256)
+        .header(header)
         .build()
         .expect("Failed to build token signer");
     token_signer

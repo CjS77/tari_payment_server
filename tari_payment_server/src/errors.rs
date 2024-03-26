@@ -69,15 +69,15 @@ pub struct OrderConversionError(pub String);
 
 #[derive(Debug, Clone, Error)]
 pub enum AuthError {
-    #[error("Login token contained an invalid public key")]
+    #[error("Login token contained an invalid public key.")]
     InvalidPublicKey,
-    #[error("Login token requested permission the user is not entitled to")]
+    #[error("Insufficient Permissions. {0}")]
     InsufficientPermissions(String),
     #[error("Login token signature is invalid. {0}")]
     ValidationError(String),
     #[error("Login token is not in the correct format. {0}")]
     PoorlyFormattedToken(String),
-    #[error("User account not found")]
+    #[error("User account not found.")]
     AccountNotFound,
 }
 
@@ -85,13 +85,11 @@ impl From<AuthApiError> for ServerError {
     fn from(e: AuthApiError) -> Self {
         match e {
             AuthApiError::InvalidNonce => {
-                Self::AuthenticationError(AuthError::ValidationError("Invalid nonce".to_string()))
+                Self::AuthenticationError(AuthError::ValidationError(e.to_string()))
             }
             AuthApiError::PubkeyNotFound => Self::AuthenticationError(AuthError::AccountNotFound),
-            AuthApiError::RoleNotAllowed(r) => {
-                Self::AuthenticationError(AuthError::InsufficientPermissions(format!(
-                    "User does not have rights to the {r} role."
-                )))
+            AuthApiError::RoleNotAllowed(_) => {
+                Self::AuthenticationError(AuthError::InsufficientPermissions(e.to_string()))
             }
             AuthApiError::DatabaseError(e) => Self::BackendError(format!("Database error: {e}")),
         }
