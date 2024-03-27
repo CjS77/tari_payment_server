@@ -1,9 +1,10 @@
-use crate::errors::OrderConversionError;
 use chrono::{DateTime, Utc};
 use rand::{Rng, RngCore};
 use serde::{Deserialize, Serialize};
 use tari_payment_engine::db_types::{MicroTari, NewOrder, OrderId};
 use tpg_common::TARI_CURRENCY_CODE_LOWER;
+
+use crate::errors::OrderConversionError;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShopifyOrder {
@@ -32,12 +33,10 @@ pub struct ShopifyOrder {
 
 impl TryFrom<ShopifyOrder> for NewOrder {
     type Error = OrderConversionError;
+
     fn try_from(value: ShopifyOrder) -> Result<Self, Self::Error> {
         if value.currency.as_str().to_lowercase() != TARI_CURRENCY_CODE_LOWER {
-            return Err(OrderConversionError(format!(
-                "Unsupported currency: {}",
-                value.currency
-            )));
+            return Err(OrderConversionError(format!("Unsupported currency: {}", value.currency)));
         }
         let total_price = value
             .total_price
@@ -46,10 +45,7 @@ impl TryFrom<ShopifyOrder> for NewOrder {
             .map(MicroTari::try_from)?
             .map_err(|e| OrderConversionError(e.to_string()))?;
 
-        let timestamp = value
-            .created_at
-            .parse::<DateTime<Utc>>()
-            .map_err(|e| OrderConversionError(e.to_string()))?;
+        let timestamp = value.created_at.parse::<DateTime<Utc>>().map_err(|e| OrderConversionError(e.to_string()))?;
 
         Ok(Self {
             order_id: OrderId(value.id.to_string()),
@@ -213,12 +209,8 @@ impl OrderBuilder {
         ShopifyOrder {
             id,
             token: self.token.unwrap_or_else(|| rng.next_u64().to_string()),
-            cart_token: self
-                .cart_token
-                .unwrap_or_else(|| format!("{:x}", rng.next_u64())),
-            email: self
-                .email
-                .unwrap_or_else(|| format!("{}@example.com", rng.gen_range(0..1000))),
+            cart_token: self.cart_token.unwrap_or_else(|| format!("{:x}", rng.next_u64())),
+            email: self.email.unwrap_or_else(|| format!("{}@example.com", rng.gen_range(0..1000))),
             buyer_accepts_marketing: self.buyer_accepts_marketing.unwrap_or_default(),
             created_at: self.created_at.unwrap_or_else(|| Utc::now().to_rfc3339()),
             updated_at: self.updated_at.unwrap_or_else(|| Utc::now().to_rfc3339()),
@@ -229,14 +221,10 @@ impl OrderBuilder {
             user_id: self.user_id,
             name: self.name.unwrap_or_default(),
             source_name: self.source_name.unwrap_or_default(),
-            presentment_currency: self
-                .presentment_currency
-                .unwrap_or_else(|| "XTR".to_string()),
+            presentment_currency: self.presentment_currency.unwrap_or_else(|| "XTR".to_string()),
             total_discounts: self.total_discounts.unwrap_or_default(),
             total_line_items_price: self.total_line_items_price.unwrap_or_default(),
-            total_price: self
-                .total_price
-                .unwrap_or_else(|| format!("{}", rng.gen_range(1_000..250_000) * 1000)),
+            total_price: self.total_price.unwrap_or_else(|| format!("{}", rng.gen_range(1_000..250_000) * 1000)),
             total_tax: self.total_tax.unwrap_or_default(),
             subtotal_price: self.subtotal_price.unwrap_or_default(),
             customer: self.customer.unwrap_or_default(),

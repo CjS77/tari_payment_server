@@ -1,6 +1,7 @@
+use std::path::Path;
+
 use log::*;
 use sqlx::{migrate, migrate::MigrateDatabase, Sqlite};
-use std::path::Path;
 use tari_payment_engine::SqliteDatabase;
 
 pub async fn prepare_test_env(url: &str) {
@@ -16,13 +17,8 @@ pub fn random_db_path() -> String {
 }
 
 pub async fn run_migrations(url: &str) {
-    let db = SqliteDatabase::new_with_url(url)
-        .await
-        .expect("Error creating connection to database");
-    migrate!("./src/db/sqlite/migrations")
-        .run(db.pool())
-        .await
-        .expect("Error running DB migrations");
+    let db = SqliteDatabase::new_with_url(url).await.expect("Error creating connection to database");
+    migrate!("./src/db/sqlite/migrations").run(db.pool()).await.expect("Error running DB migrations");
     info!("🚀️ Migrations complete");
 }
 
@@ -31,8 +27,6 @@ pub async fn create_database<P: AsRef<Path>>(path: P) {
     if let Err(e) = Sqlite::drop_database(p).await {
         warn!("Error dropping database {p}: {e:?}");
     }
-    Sqlite::create_database(p)
-        .await
-        .expect("Error creating database");
+    Sqlite::create_database(p).await.expect("Error creating database");
     info!("Created Sqlite database {p}");
 }

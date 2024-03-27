@@ -28,4 +28,4 @@ pub mod server;
 pub mod shopify_order;
 
 #[cfg(test)]
-mod test;
+mod endpoint_tests;

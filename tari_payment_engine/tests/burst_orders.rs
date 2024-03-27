@@ -1,9 +1,10 @@
-use crate::support::prepare_env::prepare_test_env;
-use log::*;
 use std::time::Duration;
-use tari_payment_engine::db_types::*;
-use tari_payment_engine::{OrderManagerApi, SqliteDatabase};
+
+use log::*;
+use tari_payment_engine::{db_types::*, OrderManagerApi, SqliteDatabase};
 use tokio::runtime::Runtime;
+
+use crate::support::prepare_env::prepare_test_env;
 mod support;
 
 const NUM_ORDERS: u64 = 20;
@@ -20,9 +21,7 @@ fn burst_orders() {
     sys.block_on(async move {
         let url = "sqlite://../data/test_burst_orders.db";
         prepare_test_env(url).await;
-        let db = SqliteDatabase::new_with_url(url)
-            .await
-            .expect("Error creating database");
+        let db = SqliteDatabase::new_with_url(url).await.expect("Error creating database");
         let api = OrderManagerApi::new(db);
 
         let mut timer = tokio::time::interval(delay);

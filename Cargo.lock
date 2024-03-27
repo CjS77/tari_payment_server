@@ -69,6 +69,7 @@ dependencies = [
  "derive_builder",
  "form_urlencoded",
  "jwt-compact",
+ "log",
  "serde",
 ]
 
@@ -3464,6 +3465,7 @@ dependencies = [
  "env_logger",
  "log",
  "mockall",
+ "paste",
  "rand",
  "serde",
  "serde_json",

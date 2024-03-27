@@ -31,5 +31,5 @@ once_cell = "1.19.0"
 rand = "0.8.5"
 
 [[test]]
-name = "order_flow" # this should be the same as the filename of your test target
+name = "cucumber_tests" # this should be the same as the filename of your test target
 harness = false  # allows Cucumber to print output instead of libtest

@@ -1,9 +1,9 @@
-use crate::support::prepare_env::{create_database, random_db_path, run_migrations};
 use cucumber::World;
 use log::*;
-
 use tari_payment_engine::{OrderManagerApi, SqliteDatabase};
 use tokio::time::sleep;
+
+use crate::support::prepare_env::{create_database, random_db_path, run_migrations};
 
 #[derive(Default, Debug, World)]
 pub struct ShopifyWorld {
@@ -18,20 +18,14 @@ pub struct OrderManagementSystem {
 
 impl ShopifyWorld {
     pub fn api(&self) -> &OrderManagerApi<SqliteDatabase> {
-        &self
-            .system
-            .as_ref()
-            .expect("OrderManagerApi not initialised")
-            .api
+        &self.system.as_ref().expect("OrderManagerApi not initialised").api
     }
 }
 
 impl OrderManagementSystem {
     pub async fn new() -> Self {
         let url = prepare_test_env().await;
-        let db = SqliteDatabase::new_with_url(&url)
-            .await
-            .expect("Error creating connection to database");
+        let db = SqliteDatabase::new_with_url(&url).await.expect("Error creating connection to database");
         debug!("Created database: {url}");
         sleep(std::time::Duration::from_millis(50)).await;
         let api = OrderManagerApi::new(db);

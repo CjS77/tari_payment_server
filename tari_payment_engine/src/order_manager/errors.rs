@@ -1,6 +1,6 @@
-use crate::db_types::Role;
-use crate::PaymentGatewayDatabase;
 use thiserror::Error;
+
+use crate::PaymentGatewayDatabase;
 
 #[derive(Debug, Error)]
 pub enum OrderManagerError<B: PaymentGatewayDatabase> {
@@ -16,8 +16,14 @@ pub enum AuthApiError {
     DatabaseError(String),
     #[error("Nonce is not strictly increasing.")]
     InvalidNonce,
-    #[error("Public key not found")]
-    PubkeyNotFound,
-    #[error("User requested a role that is not allowed: {0}")]
-    RoleNotAllowed(Role),
+    #[error("Tari address not found")]
+    AddressNotFound,
+    #[error("User requested at least {0} roles that are not allowed")]
+    RoleNotAllowed(usize),
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum AccountApiError {
+    #[error("Database error: {0}")]
+    DatabaseError(String),
 }

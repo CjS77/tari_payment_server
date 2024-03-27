@@ -19,6 +19,8 @@ pub enum ServerError {
     CouldNotDeserializeAuthToken,
     #[error("Could not read request body: {0}")]
     InvalidRequestBody(String),
+    #[error("Could not read request path: {0}")]
+    InvalidRequestPath(String),
     #[error("An I/O error happened in the server. {0}")]
     IOError(#[from] std::io::Error),
     #[error("Order conversion error. {0}")]
@@ -31,6 +33,10 @@ pub enum ServerError {
     AuthenticationError(#[from] AuthError),
     #[error("Could not serialize access token. {0}")]
     CouldNotSerializeAccessToken(String),
+    #[error("The data was not found. {0}")]
+    NoRecordFound(String),
+    #[error("Insufficient Permissions. {0}")]
+    InsufficientPermissions(String),
 }
 
 impl ResponseError for ServerError {
@@ -53,6 +59,9 @@ impl ResponseError for ServerError {
             Self::ConfigurationError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::Unspecified(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::CouldNotSerializeAccessToken(_) => StatusCode::BAD_REQUEST,
+            Self::InvalidRequestPath(_) => StatusCode::BAD_REQUEST,
+            Self::NoRecordFound(_) => StatusCode::NOT_FOUND,
+            ServerError::InsufficientPermissions(_) => StatusCode::FORBIDDEN,
         }
     }
 
@@ -84,13 +93,11 @@ pub enum AuthError {
 impl From<AuthApiError> for ServerError {
     fn from(e: AuthApiError) -> Self {
         match e {
-            AuthApiError::InvalidNonce => {
-                Self::AuthenticationError(AuthError::ValidationError(e.to_string()))
-            }
-            AuthApiError::PubkeyNotFound => Self::AuthenticationError(AuthError::AccountNotFound),
+            AuthApiError::InvalidNonce => Self::AuthenticationError(AuthError::ValidationError(e.to_string())),
+            AuthApiError::AddressNotFound => Self::AuthenticationError(AuthError::AccountNotFound),
             AuthApiError::RoleNotAllowed(_) => {
                 Self::AuthenticationError(AuthError::InsufficientPermissions(e.to_string()))
-            }
+            },
             AuthApiError::DatabaseError(e) => Self::BackendError(format!("Database error: {e}")),
         }
     }

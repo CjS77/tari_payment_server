@@ -1,7 +1,8 @@
-use crate::db::common::AuthManagement;
-use crate::AuthApiError;
 use std::fmt::Debug;
+
 use tari_common_types::tari_address::TariAddress;
+
+use crate::{db::common::AuthManagement, AuthApiError};
 
 pub struct AuthApi<B> {
     db: B,
@@ -20,14 +21,9 @@ impl<B> AuthApi<B> {
 }
 
 impl<B> AuthApi<B>
-where
-    B: AuthManagement,
+where B: AuthManagement
 {
-    pub async fn update_nonce_for_address(
-        &self,
-        pubkey: &TariAddress,
-        nonce: u64,
-    ) -> Result<Option<i64>, AuthApiError> {
+    pub async fn update_nonce_for_address(&self, pubkey: &TariAddress, nonce: u64) -> Result<(), AuthApiError> {
         self.db.update_nonce_for_address(pubkey, nonce).await
     }
 }

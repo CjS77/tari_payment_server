@@ -1,8 +1,10 @@
-use crate::db::common::InsertOrderResult;
-use crate::db::sqlite::SqliteDatabaseError;
-use crate::db_types::{NewOrder, Order, OrderId, OrderStatusType, OrderUpdate};
 use log::{debug, trace};
 use sqlx::{QueryBuilder, SqliteConnection};
+
+use crate::{
+    db::{common::InsertOrderResult, sqlite::SqliteDatabaseError},
+    db_types::{NewOrder, Order, OrderId, OrderStatusType, OrderUpdate},
+};
 
 pub async fn idempotent_insert(
     order: NewOrder,
@@ -17,10 +19,7 @@ pub async fn idempotent_insert(
 
 /// Inserts a new order into the database using the given connection. This is not atomic. You can embedd this call
 /// inside a transaction if you need to ensure atomicity, and pass `&mut *tx` as the connection argument.
-async fn insert_order(
-    order: NewOrder,
-    conn: &mut SqliteConnection,
-) -> Result<InsertOrderResult, SqliteDatabaseError> {
+async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<InsertOrderResult, SqliteDatabaseError> {
     let record = sqlx::query!(
         r#"
             INSERT INTO orders (
@@ -80,13 +79,8 @@ pub async fn fetch_order_by_order_id(
 
 /// Checks whether the order with the given `OrderId` already exists in the database. If it does exist, the `id` of the
 /// order is returned. If it does not exist, `None` is returned.
-pub async fn order_exists(
-    order_id: &OrderId,
-    conn: &mut SqliteConnection,
-) -> Result<Option<i64>, SqliteDatabaseError> {
-    fetch_order_by_order_id(order_id, conn)
-        .await
-        .map(|o| o.map(|o| o.id))
+pub async fn order_exists(order_id: &OrderId, conn: &mut SqliteConnection) -> Result<Option<i64>, SqliteDatabaseError> {
+    fetch_order_by_order_id(order_id, conn).await.map(|o| o.map(|o| o.id))
 }
 
 #[derive(Debug, Clone, Default)]
@@ -125,11 +119,11 @@ impl OrderQueryFilter {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.memo.is_none()
-            && self.order_id.is_none()
-            && self.account_id.is_none()
-            && self.currency.is_none()
-            && self.statuses.is_empty()
+        self.memo.is_none() &&
+            self.order_id.is_none() &&
+            self.account_id.is_none() &&
+            self.currency.is_none() &&
+            self.statuses.is_empty()
     }
 }
 
@@ -189,13 +183,10 @@ pub(crate) async fn update_order_status(
     conn: &mut SqliteConnection,
 ) -> Result<(), SqliteDatabaseError> {
     let status = status.to_string();
-    let _ = sqlx::query!(
-        "UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2",
-        status,
-        order_id
-    )
-    .execute(conn)
-    .await?;
+    let _ =
+        sqlx::query!("UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", status, order_id)
+            .execute(conn)
+            .await?;
     Ok(())
 }
 

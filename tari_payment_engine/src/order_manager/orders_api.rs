@@ -1,9 +1,14 @@
-use crate::db_types::{NewOrder, NewPayment, Order, TransferStatus};
-use crate::order_manager::OrderManagerError;
-use crate::{InsertOrderResult, PaymentGatewayDatabase};
+use std::fmt::Debug;
+
 use futures_util::future::LocalBoxFuture;
 use log::*;
-use std::fmt::Debug;
+
+use crate::{
+    db_types::{NewOrder, NewPayment, Order, TransferStatus},
+    order_manager::OrderManagerError,
+    InsertOrderResult,
+    PaymentGatewayDatabase,
+};
 
 pub type OrderCreatedHookFn = Box<dyn Fn(NewOrder) -> LocalBoxFuture<'static, ()> + Sync>;
 pub type PaymentCreatedHookFn = Box<dyn Fn(NewPayment) -> LocalBoxFuture<'static, ()> + Sync>;
@@ -21,11 +26,7 @@ impl<B> Debug for OrderManagerApi<B> {
 
 impl<B> OrderManagerApi<B> {
     pub fn new(db: B) -> Self {
-        Self {
-            db,
-            on_order_created: None,
-            on_payment_created: None,
-        }
+        Self { db, on_order_created: None, on_payment_created: None }
     }
 
     /// Add a hook that is called when a new order is created.
@@ -50,8 +51,7 @@ impl<B> OrderManagerApi<B> {
 }
 
 impl<B> OrderManagerApi<B>
-where
-    B: PaymentGatewayDatabase,
+where B: PaymentGatewayDatabase
 {
     /// Submit a new order to the order manager.
     ///
@@ -60,32 +60,20 @@ where
     ///
     /// After the order is added, all the orders for the account are checked to see if any can be marked as paid.
     /// If any orders are marked as paid, they are returned.
-    pub async fn process_new_order(
-        &self,
-        order: NewOrder,
-    ) -> Result<Vec<Order>, OrderManagerError<B>> {
+    pub async fn process_new_order(&self, order: NewOrder) -> Result<Vec<Order>, OrderManagerError<B>> {
         let account_id = self
             .db
             .process_new_order_for_customer(order.clone())
             .await
             .map_err(|e| OrderManagerError::DatabaseError(e))?;
         if let Some(hook) = &self.on_order_created {
-            trace!(
-                "🔄️📦️ Executing OnOrderCreated hook for [{}].",
-                order.order_id
-            );
+            trace!("🔄️📦️ Executing OnOrderCreated hook for [{}].", order.order_id);
             hook(order.clone()).await;
         }
-        let payable = self
-            .db
-            .fetch_payable_orders(account_id)
-            .await
-            .map_err(|e| OrderManagerError::DatabaseError(e))?;
-        let paid_orders = self
-            .db
-            .try_pay_orders(account_id, &payable)
-            .await
-            .map_err(|e| OrderManagerError::DatabaseError(e))?;
+        let payable =
+            self.db.fetch_payable_orders(account_id).await.map_err(|e| OrderManagerError::DatabaseError(e))?;
+        let paid_orders =
+            self.db.try_pay_orders(account_id, &payable).await.map_err(|e| OrderManagerError::DatabaseError(e))?;
         debug!(
             "🔄️📦️ Order [{}] processing complete. {} orders are paid for account #{account_id}",
             order.order_id,
@@ -101,10 +89,7 @@ where
     ///
     /// After the payment is added, all the orders for the account are checked to see if any can be marked as paid.
     /// If any orders are marked as paid, they are returned.
-    pub async fn process_new_payment(
-        &self,
-        payment: NewPayment,
-    ) -> Result<Vec<Order>, OrderManagerError<B>> {
+    pub async fn process_new_payment(&self, payment: NewPayment) -> Result<Vec<Order>, OrderManagerError<B>> {
         let txid = payment.txid.clone();
         let account_id = self
             .db
@@ -116,28 +101,19 @@ where
             trace!("🔄️💰️ Executing OnPayment hook for [{txid}].");
             hook(payment.clone()).await;
         }
-        let payable = self
-            .db
-            .fetch_payable_orders(account_id)
-            .await
-            .map_err(|e| OrderManagerError::DatabaseError(e))?;
-        trace!(
-            "🔄️💰️ {} fulfillable orders fetched for account #{account_id}",
+        let payable =
+            self.db.fetch_payable_orders(account_id).await.map_err(|e| OrderManagerError::DatabaseError(e))?;
+        trace!("🔄️💰️ {} fulfillable orders fetched for account #{account_id}", payable.len());
+        let paid_orders =
+            self.db.try_pay_orders(account_id, &payable).await.map_err(|e| OrderManagerError::DatabaseError(e))?;
+        debug!(
+            "🔄️💰️ Payment [{txid}] processing complete. {} orders are paid for account #{account_id}",
             payable.len()
         );
-        let paid_orders = self
-            .db
-            .try_pay_orders(account_id, &payable)
-            .await
-            .map_err(|e| OrderManagerError::DatabaseError(e))?;
-        debug!("🔄️💰️ Payment [{txid}] processing complete. {} orders are paid for account #{account_id}",payable.len());
         Ok(paid_orders)
     }
 
-    pub async fn confirm_transaction(
-        &self,
-        txid: String,
-    ) -> Result<Vec<Order>, OrderManagerError<B>> {
+    pub async fn confirm_transaction(&self, txid: String) -> Result<Vec<Order>, OrderManagerError<B>> {
         trace!("🔄️✅️ Payment {txid} is being marked as confirmed");
         let account_id = self
             .db
@@ -146,30 +122,18 @@ where
             .map_err(|e| OrderManagerError::DatabaseError(e))?;
         let paid_orders = match account_id {
             Some(acc_id) => {
-                let payable = self
-                    .db
-                    .fetch_payable_orders(acc_id)
-                    .await
-                    .map_err(|e| OrderManagerError::DatabaseError(e))?;
-                trace!(
-                    "🔄️✅️ {} fulfillable orders fetched for account #{acc_id}",
-                    payable.len()
-                );
-                let paid_orders = self
-                    .db
-                    .try_pay_orders(acc_id, &payable)
-                    .await
-                    .map_err(|e| OrderManagerError::DatabaseError(e))?;
-                debug!(
-                    "🔄️✅️ [{txid}] confirmed. {} orders are paid for account #{acc_id}",
-                    payable.len()
-                );
+                let payable =
+                    self.db.fetch_payable_orders(acc_id).await.map_err(|e| OrderManagerError::DatabaseError(e))?;
+                trace!("🔄️✅️ {} fulfillable orders fetched for account #{acc_id}", payable.len());
+                let paid_orders =
+                    self.db.try_pay_orders(acc_id, &payable).await.map_err(|e| OrderManagerError::DatabaseError(e))?;
+                debug!("🔄️✅️ [{txid}] confirmed. {} orders are paid for account #{acc_id}", payable.len());
                 paid_orders
-            }
+            },
             None => {
                 error!("🔄️✅️ [{txid}] confirmed, but it is not linked to any account!");
                 Vec::new()
-            }
+            },
         };
         Ok(paid_orders)
     }
@@ -184,10 +148,7 @@ where
     }
 
     /// Update an existing order in the order manager.
-    pub async fn update_order(
-        &self,
-        _order: NewOrder,
-    ) -> Result<InsertOrderResult, OrderManagerError<B>> {
+    pub async fn update_order(&self, _order: NewOrder) -> Result<InsertOrderResult, OrderManagerError<B>> {
         todo!()
     }
 

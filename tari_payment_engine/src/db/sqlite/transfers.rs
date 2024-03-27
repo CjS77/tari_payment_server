@@ -1,8 +1,9 @@
-use crate::db::common::InsertPaymentResult;
-use crate::db::sqlite::SqliteDatabaseError;
-use crate::db_types::{NewPayment, Payment, TransferStatus};
-
 use sqlx::SqliteConnection;
+
+use crate::{
+    db::{common::InsertPaymentResult, sqlite::SqliteDatabaseError},
+    db_types::{NewPayment, Payment, TransferStatus},
+};
 
 pub async fn idempotent_insert(
     transfer: NewPayment,
@@ -24,9 +25,7 @@ pub async fn idempotent_insert(
     .await
     {
         Ok(row) => Ok(InsertPaymentResult::Inserted(row.txid)),
-        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
-            Ok(InsertPaymentResult::AlreadyExists(txid))
-        }
+        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => Ok(InsertPaymentResult::AlreadyExists(txid)),
         Err(e) => Err(SqliteDatabaseError::from(e)),
     }
 }
@@ -37,20 +36,11 @@ pub async fn update_status(
     conn: &mut SqliteConnection,
 ) -> Result<(), SqliteDatabaseError> {
     let status = status.to_string();
-    let _ = sqlx::query!(
-        "UPDATE payments SET status = $1 WHERE txid = $2",
-        status,
-        txid
-    )
-    .execute(conn)
-    .await?;
+    let _ = sqlx::query!("UPDATE payments SET status = $1 WHERE txid = $2", status, txid).execute(conn).await?;
     Ok(())
 }
 
-pub async fn fetch_payment(
-    txid: &str,
-    conn: &mut SqliteConnection,
-) -> Result<Option<Payment>, SqliteDatabaseError> {
+pub async fn fetch_payment(txid: &str, conn: &mut SqliteConnection) -> Result<Option<Payment>, SqliteDatabaseError> {
     let payment = sqlx::query_as!(
         Payment,
         r#"SELECT

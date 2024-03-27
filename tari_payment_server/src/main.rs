@@ -1,8 +1,6 @@
 use dotenvy::dotenv;
 use log::info;
-use tari_payment_server::{
-    cli::handle_command_line_args, config::ServerConfig, server::run_server,
-};
+use tari_payment_server::{cli::handle_command_line_args, config::ServerConfig, server::run_server};
 
 #[actix_web::main]
 async fn main() {

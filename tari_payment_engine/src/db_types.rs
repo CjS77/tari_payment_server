@@ -1,16 +1,20 @@
-use crate::op;
+use std::{
+    fmt::Display,
+    ops::{Add, Neg, Sub, SubAssign},
+    str::FromStr,
+};
+
 use chrono::{DateTime, Utc};
 use log::error;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Type};
-use std::fmt::Display;
-use std::ops::{Add, Neg, Sub, SubAssign};
-use std::str::FromStr;
 use tari_common_types::tari_address::TariAddress;
 use thiserror::Error;
 
+use crate::op;
+
 //--------------------------------------     MicroTari       ---------------------------------------------------------
-#[derive(Debug, Clone, Copy, Default, Type, Ord, PartialOrd)]
+#[derive(Debug, Clone, Copy, Default, Type, Ord, PartialOrd, Serialize, Deserialize)]
 #[sqlx(transparent)]
 pub struct MicroTari(i64);
 
@@ -39,12 +43,10 @@ impl Eq for MicroTari {}
 
 impl TryFrom<u64> for MicroTari {
     type Error = MicroTariConversionError;
+
     fn try_from(value: u64) -> Result<Self, Self::Error> {
         if value > i64::MAX as u64 {
-            Err(MicroTariConversionError(format!(
-                "Value {} is too large to convert to MicroTari",
-                value
-            )))
+            Err(MicroTariConversionError(format!("Value {} is too large to convert to MicroTari", value)))
         } else {
             #[allow(clippy::cast_possible_wrap)]
             Ok(Self(value as i64))
@@ -84,7 +86,7 @@ impl<S: Into<String>> From<S> for PublicKey {
 }
 
 //--------------------------------------     UserAccount       ---------------------------------------------------------
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct UserAccount {
     pub id: i64,
     pub created_at: DateTime<Utc>,
@@ -117,7 +119,7 @@ pub struct UserAccountCustomerId {
 }
 
 //--------------------------------------   OrderStatusType     ---------------------------------------------------------
-#[derive(Debug, Clone, PartialEq, Eq, Type)]
+#[derive(Debug, Clone, PartialEq, Eq, Type, Serialize, Deserialize)]
 pub enum OrderStatusType {
     /// The order has been created and the payment has been received in full
     Paid,
@@ -143,19 +145,18 @@ impl Display for OrderStatusType {
 impl From<String> for OrderStatusType {
     fn from(value: String) -> Self {
         value.parse().unwrap_or_else(|_| {
-            error!(
-                "Invalid order status: {value}. But this conversion cannot fail. Defaulting to New"
-            );
+            error!("Invalid order status: {value}. But this conversion cannot fail. Defaulting to New");
             OrderStatusType::New
         })
     }
 }
 
 #[derive(Debug, Clone, Error)]
-#[error("Invalid order status: {0}")]
+#[error("Invalid conversion from string: {0}")]
 pub struct ConversionError(String);
 impl FromStr for OrderStatusType {
     type Err = ConversionError;
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "Paid" => Ok(Self::Paid),
@@ -168,12 +169,14 @@ impl FromStr for OrderStatusType {
 }
 
 //--------------------------------------        OrderId        ---------------------------------------------------------
-#[derive(Debug, Clone, PartialEq, Eq, Type)]
+#[derive(Debug, Clone, PartialEq, Eq, Type, Serialize, Deserialize)]
 #[sqlx(transparent)]
+#[serde(transparent)]
 pub struct OrderId(pub String);
 
 impl FromStr for OrderId {
     type Err = ();
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Self(s.to_string()))
     }
@@ -206,7 +209,7 @@ pub struct OrderStatus {
 }
 
 //--------------------------------------        Order       ---------------------------------------------------------
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct Order {
     pub id: i64,
     pub order_id: OrderId,
@@ -238,23 +241,16 @@ pub struct NewOrder {
 
 impl NewOrder {
     pub fn new(order_id: OrderId, customer_id: String, total_price: MicroTari) -> Self {
-        Self {
-            order_id,
-            customer_id,
-            memo: None,
-            total_price,
-            currency: "XTR".to_string(),
-            created_at: Utc::now(),
-        }
+        Self { order_id, customer_id, memo: None, total_price, currency: "XTR".to_string(), created_at: Utc::now() }
     }
 
     pub fn is_equivalent(&self, order: &Order) -> bool {
-        self.order_id == order.order_id
-            && self.customer_id == order.customer_id
-            && self.memo == order.memo
-            && self.total_price == order.total_price
-            && self.currency == order.currency
-            && self.created_at == order.created_at
+        self.order_id == order.order_id &&
+            self.customer_id == order.customer_id &&
+            self.memo == order.memo &&
+            self.total_price == order.total_price &&
+            self.currency == order.currency &&
+            self.created_at == order.created_at
     }
 }
 
@@ -275,10 +271,7 @@ pub struct OrderUpdate {
 
 impl OrderUpdate {
     pub fn is_empty(&self) -> bool {
-        self.memo.is_none()
-            && self.total_price.is_none()
-            && self.currency.is_none()
-            && self.status.is_none()
+        self.memo.is_none() && self.total_price.is_none() && self.currency.is_none() && self.status.is_none()
     }
 
     pub fn with_memo(mut self, memo: String) -> Self {
@@ -359,12 +352,7 @@ pub struct NewPayment {
 
 impl NewPayment {
     pub fn new(sender: TariAddress, amount: MicroTari, txid: String) -> Self {
-        Self {
-            sender,
-            amount,
-            txid,
-            memo: None,
-        }
+        Self { sender, amount, txid, memo: None }
     }
 
     pub fn with_memo(mut self, memo: String) -> Self {
@@ -414,6 +402,19 @@ pub enum Role {
     User,
 }
 
+impl FromStr for Role {
+    type Err = ConversionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "read_all" => Ok(Self::ReadAll),
+            "write" => Ok(Self::Write),
+            "user" => Ok(Self::User),
+            s => Err(ConversionError(format!("Invalid role: {s}"))),
+        }
+    }
+}
+
 pub fn admin() -> Roles {
     vec![Role::ReadAll, Role::Write, Role::User]
 }
@@ -426,4 +427,12 @@ impl Display for Role {
             Role::User => write!(f, "user"),
         }
     }
+}
+
+//--------------------------------------    Authentication  ---------------------------------------------------------
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LoginToken {
+    pub address: TariAddress,
+    pub nonce: u64,
+    pub desired_roles: Roles,
 }

@@ -1,7 +1,11 @@
 use mockall::mock;
 use tari_common_types::tari_address::TariAddress;
-use tari_payment_engine::db_types::{OrderId, UserAccount};
-use tari_payment_engine::{AccountManagement, AuthApiError, AuthManagement};
+use tari_payment_engine::{
+    db_types::{Order, OrderId, Role, UserAccount},
+    AccountManagement,
+    AuthApiError,
+    AuthManagement,
+};
 use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
@@ -11,9 +15,7 @@ pub struct MockErr {
 
 impl MockErr {
     pub fn new(message: &str) -> Self {
-        Self {
-            message: message.to_string(),
-        }
+        Self { message: message.to_string() }
     }
 }
 
@@ -31,13 +33,17 @@ mock! {
         async fn fetch_user_account_for_order(&self, order_id: &OrderId) -> Result<Option<UserAccount>, MockErr>;
         async fn search_for_user_account_by_memo(&self, memo_match: &str) -> Result<Option<i64>, MockErr>;
         async fn fetch_user_account_for_customer_id(&self, customer_id: &str) -> Result<Option<UserAccount>, MockErr>;
-        async fn fetch_user_account_for_pubkey(&self, pubkey: &TariAddress) -> Result<Option<UserAccount>, MockErr>;
+        async fn fetch_user_account_for_address(&self, address: &TariAddress) -> Result<Option<UserAccount>, MockErr>;
+        async fn fetch_orders_for_account(&self, account_id: i64) -> Result<Vec<Order>, MockErr>;
     }
 }
 
 mock! {
     pub AuthManager {}
     impl AuthManagement for AuthManager {
-        async fn update_nonce_for_address(&self, pubkey: &TariAddress, nonce: u64) -> std::result::Result<Option<i64>, AuthApiError>;
+        async fn update_nonce_for_address(&self, pubkey: &TariAddress, nonce: u64) -> Result<(), AuthApiError>;
+        async fn check_auth_account_exists(&self, address: &TariAddress) -> Result<bool, AuthApiError>;
+        async fn check_address_has_roles(&self, address: &TariAddress, roles: &[Role]) -> Result<(), AuthApiError>;
+        async fn fetch_roles_for_address(&self, address: &TariAddress) -> Result<Vec<Role>, AuthApiError>;
     }
 }

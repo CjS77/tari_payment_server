@@ -5,10 +5,10 @@
 //!
 //! The library is divided into two main sections:
 //! 1. Database management and control. Currently, Sqlite and Postgres are the two supported backends. You should never
-//!    need to access the database directly. Instead, use the public API provided by the payment engine.
-//!    The exception is the data types used in the database. These are defined in the `db_types` module and are public.
-//! 2. Order management and control. This is the core logic of the payment engine. It is responsible for managing orders,
-//!    and exposes the public API for the payment engine.
+//!    need to access the database directly. Instead, use the public API provided by the payment engine. The exception
+//!    is the data types used in the database. These are defined in the `db_types` module and are public.
+//! 2. Order management and control. This is the core logic of the payment engine. It is responsible for managing
+//!    orders, and exposes the public API for the payment engine.
 //!
 //! The engine also provides a set of events that can be subscribed to. These events are emitted when certain actions
 //! occur within the payment engine. For example, when a new order is created, an `OrderCreated` event is emitted.
@@ -21,12 +21,18 @@ pub mod events;
 mod order_manager;
 
 pub use db::common::{
-    AccountManagement, AuthManagement, InsertOrderResult, InsertPaymentResult, OrderManagement,
+    AccountManagement,
+    AuthManagement,
+    InsertOrderResult,
+    InsertPaymentResult,
+    OrderManagement,
     PaymentGatewayDatabase,
 };
-pub use order_manager::{
-    auth_api::AuthApi, errors::AuthApiError, errors::OrderManagerError, orders_api::OrderManagerApi,
-};
-
 #[cfg(feature = "sqlite")]
 pub use db::sqlite::db::SqliteDatabase;
+pub use order_manager::{
+    accounts_api::AccountApi,
+    auth_api::AuthApi,
+    errors::{AuthApiError, OrderManagerError},
+    orders_api::OrderManagerApi,
+};

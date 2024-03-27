@@ -1,14 +1,20 @@
-use crate::errors::ServerError;
+use std::{env, io::Write};
+
 use log::*;
 use rand::thread_rng;
 use serde_json::json;
-use std::env;
-use std::io::Write;
-use tari_jwt::tari_crypto::keys::PublicKey;
-use tari_jwt::tari_crypto::ristretto::{RistrettoPublicKey, RistrettoSecretKey};
-use tari_jwt::tari_crypto::tari_utilities::hex::Hex;
-use tari_jwt::{Ristretto256SigningKey, Ristretto256VerifyingKey};
+use tari_jwt::{
+    tari_crypto::{
+        keys::PublicKey,
+        ristretto::{RistrettoPublicKey, RistrettoSecretKey},
+        tari_utilities::hex::Hex,
+    },
+    Ristretto256SigningKey,
+    Ristretto256VerifyingKey,
+};
 use tempfile::NamedTempFile;
+
+use crate::errors::ServerError;
 
 const DEFAULT_TPG_HOST: &str = "127.0.0.1";
 const DEFAULT_TPG_PORT: u16 = 8360;
@@ -35,52 +41,35 @@ impl Default for ServerConfig {
 
 impl ServerConfig {
     pub fn new(host: &str, port: u16) -> Self {
-        Self {
-            host: host.to_string(),
-            port,
-            ..Default::default()
-        }
+        Self { host: host.to_string(), port, ..Default::default() }
     }
 
     pub fn from_env_or_default() -> Self {
-        let host = env::var("TPG_HOST")
-            .ok()
-            .unwrap_or_else(|| DEFAULT_TPG_HOST.into());
+        let host = env::var("TPG_HOST").ok().unwrap_or_else(|| DEFAULT_TPG_HOST.into());
         let port = env::var("TPG_PORT")
             .map(|s| {
                 s.parse::<u16>().unwrap_or_else(|e| {
-                    error!(
-                        "{s} is not a valid port for TPG_PORT. {e} Using the default, {DEFAULT_TPG_PORT}, \
-                         instead."
-                    );
+                    error!("{s} is not a valid port for TPG_PORT. {e} Using the default, {DEFAULT_TPG_PORT}, instead.");
                     DEFAULT_TPG_PORT
                 })
             })
             .ok()
             .unwrap_or(DEFAULT_TPG_PORT);
-        let shopify_api_key = env::var("TPG_SHOPIFY_API_KEY")
-            .ok()
-            .unwrap_or_else(|| {
-                error!("TPG_SHOPIFY_API_KEY is not set. Please set it to the API key for your Shopify app.");
-                String::default()
-            });
+        let shopify_api_key = env::var("TPG_SHOPIFY_API_KEY").ok().unwrap_or_else(|| {
+            error!("TPG_SHOPIFY_API_KEY is not set. Please set it to the API key for your Shopify app.");
+            String::default()
+        });
         let auth = AuthConfig::try_from_env().unwrap_or_default();
         let database_url = env::var("TPG_DATABASE_URL").ok().unwrap_or_else(|| {
             error!("TPG_DATABASE_URL is not set. Please set it to the URL for the TPG database.");
             String::default()
         });
-        Self {
-            host,
-            port,
-            shopify_api_key,
-            auth,
-            database_url,
-        }
+        Self { host, port, shopify_api_key, auth, database_url }
     }
 }
 
 //-------------------------------------------------  AuthConfig  -------------------------------------------------------
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AuthConfig {
     /// This is the secret key used to sign JWTs. It must be in hex format and be a valid Tari secret key.
     pub jwt_signing_key: Ristretto256SigningKey,
@@ -92,8 +81,10 @@ pub struct AuthConfig {
 impl Default for AuthConfig {
     fn default() -> Self {
         let mut tmpfile = NamedTempFile::new().ok().map(|f| f.keep().ok()).flatten();
-        warn!("🚨🚨🚨 The JWT signing key has not been set. I'm using a random value for this session.\
-        DO NOT operate on production like this since you may lose access to data. 🚨🚨🚨");
+        warn!(
+            "🚨🚨🚨 The JWT signing key has not been set. I'm using a random value for this session.DO NOT operate on \
+             production like this since you may lose access to data. 🚨🚨🚨"
+        );
         let mut rng = thread_rng();
         let (sk, pk) = RistrettoPublicKey::random_keypair(&mut rng);
         match &mut tmpfile {
@@ -104,52 +95,42 @@ impl Default for AuthConfig {
                 })
                 .to_string();
                 match writeln!(f, "{key_data}") {
-                    Ok(()) => warn!("🚨🚨🚨 The JWT signing key for this session was written to {}. If this is a \
-                    production instance, you are doing it wrong! Set the TPG_JWT_SIGNING_KEY and \
-                    TPG_JWT_VERIFICATION_KEY environment variables instead. 🚨🚨🚨", p.to_str().unwrap_or("???")),
+                    Ok(()) => warn!(
+                        "🚨🚨🚨 The JWT signing key for this session was written to {}. If this is a production \
+                         instance, you are doing it wrong! Set the TPG_JWT_SIGNING_KEY and TPG_JWT_VERIFICATION_KEY \
+                         environment variables instead. 🚨🚨🚨",
+                        p.to_str().unwrap_or("???")
+                    ),
                     Err(e) => warn!("Could not write the JWT signing key to the temporary file. {e}"),
                 }
-            }
+            },
             None => {
                 warn!("Could not create a temporary file to store the JWT signing key. ");
-            }
+            },
         }
-        Self {
-            jwt_signing_key: Ristretto256SigningKey(sk),
-            jwt_verification_key: Ristretto256VerifyingKey(pk),
-        }
+        Self { jwt_signing_key: Ristretto256SigningKey(sk), jwt_verification_key: Ristretto256VerifyingKey(pk) }
     }
 }
 
 impl AuthConfig {
     pub fn try_from_env() -> Result<Self, ServerError> {
-        let jwt_sk_hex = env::var("TPG_JWT_SIGNING_KEY")
-            .map_err(|e| ServerError::ConfigurationError(e.to_string()))?;
-        let jwt_pk_hex = env::var("TPG_JWT_VERIFICATION_KEY")
-            .map_err(|e| ServerError::ConfigurationError(e.to_string()))?;
+        let jwt_sk_hex = env::var("TPG_JWT_SIGNING_KEY").map_err(|e| ServerError::ConfigurationError(e.to_string()))?;
+        let jwt_pk_hex =
+            env::var("TPG_JWT_VERIFICATION_KEY").map_err(|e| ServerError::ConfigurationError(e.to_string()))?;
         // Why have users specify the public key if we can just derive it from the private key?
         // The reason is that it's easy to share and/or look up the public key if it is stored in the configuration.
-        let sk = RistrettoSecretKey::from_hex(&jwt_sk_hex).map_err(|e| {
-            ServerError::ConfigurationError(format!(
-                "Invalid signing key in TPG_JWT_SIGNING_KEY: {e}"
-            ))
-        })?;
+        let sk = RistrettoSecretKey::from_hex(&jwt_sk_hex)
+            .map_err(|e| ServerError::ConfigurationError(format!("Invalid signing key in TPG_JWT_SIGNING_KEY: {e}")))?;
         let expected = RistrettoPublicKey::from_secret_key(&sk);
         let vk = RistrettoPublicKey::from_hex(&jwt_pk_hex).map_err(|e| {
-            ServerError::ConfigurationError(format!(
-                "Invalid verification key in TPG_JWT_VERIFICATION_KEY: {e}"
-            ))
+            ServerError::ConfigurationError(format!("Invalid verification key in TPG_JWT_VERIFICATION_KEY: {e}"))
         })?;
         if vk != expected {
             Err(ServerError::ConfigurationError(
-                "The verification key does not match the signing key. Check you configuration."
-                    .to_string(),
+                "The verification key does not match the signing key. Check you configuration.".to_string(),
             ))
         } else {
-            Ok(Self {
-                jwt_signing_key: Ristretto256SigningKey(sk),
-                jwt_verification_key: Ristretto256VerifyingKey(vk),
-            })
+            Ok(Self { jwt_signing_key: Ristretto256SigningKey(sk), jwt_verification_key: Ristretto256VerifyingKey(vk) })
         }
     }
 }

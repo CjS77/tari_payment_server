@@ -1,9 +1,12 @@
-use crate::address_extractor::{extract_order_number_from_memo, extract_public_key_from_memo};
-use crate::db::sqlite::SqliteDatabaseError;
-use crate::db_types::{MicroTari, NewOrder, NewPayment, OrderId, UserAccount};
 use log::{debug, error, trace};
 use sqlx::SqliteConnection;
 use tari_common_types::tari_address::TariAddress;
+
+use crate::{
+    address_extractor::{extract_order_number_from_memo, extract_public_key_from_memo},
+    db::sqlite::SqliteDatabaseError,
+    db_types::{MicroTari, NewOrder, NewPayment, OrderId, UserAccount},
+};
 
 pub async fn user_account_by_id(
     account_id: i64,
@@ -38,7 +41,8 @@ pub async fn user_account_for_order(
     conn: &mut SqliteConnection,
 ) -> Result<Option<UserAccount>, SqliteDatabaseError> {
     trace!("🧑️ Fetching user account for order [{order_id}]");
-    let result = sqlx::query_as!(UserAccount,
+    let result = sqlx::query_as!(
+        UserAccount,
         r#"
         SELECT
             id,
@@ -57,7 +61,9 @@ pub async fn user_account_for_order(
             LIMIT 1
         )"#,
         order_id.0
-    ).fetch_one(conn).await;
+    )
+    .fetch_one(conn)
+    .await;
     match result {
         Err(sqlx::Error::RowNotFound) => Ok(None),
         Err(e) => Err(e.into()),
@@ -69,7 +75,8 @@ pub async fn user_account_for_tx(
     txid: &str,
     conn: &mut SqliteConnection,
 ) -> Result<Option<UserAccount>, SqliteDatabaseError> {
-    let result = sqlx::query_as!(UserAccount,
+    let result = sqlx::query_as!(
+        UserAccount,
         r#"
         SELECT
             id,
@@ -85,8 +92,11 @@ pub async fn user_account_for_tx(
             FROM user_account_public_keys INNER JOIN payments ON user_account_public_keys.public_key = payments.sender
             WHERE txid = $1
             LIMIT 1
-        )"#,txid
-    ).fetch_optional(conn).await?;
+        )"#,
+        txid
+    )
+    .fetch_optional(conn)
+    .await?;
     Ok(result)
 }
 
@@ -123,7 +133,7 @@ pub async fn user_account_for_customer_id(
     }
 }
 
-pub async fn user_account_for_public_key(
+pub async fn user_account_for_address(
     public_key: &TariAddress,
     conn: &mut SqliteConnection,
 ) -> Result<Option<UserAccount>, SqliteDatabaseError> {
@@ -153,35 +163,23 @@ pub async fn user_account_for_public_key(
     Ok(result)
 }
 
-async fn acc_id_for_pubkey(
-    pk: &TariAddress,
-    conn: &mut SqliteConnection,
-) -> Result<Option<i64>, SqliteDatabaseError> {
+async fn acc_id_for_pubkey(pk: &TariAddress, conn: &mut SqliteConnection) -> Result<Option<i64>, SqliteDatabaseError> {
     let pk = pk.to_hex();
-    let id = sqlx::query!(
-        "SELECT user_account_id FROM user_account_public_keys WHERE public_key = $1 LIMIT 1",
-        pk
-    )
-    .fetch_optional(conn)
-    .await?
-    .map(|r| r.user_account_id);
+    let id = sqlx::query!("SELECT user_account_id FROM user_account_public_keys WHERE public_key = $1 LIMIT 1", pk)
+        .fetch_optional(conn)
+        .await?
+        .map(|r| r.user_account_id);
     if let Some(id) = id {
         trace!("🧑️ Public key {pk} is linked to account #{id}");
     }
     Ok(id)
 }
 
-async fn acc_id_for_cust_id(
-    cid: &str,
-    conn: &mut SqliteConnection,
-) -> Result<Option<i64>, SqliteDatabaseError> {
-    let id = sqlx::query!(
-        "SELECT user_account_id FROM user_account_customer_ids WHERE customer_id = $1 LIMIT 1",
-        cid
-    )
-    .fetch_optional(conn)
-    .await?
-    .map(|r| r.user_account_id);
+async fn acc_id_for_cust_id(cid: &str, conn: &mut SqliteConnection) -> Result<Option<i64>, SqliteDatabaseError> {
+    let id = sqlx::query!("SELECT user_account_id FROM user_account_customer_ids WHERE customer_id = $1 LIMIT 1", cid)
+        .fetch_optional(conn)
+        .await?
+        .map(|r| r.user_account_id);
     if let Some(id) = id {
         debug!("🧑️ Customer_id {cid} is linked to account #{id}");
     }
@@ -193,9 +191,7 @@ async fn create_account_with_links(
     pk: Option<TariAddress>,
     tx: &mut SqliteConnection,
 ) -> Result<i64, SqliteDatabaseError> {
-    let row = sqlx::query!("INSERT INTO user_accounts DEFAULT VALUES RETURNING id")
-        .fetch_one(&mut *tx)
-        .await?;
+    let row = sqlx::query!("INSERT INTO user_accounts DEFAULT VALUES RETURNING id").fetch_one(&mut *tx).await?;
     let account_id = row.id;
     debug!("📝️ Created new user account with id #{account_id}");
     link_accounts(account_id, cid, pk, tx).await
@@ -275,7 +271,7 @@ pub async fn fetch_or_create_account(
                     "🧑️ Customer_id and public_key are linked to different accounts".to_string(),
                 ))
             }
-        }
+        },
         (Some(account_id), None) => link_accounts(account_id, None, pubkey, &mut *conn).await,
         (None, Some(account_id)) => link_accounts(account_id, cust_id, None, &mut *conn).await,
         (None, None) => {
@@ -293,7 +289,7 @@ pub async fn fetch_or_create_account(
             } else {
                 create_account_with_links(cust_id, pubkey, &mut *conn).await
             }
-        }
+        },
     }?;
     Ok(id)
 }

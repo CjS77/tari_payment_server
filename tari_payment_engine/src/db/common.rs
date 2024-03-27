@@ -1,8 +1,9 @@
-use crate::db_types::{
-    NewOrder, NewPayment, Order, OrderId, OrderUpdate, TransferStatus, UserAccount,
-};
-use crate::AuthApiError;
 use tari_common_types::tari_address::TariAddress;
+
+use crate::{
+    db_types::{NewOrder, NewPayment, Order, OrderId, OrderUpdate, Role, TransferStatus, UserAccount},
+    AuthApiError,
+};
 
 pub enum InsertOrderResult {
     Inserted(i64),
@@ -33,8 +34,8 @@ pub trait PaymentGatewayDatabase: Clone {
     ) -> Result<i64, Self::Error>;
 
     /// Takes a new order, and in a single atomic transaction,
-    /// * calls `save_new_order` to store the order in the database. If the order already exists,
-    ///   nothing further is done.
+    /// * calls `save_new_order` to store the order in the database. If the order already exists, nothing further is
+    ///   done.
     /// * creates a new account for the customer if one does not already exist
     /// * Updates the total orders value for the account
     ///
@@ -42,13 +43,12 @@ pub trait PaymentGatewayDatabase: Clone {
     async fn process_new_order_for_customer(&self, order: NewOrder) -> Result<i64, Self::Error>;
 
     /// Takes a new payment, and in a single atomic transaction,
-    /// * calls `save_payment` to store the payment in the database. If the payment already exists,
-    ///   nothing further is done.
+    /// * calls `save_payment` to store the payment in the database. If the payment already exists, nothing further is
+    ///   done.
     /// * The payment is marked as `Unconfirmed`
     /// * creates a new account for the public key if one does not already exist
     /// Returns the account id for the public key.
-    async fn process_new_payment_for_pubkey(&self, payment: NewPayment)
-        -> Result<i64, Self::Error>;
+    async fn process_new_payment_for_pubkey(&self, payment: NewPayment) -> Result<i64, Self::Error>;
 
     /// Checks whether any orders associated with the given account id can be fulfilled.
     /// If no orders can be fulfilled, an empty vector is returned.
@@ -59,11 +59,7 @@ pub trait PaymentGatewayDatabase: Clone {
     /// Any order that has enough credit in the account
     /// * Will be marked as Paid
     /// * Returned in the result vector.
-    async fn try_pay_orders(
-        &self,
-        account_id: i64,
-        orders: &[Order],
-    ) -> Result<Vec<Order>, Self::Error>;
+    async fn try_pay_orders(&self, account_id: i64, orders: &[Order]) -> Result<Vec<Order>, Self::Error>;
 
     /// Updates the payment status for the given transaction id. This is typically called to transition a payment from
     /// `Unconfirmed` to `Confirmed` or `Cancelled`.
@@ -72,11 +68,7 @@ pub trait PaymentGatewayDatabase: Clone {
     /// If the status is unchanged, then nothing is changed, and `None` is returned.
     ///
     /// If the status is changed, the account id corresponding to the transaction is returned.
-    async fn update_payment_status(
-        &self,
-        tx_id: &str,
-        status: TransferStatus,
-    ) -> Result<Option<i64>, Self::Error>;
+    async fn update_payment_status(&self, tx_id: &str, status: TransferStatus) -> Result<Option<i64>, Self::Error>;
 
     /// Updates the order details for the given order id. Not all fields are permitted to be updated, so
     /// `OrderUpdate` only exposes those that can be changed.
@@ -99,46 +91,44 @@ pub trait OrderManagement {
 pub trait AccountManagement {
     type Error: std::error::Error;
     /// Fetches the user account associated with the given account id. If no account exists, `None` is returned.
-    async fn fetch_user_account(&self, account_id: i64)
-        -> Result<Option<UserAccount>, Self::Error>;
+    async fn fetch_user_account(&self, account_id: i64) -> Result<Option<UserAccount>, Self::Error>;
 
     /// Fetches the user account for the given order id. A user account must have already been created for this account.
     /// If no account is found, `None` will be returned.
     ///
     /// Alternatively, you can search through the memo fields of payments to find a matching order id by calling
     /// [`search_for_user_account_by_memo`].
-    async fn fetch_user_account_for_order(
-        &self,
-        order_id: &OrderId,
-    ) -> Result<Option<UserAccount>, Self::Error>;
+    async fn fetch_user_account_for_order(&self, order_id: &OrderId) -> Result<Option<UserAccount>, Self::Error>;
 
     /// Searches through the memo fields of payments to find an account matching the memo string.
     /// If no account is found, `None` will be returned.
     ///
     /// The `memo_match` is a string that is used to search for a matching order id using `LIKE`.
     /// For example, `format!("%Order id: [{order_id}]%)` will match any memo that contains the order id."
-    async fn search_for_user_account_by_memo(
-        &self,
-        memo_match: &str,
-    ) -> Result<Option<i64>, Self::Error>;
+    async fn search_for_user_account_by_memo(&self, memo_match: &str) -> Result<Option<i64>, Self::Error>;
 
-    async fn fetch_user_account_for_customer_id(
-        &self,
-        customer_id: &str,
-    ) -> Result<Option<UserAccount>, Self::Error>;
-    async fn fetch_user_account_for_pubkey(
-        &self,
-        pubkey: &TariAddress,
-    ) -> Result<Option<UserAccount>, Self::Error>;
+    async fn fetch_user_account_for_customer_id(&self, customer_id: &str) -> Result<Option<UserAccount>, Self::Error>;
+    async fn fetch_user_account_for_address(&self, address: &TariAddress) -> Result<Option<UserAccount>, Self::Error>;
+
+    async fn fetch_orders_for_account(&self, account_id: i64) -> Result<Vec<Order>, Self::Error>;
 }
 
 #[allow(async_fn_in_trait)]
 pub trait AuthManagement {
-    async fn update_nonce_for_address(
-        &self,
-        pubkey: &TariAddress,
-        nonce: u64,
-    ) -> Result<Option<i64>, AuthApiError>;
+    /// Checks whether an account exists for the given address. The function succeeds if the query succeeds, returning
+    /// the existence of the account as a boolean.
+    async fn check_auth_account_exists(&self, address: &TariAddress) -> Result<bool, AuthApiError>;
+    /// Checks whether an address is authorised for **all** of the given roles. The function only succeeds if this is
+    /// the case. If any of the roles are missing, the error [`AuthApiError::RoleNotAllowed(usize)`] is returned,
+    /// with the number of missing roles given as the parameter.
+    /// You can use [`fetch_roles_for_address`] to get valid roles for the address.
+    async fn check_address_has_roles(&self, address: &TariAddress, roles: &[Role]) -> Result<(), AuthApiError>;
+    /// Fetches the roles for the given address. If the address is not found, the request still succeeds and returns
+    /// an empty vector.
+    async fn fetch_roles_for_address(&self, address: &TariAddress) -> Result<Vec<Role>, AuthApiError>;
+    /// Updates the nonce for the given address. The nonce must be strictly increasing, otherwise the error
+    /// [`AuthApiError::InvalidNonce`] is returned.
+    async fn update_nonce_for_address(&self, pubkey: &TariAddress, nonce: u64) -> Result<(), AuthApiError>;
 }
 
 #[macro_export]
@@ -146,6 +136,7 @@ macro_rules! op {
     (binary $for_struct:ident, $impl_trait:ident, $impl_fn:ident) => {
         impl $impl_trait for $for_struct {
             type Output = Self;
+
             fn $impl_fn(self, rhs: Self) -> Self::Output {
                 Self(self.0.$impl_fn(rhs.0))
             }
@@ -163,6 +154,7 @@ macro_rules! op {
     (unary $for_struct:ident, $impl_trait:ident, $impl_fn:ident) => {
         impl $impl_trait for $for_struct {
             type Output = Self;
+
             fn $impl_fn(self) -> Self::Output {
                 Self(self.0.$impl_fn())
             }

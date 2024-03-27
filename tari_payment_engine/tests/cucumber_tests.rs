@@ -1,17 +1,14 @@
 mod cucumber;
 mod support;
 
-use crate::cucumber::ShopifyWorld;
-use ::cucumber::codegen::LocalBoxFuture;
-use ::cucumber::event::ScenarioFinished;
-
-use ::cucumber::{gherkin, writer, World};
+use ::cucumber::{codegen::LocalBoxFuture, event::ScenarioFinished, gherkin, writer, World};
 use futures_util::FutureExt;
 use log::*;
-use sqlx::migrate::MigrateDatabase;
-use sqlx::Sqlite;
+use sqlx::{migrate::MigrateDatabase, Sqlite};
 use tari_payment_engine::PaymentGatewayDatabase;
 use tokio::runtime::Runtime;
+
+use crate::cucumber::ShopifyWorld;
 
 fn main() {
     dotenvy::from_filename(".env.test").ok();
@@ -38,14 +35,14 @@ fn post_test_hook<'a>(
             match ev {
                 ScenarioFinished::StepFailed(_, _, _) | ScenarioFinished::StepSkipped => {
                     error!("🚀️ Error in scenario, database retained: {db_path}");
-                }
+                },
                 ScenarioFinished::StepPassed => {
                     debug!("🚀️ Scenario complete, removing database: {db_path}");
                     if let Err(e) = sys.api.db_mut().close().await {
                         error!("🚀️ Failed to close database: {e}");
                     }
                     Sqlite::drop_database(&db_path).await.unwrap();
-                }
+                },
                 _ => trace!("🚀️ Unhandled event: {ev:?}"),
             }
         } else {
