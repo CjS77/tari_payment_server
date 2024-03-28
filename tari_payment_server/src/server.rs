@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use actix_jwt_auth_middleware::use_jwt::UseJWTOnApp;
-use actix_web::{http::KeepAlive, middleware::Logger, web, App, HttpServer};
+use actix_web::{dev::Server, http::KeepAlive, middleware::Logger, web, App, HttpServer};
 use tari_payment_engine::{AccountApi, AuthApi, OrderManagerApi, SqliteDatabase};
 
 use crate::{
@@ -12,10 +12,15 @@ use crate::{
 };
 
 pub async fn run_server(config: ServerConfig) -> Result<(), ServerError> {
-    let db = SqliteDatabase::new_with_url(&config.database_url)
+    let db = SqliteDatabase::new_with_url(&config.database_url, 25)
         .await
         .map_err(|e| ServerError::InitializeError(e.to_string()))?;
-    HttpServer::new(move || {
+    let srv = create_server_instance(config, db)?;
+    srv.await.map_err(|e| ServerError::Unspecified(e.to_string()))
+}
+
+pub fn create_server_instance(config: ServerConfig, db: SqliteDatabase) -> Result<Server, ServerError> {
+    let srv = HttpServer::new(move || {
         let orders_api = OrderManagerApi::new(db.clone());
         let auth_api = AuthApi::new(db.clone());
         let jwt_signer = TokenIssuer::new(&config.auth);
@@ -39,7 +44,6 @@ pub async fn run_server(config: ServerConfig) -> Result<(), ServerError> {
     })
     .keep_alive(KeepAlive::Timeout(Duration::from_secs(600)))
     .bind((config.host.as_str(), config.port))?
-    .run()
-    .await
-    .map_err(|e| ServerError::Unspecified(e.to_string()))
+    .run();
+    Ok(srv)
 }

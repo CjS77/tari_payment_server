@@ -8,14 +8,13 @@ use tari_payment_engine::{
     PaymentGatewayDatabase,
 };
 
-use crate::cucumber::{shopify_world::OrderManagementSystem, ShopifyWorld};
-
+use crate::cucumber::ShopifyWorld;
 
 #[when(expr = "I receive an order with id {word} from customer '{word}' for {int} XTR")]
 async fn receive_order(world: &mut ShopifyWorld, order_id: String, customer_id: String, price: i64) {
     let id = OrderId::from(order_id);
     let order = NewOrder::new(id, customer_id, MicroTari::from(price * 1_000_000));
-    let _ = world.api().process_new_order(order).await.expect("Error processing order");
+    let _res = world.api().process_new_order(order).await.expect("Error processing order");
 }
 
 #[when(expr = "I receive a wallet payment with txid [{word}] from '{word}' for {int} XTR")]
@@ -36,17 +35,17 @@ async fn wallet_payment(world: &mut ShopifyWorld, txid: String, pubkey: String, 
     if let Some(memo) = memo {
         payment = payment.with_memo(memo);
     }
-    let _ = world.api().process_new_payment(payment).await.expect("Error processing payment");
+    let _res = world.api().process_new_payment(payment).await.expect("Error processing payment");
 }
 
 #[when(expr = "payment [{word}] confirms")]
 async fn confirm_payment(world: &mut ShopifyWorld, txid: String) {
-    let _ = world.api().confirm_transaction(txid).await.expect("Error confirming payment");
+    let _res = world.api().confirm_transaction(txid).await.expect("Error confirming payment");
 }
 
 #[when(expr = "payment [{word}] is cancelled")]
 async fn cancel_payment(world: &mut ShopifyWorld, txid: String) {
-    let _ = world.api().cancel_transaction(txid).await.expect("Error cancelling payment");
+    world.api().cancel_transaction(txid).await.expect("Error cancelling payment");
 }
 
 #[when(expr = "I pause for {int}ms")]
@@ -158,7 +157,7 @@ async fn update_order(world: &mut ShopifyWorld, oid: OrderId, field: String, val
         _ => panic!("Unknown field {field}"),
     }
     let db = world.api().db();
-    let _ = db.update_order(&oid, update).await.expect("Error updating order");
+    db.update_order(&oid, update).await.expect("Error updating order");
 }
 
 #[then(expr = "the confirmation status for payment #{int} is {string}")]

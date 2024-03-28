@@ -19,6 +19,7 @@ use crate::errors::ServerError;
 const DEFAULT_TPG_HOST: &str = "127.0.0.1";
 const DEFAULT_TPG_PORT: u16 = 8360;
 
+#[derive(Clone, Debug)]
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
@@ -80,7 +81,7 @@ pub struct AuthConfig {
 
 impl Default for AuthConfig {
     fn default() -> Self {
-        let mut tmpfile = NamedTempFile::new().ok().map(|f| f.keep().ok()).flatten();
+        let mut tmpfile = NamedTempFile::new().ok().and_then(|f| f.keep().ok());
         warn!(
             "🚨🚨🚨 The JWT signing key has not been set. I'm using a random value for this session.DO NOT operate on \
              production like this since you may lose access to data. 🚨🚨🚨"
@@ -125,12 +126,12 @@ impl AuthConfig {
         let vk = RistrettoPublicKey::from_hex(&jwt_pk_hex).map_err(|e| {
             ServerError::ConfigurationError(format!("Invalid verification key in TPG_JWT_VERIFICATION_KEY: {e}"))
         })?;
-        if vk != expected {
-            Err(ServerError::ConfigurationError(
-                "The verification key does not match the signing key. Check you configuration.".to_string(),
-            ))
-        } else {
+        if vk == expected {
             Ok(Self { jwt_signing_key: Ristretto256SigningKey(sk), jwt_verification_key: Ristretto256VerifyingKey(vk) })
+        } else {
+            Err(ServerError::ConfigurationError(
+                "The verification key does not match the signing key. Check your configuration.".to_string(),
+            ))
         }
     }
 }

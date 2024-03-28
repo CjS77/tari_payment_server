@@ -1,5 +1,4 @@
 mod cucumber;
-mod support;
 
 use ::cucumber::{codegen::LocalBoxFuture, event::ScenarioFinished, gherkin, writer, World};
 use futures_util::FutureExt;

@@ -45,5 +45,6 @@ mock! {
         async fn check_auth_account_exists(&self, address: &TariAddress) -> Result<bool, AuthApiError>;
         async fn check_address_has_roles(&self, address: &TariAddress, roles: &[Role]) -> Result<(), AuthApiError>;
         async fn fetch_roles_for_address(&self, address: &TariAddress) -> Result<Vec<Role>, AuthApiError>;
+        async fn assign_roles(&self, address: &TariAddress, roles: &[Role]) -> Result<(), AuthApiError>;
     }
 }

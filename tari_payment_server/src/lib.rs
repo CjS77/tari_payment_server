@@ -14,8 +14,6 @@
 
 #![feature(type_alias_impl_trait)]
 
-extern crate core;
-
 pub mod auth;
 pub mod cli;
 pub mod config;

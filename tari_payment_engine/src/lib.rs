@@ -20,6 +20,9 @@ pub mod db_types;
 pub mod events;
 mod order_manager;
 
+#[cfg(any(feature = "test_utils", test))]
+pub mod test_utils;
+
 pub use db::common::{
     AccountManagement,
     AuthManagement,

@@ -25,18 +25,17 @@ pub type TpsAuthority = Authority<JwtClaims, Ristretto256, impl Handler<(), Outp
 
 pub fn build_jwt_signer(jwt_signing_key: Ristretto256SigningKey) -> TokenSigner<JwtClaims, Ristretto256> {
     let header = Header::empty().with_token_type("JWT");
-    let token_signer = TokenSigner::new()
+    TokenSigner::new()
         .signing_key(jwt_signing_key)
         .algorithm(Ristretto256)
         .header(header)
         .build()
-        .expect("Failed to build token signer");
-    token_signer
+        .expect("Failed to build token signer")
 }
 pub fn build_tps_authority(auth_config: AuthConfig) -> TpsAuthority {
     let AuthConfig { jwt_signing_key, jwt_verification_key } = auth_config;
     let token_signer = build_jwt_signer(jwt_signing_key);
-    let authority = Authority::<JwtClaims, Ristretto256, _, _>::new()
+    Authority::<JwtClaims, Ristretto256, _, _>::new()
         .refresh_authorizer(|| async { Ok(()) })
         .enable_header_tokens(true)
         .renew_access_token_automatically(false)
@@ -46,8 +45,7 @@ pub fn build_tps_authority(auth_config: AuthConfig) -> TpsAuthority {
         .verifying_key(jwt_verification_key)
         .token_signer(Some(token_signer))
         .build()
-        .expect("Failed to build authority");
-    authority
+        .expect("Failed to build authority")
 }
 
 pub fn check_login_token_signature<S: AsRef<str>>(token: S) -> Result<LoginToken, AuthError> {

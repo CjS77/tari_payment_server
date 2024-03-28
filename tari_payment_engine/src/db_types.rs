@@ -18,6 +18,8 @@ use crate::op;
 #[sqlx(transparent)]
 pub struct MicroTari(i64);
 
+pub const T: MicroTari = MicroTari(1_000_000);
+
 op!(binary MicroTari, Add, add);
 op!(binary MicroTari, Sub, sub);
 op!(inplace MicroTari, SubAssign, sub_assign);
@@ -64,6 +66,10 @@ impl Display for MicroTari {
 impl MicroTari {
     pub fn value(&self) -> i64 {
         self.0
+    }
+
+    pub fn from_tari(tari: i64) -> Self {
+        Self(tari * 1_000_000)
     }
 }
 
@@ -195,6 +201,10 @@ impl Display for OrderId {
 }
 
 impl OrderId {
+    pub fn new<S: Into<String>>(id: S) -> Self {
+        Self(id.into())
+    }
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -394,7 +404,7 @@ impl From<String> for TransferStatus {
 
 pub type Roles = Vec<Role>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
     ReadAll,

@@ -98,11 +98,6 @@ impl OrderQueryFilter {
         self
     }
 
-    pub fn with_order_id(mut self, order_id: OrderId) -> Self {
-        self.order_id = Some(order_id);
-        self
-    }
-
     pub fn with_account_id(mut self, account_id: i64) -> Self {
         self.account_id = Some(account_id);
         self

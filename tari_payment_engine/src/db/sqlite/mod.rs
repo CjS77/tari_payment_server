@@ -23,7 +23,7 @@ pub fn db_url() -> String {
     result
 }
 
-pub async fn new_pool(url: &str) -> Result<SqlitePool, SqliteDatabaseError> {
-    let pool = SqlitePoolOptions::new().max_connections(5).connect(url).await?;
+pub async fn new_pool(url: &str, max_connections: u32) -> Result<SqlitePool, SqliteDatabaseError> {
+    let pool = SqlitePoolOptions::new().max_connections(max_connections).connect(url).await?;
     Ok(pool)
 }

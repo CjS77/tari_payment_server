@@ -259,6 +259,15 @@ impl AuthManagement for SqliteDatabase {
         let mut conn = self.pool.acquire().await.map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
         auth::update_nonce_for_address(address, nonce, &mut conn).await
     }
+
+    async fn assign_roles(&self, address: &TariAddress, roles: &[Role]) -> Result<(), AuthApiError> {
+        let mut tx = self.pool.begin().await.map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
+        auth::assign_roles(address, roles, &mut tx).await?;
+        auth::create_auth_log(address, &mut tx).await?;
+        tx.commit().await.map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
+        debug!("🔑 Roles {roles:?} assigned to {}", address.to_hex());
+        Ok(())
+    }
 }
 
 impl OrderManagement for SqliteDatabase {
@@ -272,14 +281,14 @@ impl OrderManagement for SqliteDatabase {
 
 impl SqliteDatabase {
     /// Creates a new database API object
-    pub async fn new() -> Result<Self, SqliteDatabaseError> {
+    pub async fn new(max_connections: u32) -> Result<Self, SqliteDatabaseError> {
         let url = db_url();
-        SqliteDatabase::new_with_url(url.as_str()).await
+        SqliteDatabase::new_with_url(url.as_str(), max_connections).await
     }
 
-    pub async fn new_with_url(url: &str) -> Result<Self, SqliteDatabaseError> {
+    pub async fn new_with_url(url: &str, max_connections: u32) -> Result<Self, SqliteDatabaseError> {
         trace!("Creating new database connection pool with url {url}");
-        let pool = new_pool(url).await?;
+        let pool = new_pool(url, max_connections).await?;
         let url = url.to_string();
         Ok(Self { url, pool })
     }

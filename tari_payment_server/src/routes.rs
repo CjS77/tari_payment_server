@@ -46,6 +46,7 @@ macro_rules! route {
     ($name:ident => $method:ident $path:literal impl $($bounds:ty),+) => {
         paste! { pub struct [<$name:camel Route>]<A>(PhantomData<fn() -> A>);}
         paste! { impl<A> [<$name:camel Route>]<A> {
+            #[allow(clippy::new_without_default)]
             pub fn new() -> Self {
                 Self(PhantomData::<fn() -> A>)
             }
@@ -65,6 +66,7 @@ macro_rules! route {
     };
 }
 
+route!(auth => Post "/auth" impl AuthManagement);
 /// Route handler for the auth endpoint
 ///
 /// This route is used to authenticate a user and issue a JWT token.
@@ -80,7 +82,6 @@ macro_rules! route {
 /// If successful, the server will issue a JWT token that can be used to authenticate future requests.
 /// The JWT is valid for a relatively short period and will NOT refresh.
 //#[post("/auth")]
-route!(auth => Post "/auth" impl AuthManagement);
 pub async fn auth<A>(
     req: HttpRequest,
     api: web::Data<AuthApi<A>>,
@@ -97,11 +98,13 @@ where
     })?;
     let token = check_login_token_signature(login_token)?;
     debug!("💻️ Login token was validated for {token:?}");
-    let _ = api.update_nonce_for_address(&token.address, token.nonce).await?;
+    api.update_nonce_for_address(&token.address, token.nonce).await?;
+    api.check_address_has_roles(&token.address, &token.desired_roles).await?;
     let access_token = signer.issue_token(token, None)?;
     Ok(HttpResponse::Ok().content_type("application/json").body(access_token))
 }
 
+route!(my_account => Get "/account" impl AccountManagement);
 /// Route handler for the account endpoint
 ///
 /// This route is used to fetch account information for a given address. The address that is queried is the one that
@@ -109,7 +112,6 @@ where
 ///
 /// To access other accounts, the user must have the `ReadAll` role and can use the `/account/{address}` endpoint.
 //#[get("/account/")]
-route!(my_account => Get "/account" impl AccountManagement);
 pub async fn my_account<B: AccountManagement>(
     claims: JwtClaims,
     api: web::Data<AccountApi<B>>,
@@ -118,6 +120,7 @@ pub async fn my_account<B: AccountManagement>(
     get_account(&claims.address, api.as_ref()).await
 }
 
+route!(account => Get "/account/{address}" impl AccountManagement);
 /// Route handler for the account/{address} endpoint
 ///
 /// This route is used to fetch account information for a given address. The address that is queried is the one that
@@ -127,7 +130,6 @@ pub async fn my_account<B: AccountManagement>(
 /// Otherwise, the user can only access their own account. It is usually more convenient to use the `/account` endpoint
 /// for this purpose.
 //#[get("/account/{address}")]
-route!(account => Get "/account/{address}" impl AccountManagement);
 pub async fn account<B: AccountManagement>(
     claims: JwtClaims,
     path: web::Path<String>,

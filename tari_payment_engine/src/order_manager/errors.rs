@@ -20,6 +20,8 @@ pub enum AuthApiError {
     AddressNotFound,
     #[error("User requested at least {0} roles that are not allowed")]
     RoleNotAllowed(usize),
+    #[error("The requested role does not exist")]
+    RoleNotFound,
 }
 
 #[derive(Debug, Clone, Error)]

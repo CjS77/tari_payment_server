@@ -128,7 +128,8 @@ pub trait AuthManagement {
     async fn fetch_roles_for_address(&self, address: &TariAddress) -> Result<Vec<Role>, AuthApiError>;
     /// Updates the nonce for the given address. The nonce must be strictly increasing, otherwise the error
     /// [`AuthApiError::InvalidNonce`] is returned.
-    async fn update_nonce_for_address(&self, pubkey: &TariAddress, nonce: u64) -> Result<(), AuthApiError>;
+    async fn update_nonce_for_address(&self, address: &TariAddress, nonce: u64) -> Result<(), AuthApiError>;
+    async fn assign_roles(&self, address: &TariAddress, roles: &[Role]) -> Result<(), AuthApiError>;
 }
 
 #[macro_export]

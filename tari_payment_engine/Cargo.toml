@@ -6,8 +6,11 @@ description = "Database backend for Tari payment gateway"
 
 [dependencies]
 chrono = { version = "0.4.31", features = ["serde"] }
+dotenvy = {  version = "0.15.0", optional = true }
+env_logger = {  version = "0.11.3", optional = true }
 futures-util = "0.3.30"
 log = "0.4.17"
+rand = {  version = "0.8.5", optional = true }
 serde = { version = "1.0.130", features = ["derive"] }
 serde_json = "1.0.68"
 sqlx = { version = "0.7.3", features = ["runtime-tokio", "chrono"] }
@@ -21,14 +24,13 @@ default = ["sqlite"]
 sqlite = ["sqlx/sqlite"]
 postgres = ["sqlx/postgres"]
 libtest = ["cucumber/libtest"]
+test_utils = ["dotenvy", "env_logger", "rand"]
+test_features = ["sqlite", "test_utils"]
 
 [dev-dependencies]
-dotenvy = "0.15.0"
-env_logger = "0.11.3"
 cucumber = { version = "0.20", features = ["libtest"] }
 futures-util = "0.3.30"
 once_cell = "1.19.0"
-rand = "0.8.5"
 
 [[test]]
 name = "cucumber_tests" # this should be the same as the filename of your test target

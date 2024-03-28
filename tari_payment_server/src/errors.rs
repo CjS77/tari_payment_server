@@ -99,6 +99,9 @@ impl From<AuthApiError> for ServerError {
                 Self::AuthenticationError(AuthError::InsufficientPermissions(e.to_string()))
             },
             AuthApiError::DatabaseError(e) => Self::BackendError(format!("Database error: {e}")),
+            AuthApiError::RoleNotFound => {
+                Self::BackendError(format!("Role definitions in Database and Code have diverged. {e}"))
+            },
         }
     }
 }

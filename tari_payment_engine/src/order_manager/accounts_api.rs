@@ -43,10 +43,6 @@ where B: AccountManagement
             Ok(None) => return Ok(None),
             Err(e) => return Err(e),
         };
-        self.db
-            .fetch_orders_for_account(id)
-            .await
-            .map(|v| Some(v))
-            .map_err(|e| AccountApiError::DatabaseError(e.to_string()))
+        self.db.fetch_orders_for_account(id).await.map(Some).map_err(|e| AccountApiError::DatabaseError(e.to_string()))
     }
 }

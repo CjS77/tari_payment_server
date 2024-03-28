@@ -2,7 +2,6 @@ use actix_web::{http::StatusCode, web, web::ServiceConfig};
 use chrono::{Days, TimeZone, Utc};
 use log::debug;
 use tari_common_types::tari_address::TariAddress;
-use tari_jwt::tari_crypto::tari_utilities::hex::Hex;
 use tari_payment_engine::{
     db_types::{MicroTari, Order, OrderId, OrderStatusType, Role, UserAccount},
     AccountApi,

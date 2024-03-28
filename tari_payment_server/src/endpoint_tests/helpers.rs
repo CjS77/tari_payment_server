@@ -36,8 +36,7 @@ pub fn issue_token(claims: JwtClaims, expiry: DateTime<Utc>) -> String {
     let signer = Ristretto256 {};
     let mut claims = Claims::<JwtClaims>::new(claims);
     claims.expiration = Some(expiry);
-    let token = signer.token(&header, &claims, &config.jwt_signing_key).expect("Failed to sign token");
-    token
+    signer.token(&header, &claims, &config.jwt_signing_key).expect("Failed to sign token")
 }
 
 pub async fn get_request(

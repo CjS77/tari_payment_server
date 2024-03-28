@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "e2e",
     "tari_payment_engine",
     "tari_payment_server",
     "tpg_common"

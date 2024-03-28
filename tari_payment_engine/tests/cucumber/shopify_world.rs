@@ -1,9 +1,11 @@
 use cucumber::World;
 use log::*;
-use tari_payment_engine::{OrderManagerApi, SqliteDatabase};
+use tari_payment_engine::{
+    test_utils::prepare_env::{create_database, random_db_path, run_migrations},
+    OrderManagerApi,
+    SqliteDatabase,
+};
 use tokio::time::sleep;
-
-use crate::support::prepare_env::{create_database, random_db_path, run_migrations};
 
 #[derive(Default, Debug, World)]
 pub struct ShopifyWorld {
@@ -25,7 +27,7 @@ impl ShopifyWorld {
 impl OrderManagementSystem {
     pub async fn new() -> Self {
         let url = prepare_test_env().await;
-        let db = SqliteDatabase::new_with_url(&url).await.expect("Error creating connection to database");
+        let db = SqliteDatabase::new_with_url(&url, 1).await.expect("Error creating connection to database");
         debug!("Created database: {url}");
         sleep(std::time::Duration::from_millis(50)).await;
         let api = OrderManagerApi::new(db);

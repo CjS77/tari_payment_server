@@ -22,7 +22,7 @@ INSERT INTO roles VALUES
 ;
 
 CREATE TABLE role_assignments (
-    address INTEGER NOT NULL REFERENCES auth_log(address) ON DELETE CASCADE,
+    address INTEGER NOT NULL,
     role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE
 );
 
