@@ -4,9 +4,6 @@ Feature: Users receive an access token when authenticating with a login token
 
   Scenario: User authenticates without a login token
     When I authenticate with the auth header
-      """
-      foo: bar
-      """
     Then I receive a 400 BadRequest response with the message '{"error":"Auth token signature invalid or not provided"}'
 
 
@@ -52,5 +49,12 @@ Feature: Users receive an access token when authenticating with a login token
     Then I receive a 200 Ok response
     When Alice authenticates with nonce = 1 and roles = "user"
     Then I receive a 401 Unauthorized response with the message 'Nonce is not strictly increasing'
+
+  Scenario: User can authenticate multiple times
+    Given some role assignments
+    When Alice authenticates with nonce = 1 and roles = "user"
+    Then I receive a 200 Ok response
+    When Alice authenticates with nonce = 2 and roles = "user"
+    Then I receive a 200 Ok response
 
 
