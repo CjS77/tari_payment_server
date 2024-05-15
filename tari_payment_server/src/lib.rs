@@ -17,6 +17,7 @@
 pub mod auth;
 pub mod cli;
 pub mod config;
+pub mod data_objects;
 pub mod errors;
 
 pub mod helpers;

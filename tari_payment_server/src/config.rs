@@ -83,8 +83,8 @@ impl Default for AuthConfig {
     fn default() -> Self {
         let mut tmpfile = NamedTempFile::new().ok().and_then(|f| f.keep().ok());
         warn!(
-            "🚨🚨🚨 The JWT signing key has not been set. I'm using a random value for this session.DO NOT operate on \
-             production like this since you may lose access to data. 🚨🚨🚨"
+            "🚨️🚨️🚨️ The JWT signing key has not been set. I'm using a random value for this session.DO NOT operate on \
+             production like this since you may lose access to data. 🚨️🚨️🚨️"
         );
         let mut rng = thread_rng();
         let (sk, pk) = RistrettoPublicKey::random_keypair(&mut rng);
@@ -97,9 +97,9 @@ impl Default for AuthConfig {
                 .to_string();
                 match writeln!(f, "{key_data}") {
                     Ok(()) => warn!(
-                        "🚨🚨🚨 The JWT signing key for this session was written to {}. If this is a production \
+                        "🚨️🚨️🚨️ The JWT signing key for this session was written to {}. If this is a production \
                          instance, you are doing it wrong! Set the TPG_JWT_SIGNING_KEY and TPG_JWT_VERIFICATION_KEY \
-                         environment variables instead. 🚨🚨🚨",
+                         environment variables instead. 🚨️🚨️🚨️",
                         p.to_str().unwrap_or("???")
                     ),
                     Err(e) => warn!("Could not write the JWT signing key to the temporary file. {e}"),

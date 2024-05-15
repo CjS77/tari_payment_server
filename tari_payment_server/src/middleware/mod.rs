@@ -1,3 +1,3 @@
 mod acl;
 
-pub use acl::{AclMiddlewareService, AclMiddlewareFactory};
+pub use acl::{AclMiddlewareFactory, AclMiddlewareService};

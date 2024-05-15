@@ -80,6 +80,21 @@ fn super_admin() -> UserInfo {
     }
 }
 
+pub struct SuperAdmin(UserInfo);
+
+impl SuperAdmin {
+    pub fn new() -> Self {
+        Self(super_admin())
+    }
+
+    pub fn token(&self, nonce: u64) -> String {
+        let claims = LoginToken { address: self.0.address.clone(), nonce, desired_roles: vec![Role::SuperAdmin] };
+        let claims = Claims::new(claims);
+        let header = Header::empty().with_token_type("JWT");
+        Ristretto256.token(&header, &claims, &Ristretto256SigningKey(self.0.secret.clone())).unwrap()
+    }
+}
+
 pub struct SeedUsers {
     pub users: HashMap<&'static str, UserInfo>,
 }
@@ -131,6 +146,7 @@ async fn fresh_database(world: &mut TPGWorld) {
     for order in seed_orders() {
         db.fetch_or_create_account(Some(order), None).await.unwrap();
     }
+    world.start_server().await;
 }
 
 #[given("some role assignments")]

@@ -31,30 +31,33 @@ Feature: Users receive an access token when authenticating with a login token
   Scenario: User authenticates with a valid token signature, but asks for roles they aren't entitled to
     Given some role assignments
     When Alice authenticates with nonce = 1 and roles = "user, read_all, write"
-    Then I receive a 403 Forbidden response with the message 'Authentication Error. Insufficient Permissions.'
+    Then I receive a 403 Forbidden response with the message 'Insufficient Permissions.'
 
   Scenario: User authenticates with a valid token
     Given some role assignments
     When Alice authenticates with nonce = 1 and roles = "user"
-    Then I receive a 200 Ok response with the message 'InJvbGVzIjpbInVzZXIiXX0'
+    Then I am logged in
+    Then my access token starts with 'eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ'
 
   Scenario: User authenticates with a valid token, asks for a subset of roles
     Given some role assignments
     When Admin authenticates with nonce = 1 and roles = "user, read_all"
-    Then I receive a 200 Ok response with the message 'InJvbGVzIjpbInVzZXIiLCJyZWFkX2FsbCJdfQ'
+    Then I am logged in
+    Then my access token starts with 'eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ'
 
   Scenario: User authenticates with an invalid nonce
     Given some role assignments
     When Alice authenticates with nonce = 1 and roles = "user"
-    Then I receive a 200 Ok response
+    Then I am logged in
     When Alice authenticates with nonce = 1 and roles = "user"
     Then I receive a 401 Unauthorized response with the message 'Nonce is not strictly increasing'
 
   Scenario: User can authenticate multiple times
     Given some role assignments
     When Alice authenticates with nonce = 1 and roles = "user"
-    Then I receive a 200 Ok response
+    Then I am logged in
     When Alice authenticates with nonce = 2 and roles = "user"
-    Then I receive a 200 Ok response
+    Then I am logged in
+
 
 

@@ -34,9 +34,9 @@ pub async fn roles_for_address(address: &TariAddress, conn: &mut SqliteConnectio
             WHERE address = ?"#,
         address
     )
-        .fetch_all(conn)
-        .await
-        .map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
+    .fetch_all(conn)
+    .await
+    .map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
     let roles = result
         .iter()
         .filter_map(|r| r.name.as_ref())
@@ -59,7 +59,7 @@ pub async fn address_has_roles(
                 WHERE address = ? AND name IN ({role_strings})"#
     );
     #[allow(clippy::cast_possible_truncation)]
-        let num_matching_roles = sqlx::query(&q)
+    let num_matching_roles = sqlx::query(&q)
         .bind(address)
         .fetch_one(conn)
         .await
@@ -73,19 +73,27 @@ pub async fn address_has_roles(
     }
 }
 
-pub async fn update_nonce_for_address(
+pub async fn upsert_nonce_for_address(
     address: &TariAddress,
     nonce: u64,
     conn: &mut SqliteConnection,
 ) -> Result<(), AuthApiError> {
     let address = address.to_hex();
     #[allow(clippy::cast_possible_wrap)]
-        let nonce = nonce as i64;
-    let res = sqlx::query!("UPDATE auth_log SET last_nonce = ? WHERE address = ?", nonce, address).execute(conn).await;
+    let nonce = nonce as i64;
+    let res = sqlx::query!(
+        r#"INSERT INTO auth_log (address, last_nonce) VALUES (?, ?) ON CONFLICT(address) DO
+    UPDATE SET last_nonce = excluded.last_nonce"#,
+        nonce,
+        address
+    )
+    .execute(conn)
+    .await;
     debug!("{res:?}");
     res.map_err(|e| {
         if let sqlx::Error::Database(ref de) = e {
             if let Some(code) = de.code() {
+                // TRIGGER on increasing nonce violation
                 if code.as_ref() == "1811" {
                     return AuthApiError::InvalidNonce;
                 }
@@ -93,11 +101,11 @@ pub async fn update_nonce_for_address(
         }
         AuthApiError::DatabaseError(e.to_string())
     })
-        .and_then(|res| match res.rows_affected() {
-            0 => Err(AuthApiError::AddressNotFound),
-            1 => Ok(()),
-            _ => unreachable!("Updating auth log should only affect one row"),
-        })
+    .and_then(|res| match res.rows_affected() {
+        0 => Err(AuthApiError::AddressNotFound),
+        1 => Ok(()),
+        _ => unreachable!("Updating auth log should only affect one row"),
+    })
 }
 
 async fn fetch_roles(conn: &mut SqliteConnection) -> Result<HashMap<Role, i64>, AuthApiError> {
@@ -171,24 +179,7 @@ pub async fn remove_roles(
         values.push_bind(*id);
     });
     qb.push(")");
-    let res = qb.build().execute(conn).await
-        .map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
+    let res = qb.build().execute(conn).await.map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
 
     Ok(res.rows_affected())
 }
-
-
-pub async fn create_auth_log(address: &TariAddress, conn: &mut SqliteConnection) -> Result<(), AuthApiError> {
-    let address = address.to_hex();
-    let res = sqlx::query!("INSERT INTO auth_log (address, last_nonce) VALUES (?, 0)", address)
-        .execute(conn)
-        .await
-        .map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
-    if res.rows_affected() == 1 {
-        Ok(())
-    } else {
-        error!("Expected to insert 1 row, but inserted {}", res.rows_affected());
-        Err(AuthApiError::DatabaseError("Internal error. Report this to the developers".to_string()))
-    }
-}
-

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use actix_jwt_auth_middleware::{Authority, FromRequest, TokenSigner};
 use actix_web::{error::Error as ActixWebError, Handler};
-use log::debug;
+use log::*;
 use serde::{Deserialize, Serialize};
 use tari_common_types::tari_address::TariAddress;
 use tari_jwt::{
@@ -60,7 +60,7 @@ pub fn check_login_token_signature<S: AsRef<str>>(token: S) -> Result<LoginToken
         .validate(&untrusted_token)
         .map_err(|e| AuthError::ValidationError(format!("{e}")))?
         .into_parts();
-    debug!("Login token validated successfully. Header: {header:?}. Claims: {claims:?}");
+    trace!("Login token validated successfully. Header: {header:?}. Claims: {claims:?}");
     Ok(claims.custom)
 }
 

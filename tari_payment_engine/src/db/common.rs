@@ -126,6 +126,22 @@ pub trait AuthManagement {
     /// Fetches the roles for the given address. If the address is not found, the request still succeeds and returns
     /// an empty vector.
     async fn fetch_roles_for_address(&self, address: &TariAddress) -> Result<Vec<Role>, AuthApiError>;
+
+    /// Creates a new login record for the given address.
+    async fn create_auth_log(&self, address: &TariAddress, nonce: u64) -> Result<(), AuthApiError>;
+
+    /// Checks the nonce for the given address, creating a new login record if necessary. If the nonce is not strictly
+    /// increasing, the error [`AuthApiError::InvalidNonce`] is returned.
+    ///
+    /// The default implementation of this function is to call [`check_auth_account_exists`] and [`create_auth_log`]
+    async fn upsert_nonce_for_address(&self, address: &TariAddress, nonce: u64) -> Result<(), AuthApiError> {
+        if self.check_auth_account_exists(address).await? {
+            self.update_nonce_for_address(address, nonce).await
+        } else {
+            self.create_auth_log(address, nonce).await
+        }
+    }
+
     /// Updates the nonce for the given address. The nonce must be strictly increasing, otherwise the error
     /// [`AuthApiError::InvalidNonce`] is returned.
     async fn update_nonce_for_address(&self, address: &TariAddress, nonce: u64) -> Result<(), AuthApiError>;

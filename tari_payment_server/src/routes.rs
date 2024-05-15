@@ -23,7 +23,7 @@
 //! ```
 use std::{marker::PhantomData, str::FromStr};
 
-use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder, delete};
+use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use log::*;
 use paste::paste;
 use tari_common_types::tari_address::TariAddress;
@@ -31,6 +31,7 @@ use tari_payment_engine::{db_types::Role, AccountApi, AccountManagement, AuthApi
 
 use crate::{
     auth::{check_login_token_signature, JwtClaims, TokenIssuer},
+    data_objects::RoleUpdateRequest,
     errors::ServerError,
     shopify_order::ShopifyOrder,
 };
@@ -60,6 +61,29 @@ macro_rules! route {
                     .name(stringify!($name))
                     .guard(actix_web::guard::$method())
                     .to($name::<A>);
+                actix_web::dev::HttpServiceFactory::register(res, config);
+            }
+        }}
+    };
+
+    ($name:ident => $method:ident $path:literal impl $($bounds:ty),+ where requires [$($roles:ty),+])  => {
+        paste! { pub struct [<$name:camel Route>]<A>(PhantomData<fn() -> A>);}
+        paste! { impl<A> [<$name:camel Route>]<A> {
+            #[allow(clippy::new_without_default)]
+            pub fn new() -> Self {
+                Self(PhantomData::<fn() -> A>)
+            }
+        }}
+        paste! { impl<A> actix_web::dev::HttpServiceFactory for [<$name:camel Route>]<A>
+        where
+            A: $($bounds)++ 'static,
+        {
+            fn register(self, config: &mut actix_web::dev::AppService) {
+                let res = actix_web::Resource::new($path)
+                    .name(stringify!($name))
+                    .guard(actix_web::guard::$method())
+                    .to($name::<A>)
+                    .wrap(crate::middleware::AclMiddlewareFactory::new(&[$($roles),+]));
                 actix_web::dev::HttpServiceFactory::register(res, config);
             }
         }}
@@ -98,9 +122,14 @@ where
     })?;
     let token = check_login_token_signature(login_token)?;
     debug!("💻️ Login token was validated for {token:?}");
-    api.update_nonce_for_address(&token.address, token.nonce).await?;
-    api.check_address_has_roles(&token.address, &token.desired_roles).await?;
+    api.upsert_nonce_for_address(&token.address, token.nonce).await?;
+    trace!("💻️ Confirming auth request is valid for roles for {}", token.address);
+    api.check_address_has_roles(&token.address, &token.desired_roles).await.map_err(|e| {
+        debug!("💻️ User cannot be authenticated for requested roles. {e}");
+        ServerError::InsufficientPermissions(e.to_string())
+    })?;
     let access_token = signer.issue_token(token, None)?;
+    trace!("💻️ Issued access token");
     Ok(HttpResponse::Ok().content_type("application/json").body(access_token))
 }
 
@@ -120,7 +149,7 @@ pub async fn my_account<B: AccountManagement>(
     get_account(&claims.address, api.as_ref()).await
 }
 
-route!(account => Get "/account/{address}" impl AccountManagement);
+route!(account => Get "/account/{address}" impl AccountManagement where requires [Role::ReadAll]);
 /// Route handler for the account/{address} endpoint
 ///
 /// This route is used to fetch account information for a given address. The address that is queried is the one that
@@ -225,36 +254,21 @@ pub async fn shopify_webhook(req: HttpRequest, body: web::Bytes) -> Result<HttpR
     Ok(HttpResponse::Ok().finish())
 }
 
-#[post("/roles/{address}")]
-pub async fn add_roles(
-    _claims: JwtClaims,
-    path: web::Path<String>,
-    //api: web::Data<AccountApi<B>>,
+//#[post("/roles/")]
+route!(update_roles => Post "/roles" impl AuthManagement where requires [Role::SuperAdmin]);
+pub async fn update_roles<B: AuthManagement>(
+    api: web::Data<AuthApi<B>>,
+    body: web::Json<Vec<RoleUpdateRequest>>,
 ) -> Result<HttpResponse, ServerError> {
-    let addr_s = path.into_inner();
-    let address = TariAddress::from_str(&addr_s).map_err(|e| {
-        info!("💻️ Invalid Tari address. {e}");
-        ServerError::InvalidRequestPath(e.to_string())
-    })?;
-    debug!("💻️ POST add_roles for {addr_s}");
-
-    //api.add_roles(&address, vec![Role::ReadAll]).await?;
-    Ok(HttpResponse::Ok().finish())
-}
-
-#[delete("/roles/{address}")]
-pub async fn remove_roles(
-    _claims: JwtClaims,
-    path: web::Path<String>,
-    //api: web::Data<AccountApi<B>>,
-) -> Result<HttpResponse, ServerError> {
-    let addr_s = path.into_inner();
-    let address = TariAddress::from_str(&addr_s).map_err(|e| {
-        info!("💻️ Invalid Tari address. {e}");
-        ServerError::InvalidRequestPath(e.to_string())
-    })?;
-    debug!("💻️ DELETE remove_roles for {addr_s}");
-
-    //api.remove_roles(&address, vec![Role::ReadAll]).await?;
+    for acl_request in body.into_inner().into_iter() {
+        let address = acl_request.address;
+        let address = TariAddress::from_str(&address).map_err(|e| {
+            debug!("💻️ Could not parse address. {e}");
+            ServerError::InvalidRequestPath(e.to_string())
+        })?;
+        debug!("💻️ POST update roles for {address}");
+        api.assign_roles(&address, &acl_request.apply).await?;
+        api.remove_roles(&address, &acl_request.revoke).await?;
+    }
     Ok(HttpResponse::Ok().finish())
 }

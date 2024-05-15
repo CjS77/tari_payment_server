@@ -13,6 +13,7 @@ use tari_payment_server::{
     config::{AuthConfig, ServerConfig},
     server::create_server_instance,
 };
+
 use crate::cucumber::setup::UserInfo;
 
 #[derive(Debug, Clone, World)]
@@ -24,6 +25,7 @@ pub struct TPGWorld {
     pub server_handle: Option<ServerHandle>,
     // The access token received from the server if a successful auth request was made
     pub access_token: Option<String>,
+    pub logged_in: bool,
     pub response: Option<(StatusCode, String)>,
 }
 
@@ -38,7 +40,16 @@ impl Default for TPGWorld {
             database_url: url.clone(),
             auth: AuthConfig::default(),
         };
-        Self { config, url, db: None, super_admin: None, server_handle: None, response: None, access_token: None }
+        Self {
+            config,
+            url,
+            db: None,
+            super_admin: None,
+            server_handle: None,
+            response: None,
+            access_token: None,
+            logged_in: false,
+        }
     }
 }
 
@@ -90,7 +101,7 @@ impl TPGWorld {
 
     pub async fn request<F>(&self, method: Method, path: &str, req: F) -> (StatusCode, String)
     where F: FnOnce(RequestBuilder) -> RequestBuilder {
-        let url = format!("http://{}:{}/{path}", self.config.host, self.config.port);
+        let url = format!("http://{}:{}{path}", self.config.host, self.config.port);
         debug!("🌍️ Querying {url}");
         let client = Client::new();
         let request = client.request(method, url);

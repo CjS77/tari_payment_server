@@ -255,17 +255,27 @@ impl AuthManagement for SqliteDatabase {
         auth::roles_for_address(address, &mut conn).await
     }
 
+    async fn create_auth_log(&self, _address: &TariAddress, _nonce: u64) -> Result<(), AuthApiError> {
+        // Sqlite uses upsert
+        Ok(())
+    }
+
+    // Overriding this because we can use upserts
+    async fn upsert_nonce_for_address(&self, address: &TariAddress, nonce: u64) -> Result<(), AuthApiError> {
+        self.update_nonce_for_address(address, nonce).await
+    }
+
+    // This implementation is an upsert under the hood
     async fn update_nonce_for_address(&self, address: &TariAddress, nonce: u64) -> Result<(), AuthApiError> {
         let mut conn = self.pool.acquire().await.map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
-        auth::update_nonce_for_address(address, nonce, &mut conn).await
+        auth::upsert_nonce_for_address(address, nonce, &mut conn).await
     }
 
     async fn assign_roles(&self, address: &TariAddress, roles: &[Role]) -> Result<(), AuthApiError> {
         let mut tx = self.pool.begin().await.map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
         auth::assign_roles(address, roles, &mut tx).await?;
-        auth::create_auth_log(address, &mut tx).await?;
         tx.commit().await.map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
-        debug!("🔑 Roles {roles:?} assigned to {}", address.to_hex());
+        debug!("🔑️ Roles {roles:?} assigned to {}", address.to_hex());
         Ok(())
     }
 
