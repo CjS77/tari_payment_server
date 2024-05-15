@@ -1,0 +1,15 @@
+Feature: users can pay for orders with Tari
+  Background:
+    Given a blank slate
+    Given Alice is an authenticated user
+    Given a wallet listening for payments
+    Given a shopify store with webhooks configured
+
+  Scenario: Alice pays for an order with Tari
+    When Alice places an order "alice001" on the store. Memo "": "Item A" for 100T, "Item B" for 200T
+    Then Alice's account has a balance of 300 Tari
+    Then Alice's order "alice001" is pending
+    When Alice's sends a payment of 300 Tari
+    Then order "alice001" is fulfilled
+
+

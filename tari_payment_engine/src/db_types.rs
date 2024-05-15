@@ -410,6 +410,10 @@ pub enum Role {
     ReadAll,
     Write,
     User,
+    // Allows the address to access payment notification endpoints
+    PaymentWallet,
+    // Give access to very sensitive operations, such as adding new payment wallets.
+    SuperAdmin,
 }
 
 impl FromStr for Role {
@@ -420,6 +424,8 @@ impl FromStr for Role {
             "read_all" => Ok(Self::ReadAll),
             "write" => Ok(Self::Write),
             "user" => Ok(Self::User),
+            "payment_wallet" => Ok(Self::PaymentWallet),
+            "super_admin" => Ok(Self::SuperAdmin),
             s => Err(ConversionError(format!("Invalid role: {s}"))),
         }
     }
@@ -435,6 +441,8 @@ impl Display for Role {
             Role::ReadAll => write!(f, "read_all"),
             Role::Write => write!(f, "write"),
             Role::User => write!(f, "user"),
+            Role::PaymentWallet => write!(f, "payment_wallet"),
+            Role::SuperAdmin => write!(f, "super_admin"),
         }
     }
 }

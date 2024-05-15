@@ -1,4 +1,5 @@
 #!/bin/bash
+# Don't use this script as a template for other projects. There are tweaks here specific to this project
 # Prerequisites
 # 1. You need LLVM-COV tools:
 # $ rustup component add llvm-tools-preview
@@ -11,13 +12,14 @@
 # $ sudo apt install lcov
 
 RUSTFLAGS="-C instrument-coverage"
-RUSTUP_TOOLCHAIN=${RUSTUP_TOOLCHAIN:-nightly}
-PACKAGE=tari_jwt
+override=$(grep 'channel' rust-toolchain.toml | awk -F\" '{print $2}')
+RUSTUP_TOOLCHAIN=${RUSTUP_TOOLCHAIN:-$override}
+PACKAGE=${PACKAGE:-tari_payment_engine}
 echo "Using ${RUSTUP_TOOLCHAIN} toolchain"
 LLVM_PROFILE_FILE="./cov_raw/${PACKAGE}-%m.profraw"
 
 get_binaries() {
-  files=$( RUSTFLAGS=$RUSTFLAGS cargo +${RUSTUP_TOOLCHAIN} test --tests --no-run --message-format=json \
+  files=$( RUSTFLAGS=$RUSTFLAGS cargo +${RUSTUP_TOOLCHAIN} test --tests -p ${PACKAGE} --features test_utils --no-run --message-format=json \
               | jq -r "select(.profile.test == true) | .filenames[]" \
               | grep -v dSYM - \
         );
@@ -30,11 +32,12 @@ echo "** Generating ..."
 echo ${files}
 # Remove old coverage files
 rm -fr cov_raw coverage_report default*.profraw
+mkdir cov_raw
 
-RUSTFLAGS=$RUSTFLAGS LLVM_PROFILE_FILE=${LLVM_PROFILE_FILE} cargo +${RUSTUP_TOOLCHAIN} test --tests
+RUSTFLAGS=$RUSTFLAGS LLVM_PROFILE_FILE=${LLVM_PROFILE_FILE} cargo +${RUSTUP_TOOLCHAIN} test -p ${PACKAGE}  --features test_utils --tests
 
 cargo profdata -- \
-  merge -sparse ./cov_raw/${PACKAGE}-*.profraw -o ./cov_raw/${PACKAGE}.profdata
+  merge -sparse ./${PACKAGE}/cov_raw/${PACKAGE}-*.profraw -o ./cov_raw/${PACKAGE}.profdata
 
 cargo cov -- \
   export \
@@ -68,4 +71,5 @@ if [ -z ${SKIP_HTML+x} ]; then
 else
   echo "Skipping html generation"
 fi
-# open coverage_report/src/index.html
+cd ..
+open coverage_report/index.html

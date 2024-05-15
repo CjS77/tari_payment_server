@@ -63,11 +63,21 @@ fn seed_orders() -> [NewOrder; 5] {
     ]
 }
 
+#[derive(Debug, Clone)]
 pub struct UserInfo {
     pub username: String,
     pub secret: PrivateKey,
     pub address: TariAddress,
     pub roles: Vec<Role>,
+}
+
+fn super_admin() -> UserInfo {
+    UserInfo {
+        username: "Super".into(),
+        secret: PrivateKey::from_hex("5b1488f90c3385b0a4d3ab9f6992f2592d35f77a57655160a9236ffadb78260c").unwrap(),
+        address: TariAddress::from_hex("02f671c8294931a6395b51a1f32921f429d22c1e34def8f9f81892034fe2963cf7").unwrap(),
+        roles: vec![Role::SuperAdmin],
+    }
 }
 
 pub struct SeedUsers {
@@ -138,6 +148,14 @@ async fn pause_for_ms(_world: &mut TPGWorld, ms: u64) {
 async fn tabula_rasa(world: &mut TPGWorld) {
     world.start_database().await;
     world.start_server().await;
+}
+
+#[given("a super-admin user (Super)")]
+async fn super_admin_user(world: &mut TPGWorld) {
+    let admin = super_admin();
+    let db = world.db.clone().unwrap();
+    db.assign_roles(&admin.address, &admin.roles).await.unwrap();
+    world.super_admin = Some(admin);
 }
 
 async fn setup_roles_assignments(world: &mut TPGWorld) {

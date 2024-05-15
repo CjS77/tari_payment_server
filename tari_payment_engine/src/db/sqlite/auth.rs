@@ -34,9 +34,9 @@ pub async fn roles_for_address(address: &TariAddress, conn: &mut SqliteConnectio
             WHERE address = ?"#,
         address
     )
-    .fetch_all(conn)
-    .await
-    .map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
+        .fetch_all(conn)
+        .await
+        .map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
     let roles = result
         .iter()
         .filter_map(|r| r.name.as_ref())
@@ -59,7 +59,7 @@ pub async fn address_has_roles(
                 WHERE address = ? AND name IN ({role_strings})"#
     );
     #[allow(clippy::cast_possible_truncation)]
-    let num_matching_roles = sqlx::query(&q)
+        let num_matching_roles = sqlx::query(&q)
         .bind(address)
         .fetch_one(conn)
         .await
@@ -80,7 +80,7 @@ pub async fn update_nonce_for_address(
 ) -> Result<(), AuthApiError> {
     let address = address.to_hex();
     #[allow(clippy::cast_possible_wrap)]
-    let nonce = nonce as i64;
+        let nonce = nonce as i64;
     let res = sqlx::query!("UPDATE auth_log SET last_nonce = ? WHERE address = ?", nonce, address).execute(conn).await;
     debug!("{res:?}");
     res.map_err(|e| {
@@ -93,11 +93,11 @@ pub async fn update_nonce_for_address(
         }
         AuthApiError::DatabaseError(e.to_string())
     })
-    .and_then(|res| match res.rows_affected() {
-        0 => Err(AuthApiError::AddressNotFound),
-        1 => Ok(()),
-        _ => unreachable!("Updating auth log should only affect one row"),
-    })
+        .and_then(|res| match res.rows_affected() {
+            0 => Err(AuthApiError::AddressNotFound),
+            1 => Ok(()),
+            _ => unreachable!("Updating auth log should only affect one row"),
+        })
 }
 
 async fn fetch_roles(conn: &mut SqliteConnection) -> Result<HashMap<Role, i64>, AuthApiError> {
@@ -149,6 +149,35 @@ pub async fn assign_roles(
     }
 }
 
+pub async fn remove_roles(
+    address: &TariAddress,
+    roles: &[Role],
+    conn: &mut SqliteConnection,
+) -> Result<u64, AuthApiError> {
+    let all_roles = fetch_roles(conn).await?;
+
+    let role_ids = roles
+        .iter()
+        .map(|r| all_roles.get(r).ok_or(AuthApiError::RoleNotFound).map(|id| *id))
+        .collect::<Result<Vec<i64>, _>>()?;
+
+    let address = address.to_hex();
+
+    let mut qb = QueryBuilder::new("DELETE FROM role_assignments WHERE address = ");
+    qb.push_bind(address.clone());
+    qb.push(" AND role_id IN (");
+    let mut values = qb.separated(", ");
+    role_ids.iter().for_each(|id| {
+        values.push_bind(*id);
+    });
+    qb.push(")");
+    let res = qb.build().execute(conn).await
+        .map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
+
+    Ok(res.rows_affected())
+}
+
+
 pub async fn create_auth_log(address: &TariAddress, conn: &mut SqliteConnection) -> Result<(), AuthApiError> {
     let address = address.to_hex();
     let res = sqlx::query!("INSERT INTO auth_log (address, last_nonce) VALUES (?, 0)", address)
@@ -162,3 +191,4 @@ pub async fn create_auth_log(address: &TariAddress, conn: &mut SqliteConnection)
         Err(AuthApiError::DatabaseError("Internal error. Report this to the developers".to_string()))
     }
 }
+

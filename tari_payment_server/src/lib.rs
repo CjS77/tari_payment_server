@@ -20,6 +20,8 @@ pub mod config;
 pub mod errors;
 
 pub mod helpers;
+
+pub mod middleware;
 pub mod routes;
 pub mod server;
 

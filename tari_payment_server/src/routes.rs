@@ -23,7 +23,7 @@
 //! ```
 use std::{marker::PhantomData, str::FromStr};
 
-use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder, delete};
 use log::*;
 use paste::paste;
 use tari_common_types::tari_address::TariAddress;
@@ -222,5 +222,39 @@ pub async fn shopify_webhook(req: HttpRequest, body: web::Bytes) -> Result<HttpR
     // let new_order = ShopifyOrder::try_from(order)?;
     // TODO - Send the new order to payment engine
 
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[post("/roles/{address}")]
+pub async fn add_roles(
+    _claims: JwtClaims,
+    path: web::Path<String>,
+    //api: web::Data<AccountApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let addr_s = path.into_inner();
+    let address = TariAddress::from_str(&addr_s).map_err(|e| {
+        info!("💻️ Invalid Tari address. {e}");
+        ServerError::InvalidRequestPath(e.to_string())
+    })?;
+    debug!("💻️ POST add_roles for {addr_s}");
+
+    //api.add_roles(&address, vec![Role::ReadAll]).await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[delete("/roles/{address}")]
+pub async fn remove_roles(
+    _claims: JwtClaims,
+    path: web::Path<String>,
+    //api: web::Data<AccountApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let addr_s = path.into_inner();
+    let address = TariAddress::from_str(&addr_s).map_err(|e| {
+        info!("💻️ Invalid Tari address. {e}");
+        ServerError::InvalidRequestPath(e.to_string())
+    })?;
+    debug!("💻️ DELETE remove_roles for {addr_s}");
+
+    //api.remove_roles(&address, vec![Role::ReadAll]).await?;
     Ok(HttpResponse::Ok().finish())
 }

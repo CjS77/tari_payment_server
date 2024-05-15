@@ -18,12 +18,16 @@ CREATE TABLE roles (
 INSERT INTO roles VALUES
       (1, 'user'),
       (2, 'read_all'),
-      (3, 'write')
+      (3, 'write'),
+      (4, 'payment_wallet'),
+      (5, 'super_admin')
 ;
 
-CREATE TABLE role_assignments (
+CREATE TABLE role_assignments
+(
     address INTEGER NOT NULL,
-    role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE
+    role_id INTEGER NOT NULL REFERENCES roles (id) ON DELETE CASCADE,
+    PRIMARY KEY (address, role_id) ON CONFLICT IGNORE
 );
 
 CREATE INDEX auth_log_address_idx ON auth_log(address);

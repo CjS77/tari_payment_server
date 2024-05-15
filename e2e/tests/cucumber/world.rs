@@ -13,13 +13,17 @@ use tari_payment_server::{
     config::{AuthConfig, ServerConfig},
     server::create_server_instance,
 };
+use crate::cucumber::setup::UserInfo;
 
 #[derive(Debug, Clone, World)]
 pub struct TPGWorld {
     pub config: ServerConfig,
     pub url: String,
     pub db: Option<SqliteDatabase>,
+    pub super_admin: Option<UserInfo>,
     pub server_handle: Option<ServerHandle>,
+    // The access token received from the server if a successful auth request was made
+    pub access_token: Option<String>,
     pub response: Option<(StatusCode, String)>,
 }
 
@@ -34,7 +38,7 @@ impl Default for TPGWorld {
             database_url: url.clone(),
             auth: AuthConfig::default(),
         };
-        Self { config, url, db: None, server_handle: None, response: None }
+        Self { config, url, db: None, super_admin: None, server_handle: None, response: None, access_token: None }
     }
 }
 
@@ -81,12 +85,7 @@ impl TPGWorld {
     }
 
     pub async fn get(&self, path: &str) -> (StatusCode, String) {
-        let url = format!("http://{}:{}/{path}", self.config.host, self.config.port);
-        debug!("🌍️ Querying {url}");
-        let res = reqwest::get(&url).await.expect("Error getting response");
-        let code = res.status();
-        let body = res.text().await.expect("Error parsing response body");
-        (code, body)
+        self.request(Method::GET, path, |req| req).await
     }
 
     pub async fn request<F>(&self, method: Method, path: &str, req: F) -> (StatusCode, String)
@@ -95,7 +94,11 @@ impl TPGWorld {
         debug!("🌍️ Querying {url}");
         let client = Client::new();
         let request = client.request(method, url);
-        let request = req(request);
+        let mut request = req(request);
+        if let Some(token) = &self.access_token {
+            debug!("🌍️ Adding auth token to request");
+            request = request.header("tpg_access_token", token);
+        }
         let res = request.send().await.expect("Error getting response");
         let code = res.status();
         let body = res.text().await.expect("Error parsing response body");

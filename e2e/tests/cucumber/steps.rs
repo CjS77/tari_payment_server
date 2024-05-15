@@ -52,9 +52,9 @@ fn extract_token(docstring: Option<&String>) -> (String, String) {
         .map(|s| {
             let s = s.replace("\\\n", "");
             let mut iter = s.split(':').take(2).map(|s| s.trim().to_string());
-            (iter.next().unwrap_or_default(), iter.next().unwrap_or_default())
+            (iter.next().unwrap_or_else(|| "foo".into()), iter.next().unwrap_or_default())
         })
-        .unwrap_or_default()
+        .unwrap_or_else(|| ("none".into(), String::default()))
 }
 
 fn extract_roles(roles: &str) -> Vec<Role> {

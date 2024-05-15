@@ -129,7 +129,12 @@ pub trait AuthManagement {
     /// Updates the nonce for the given address. The nonce must be strictly increasing, otherwise the error
     /// [`AuthApiError::InvalidNonce`] is returned.
     async fn update_nonce_for_address(&self, address: &TariAddress, nonce: u64) -> Result<(), AuthApiError>;
+    /// Assigns the given roles to the address. This function must be idempotent.
     async fn assign_roles(&self, address: &TariAddress, roles: &[Role]) -> Result<(), AuthApiError>;
+
+    /// Removes the given roles from the address. The number of roles actually removed is returned. This function must
+    /// be idempotent.
+    async fn remove_roles(&self, address: &TariAddress, roles: &[Role]) -> Result<u64, AuthApiError>;
 }
 
 #[macro_export]

@@ -268,6 +268,11 @@ impl AuthManagement for SqliteDatabase {
         debug!("🔑 Roles {roles:?} assigned to {}", address.to_hex());
         Ok(())
     }
+
+    async fn remove_roles(&self, address: &TariAddress, roles: &[Role]) -> Result<u64, AuthApiError> {
+        let mut conn = self.pool.acquire().await.map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
+        auth::remove_roles(address, roles, &mut conn).await
+    }
 }
 
 impl OrderManagement for SqliteDatabase {
