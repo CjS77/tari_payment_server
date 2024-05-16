@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use cucumber::{gherkin::Step, then, when};
 use log::debug;
-use reqwest::{Method};
+use reqwest::Method;
 use tari_payment_engine::db_types::Role;
 
 use crate::cucumber::{
@@ -37,8 +37,15 @@ async fn receive_response(world: &mut TPGWorld, status: u16, text: String, messa
 
 #[then(expr = "I receive a {int} {word} response")]
 async fn receive_response_code(world: &mut TPGWorld, status: u16, text: String) {
-    let (res_status, _res_msg) = world.response.take().expect("No response received");
+    let (res_status, _res_msg) = world.response.clone().expect("No response received");
     assert_eq!(res_status, status, "Expected {status} {text} response, got {res_status}");
+}
+
+#[then(expr = "I receive a partial JSON response:")]
+async fn receive_json_response(world: &mut TPGWorld, step: &Step) {
+    let (_res_status, res_msg) = world.response.take().expect("No response received");
+    let expected = step.docstring().expect("No expected response");
+    assert!(json_is_subset_of(res_msg.as_str(), expected), "Expected response to be '{expected}', got '{res_msg}'");
 }
 
 #[when(expr = "Super authenticates with nonce = {int}")]
@@ -106,4 +113,17 @@ fn extract_token(docstring: Option<&String>) -> (String, String) {
 
 fn extract_roles(roles: &str) -> Vec<Role> {
     roles.split(',').map(|s| s.trim()).map(|r| r.parse::<Role>().expect("Invalid role")).collect()
+}
+
+fn json_is_subset_of(part: &str, complete: &str) -> bool {
+    let part: serde_json::Value = serde_json::from_str(part).expect("Invalid JSON");
+    let complete: serde_json::Value = serde_json::from_str(complete).expect("Invalid JSON");
+    for (key, value) in part.as_object().expect("Not an object") {
+        if let Some(complete_value) = complete.get(key) {
+            if complete_value != value {
+                return false;
+            }
+        }
+    }
+    true
 }

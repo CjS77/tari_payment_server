@@ -18,6 +18,7 @@ use crate::{
         OrderId,
         OrderStatusType,
         OrderUpdate,
+        Payment,
         Role,
         TransferStatus,
         UserAccount,
@@ -46,13 +47,21 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         self.url.as_str()
     }
 
-    async fn fetch_or_create_account(
-        &self,
-        order: Option<NewOrder>,
-        payment: Option<NewPayment>,
-    ) -> Result<i64, Self::Error> {
+    async fn fetch_or_create_account_for_order(&self, order: &NewOrder) -> Result<i64, Self::Error> {
         let mut conn = self.pool.acquire().await?;
-        user_accounts::fetch_or_create_account(order, payment, &mut conn).await
+        let cust_id = Some(order.customer_id.clone());
+        let pubkey = order.address.as_ref().cloned();
+        user_accounts::fetch_or_create_account(cust_id, pubkey, &mut conn).await
+    }
+
+    async fn fetch_or_create_account_for_payment(&self, payment: &Payment) -> Result<i64, Self::Error> {
+        let mut conn = self.pool.acquire().await?;
+        let pubkey = Some(payment.sender.clone());
+        let customer_id = match payment.order_id.as_ref() {
+            Some(oid) => orders::fetch_order_by_order_id(oid, &mut conn).await?.map(|o| o.customer_id),
+            None => None,
+        };
+        user_accounts::fetch_or_create_account(customer_id, pubkey, &mut conn).await
     }
 
     async fn process_new_order_for_customer(&self, order: NewOrder) -> Result<i64, Self::Error> {
@@ -65,7 +74,8 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             Err(e) => Err(e),
         }?;
         debug!("🗃️ Order #{} has been saved in the DB with id {id}", order.order_id);
-        let account_id = user_accounts::fetch_or_create_account(Some(order.clone()), None, &mut tx).await?;
+        let account_id =
+            user_accounts::fetch_or_create_account(Some(order.customer_id.clone()), order.address, &mut tx).await?;
         user_accounts::incr_total_orders(account_id, price, &mut tx).await?;
         tx.commit().await?;
         Ok(account_id)
@@ -88,7 +98,15 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             Err(e) => Err(e),
         }?;
         debug!("🗃️ Transfer {txid} received from [{}]", payment.sender);
-        let acc_id = user_accounts::fetch_or_create_account(None, Some(payment.clone()), &mut tx).await?;
+        let customer_id = match &payment.order_id {
+            Some(order_id) => {
+                let existing_order = orders::fetch_order_by_order_id(order_id, &mut tx).await?;
+                existing_order.map(|o| o.customer_id)
+            },
+            None => None,
+        };
+        let sender = Some(payment.sender);
+        let acc_id = user_accounts::fetch_or_create_account(customer_id, sender, &mut tx).await?;
         user_accounts::adjust_balances(acc_id, payment.amount, payment.amount, MicroTari::from(0), &mut tx).await?;
         debug!("🗃️ Transfer {txid} processed. {} credited to pending account", payment.amount);
         tx.commit().await?;
@@ -210,16 +228,6 @@ impl AccountManagement for SqliteDatabase {
     async fn fetch_user_account_for_order(&self, order_id: &OrderId) -> Result<Option<UserAccount>, Self::Error> {
         let mut conn = self.pool.acquire().await?;
         user_accounts::user_account_for_order(order_id, &mut conn).await
-    }
-
-    /// Searches through the memo fields of payments to find a matching order id. If no account is found, `None` will be
-    /// returned.
-    ///
-    /// The `memo_match` is a string that is used to search for a matching order id using `LIKE`.
-    /// For example, `format!("%Order id: [{order_id}]%)` will match any memo that contains the order id."
-    async fn search_for_user_account_by_memo(&self, memo_match: &str) -> Result<Option<i64>, Self::Error> {
-        let mut conn = self.pool.acquire().await?;
-        user_accounts::search_for_user_account_by_order_id_in_memo(memo_match, &mut conn).await
     }
 
     async fn fetch_user_account_for_customer_id(&self, customer_id: &str) -> Result<Option<UserAccount>, Self::Error> {

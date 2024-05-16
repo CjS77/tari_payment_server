@@ -1,7 +1,7 @@
 use tari_common_types::tari_address::TariAddress;
 
 use crate::{
-    db_types::{NewOrder, NewPayment, Order, OrderId, OrderUpdate, Role, TransferStatus, UserAccount},
+    db_types::{NewOrder, NewPayment, Order, OrderId, OrderUpdate, Payment, Role, TransferStatus, UserAccount},
     AuthApiError,
 };
 
@@ -22,16 +22,17 @@ pub trait PaymentGatewayDatabase: Clone {
     /// The URL of the database
     fn url(&self) -> &str;
 
-    /// Fetches the user account for the given customer_id and/or public key. If both customer_id and public_key are
-    /// provided, the resulting account id must match, otherwise an error is returned.
+    /// Fetches the user account for the given order.
     ///
     /// If the account does not exist, one is created and the given customer id and/or public key is linked to the
     /// account.
-    async fn fetch_or_create_account(
-        &self,
-        cust_id: Option<NewOrder>,
-        pubkey: Option<NewPayment>,
-    ) -> Result<i64, Self::Error>;
+    async fn fetch_or_create_account_for_order(&self, order: &NewOrder) -> Result<i64, Self::Error>;
+
+    /// Fetches the user account for the given payment.
+    ///
+    /// If the account does not exist, one is created and the given public key and (if present) customer id is linked to
+    /// the account.
+    async fn fetch_or_create_account_for_payment(&self, payment: &Payment) -> Result<i64, Self::Error>;
 
     /// Takes a new order, and in a single atomic transaction,
     /// * calls `save_new_order` to store the order in the database. If the order already exists, nothing further is
@@ -99,13 +100,6 @@ pub trait AccountManagement {
     /// Alternatively, you can search through the memo fields of payments to find a matching order id by calling
     /// [`search_for_user_account_by_memo`].
     async fn fetch_user_account_for_order(&self, order_id: &OrderId) -> Result<Option<UserAccount>, Self::Error>;
-
-    /// Searches through the memo fields of payments to find an account matching the memo string.
-    /// If no account is found, `None` will be returned.
-    ///
-    /// The `memo_match` is a string that is used to search for a matching order id using `LIKE`.
-    /// For example, `format!("%Order id: [{order_id}]%)` will match any memo that contains the order id."
-    async fn search_for_user_account_by_memo(&self, memo_match: &str) -> Result<Option<i64>, Self::Error>;
 
     async fn fetch_user_account_for_customer_id(&self, customer_id: &str) -> Result<Option<UserAccount>, Self::Error>;
     async fn fetch_user_account_for_address(&self, address: &TariAddress) -> Result<Option<UserAccount>, Self::Error>;

@@ -1,7 +1,10 @@
 use chrono::{DateTime, Utc};
 use rand::{Rng, RngCore};
 use serde::{Deserialize, Serialize};
-use tari_payment_engine::db_types::{MicroTari, NewOrder, OrderId};
+use tari_payment_engine::{
+    db_types::{MicroTari, NewOrder, OrderId},
+    extract_address_from_memo,
+};
 use tpg_common::TARI_CURRENCY_CODE_LOWER;
 
 use crate::errors::OrderConversionError;
@@ -46,12 +49,13 @@ impl TryFrom<ShopifyOrder> for NewOrder {
             .map_err(|e| OrderConversionError(e.to_string()))?;
 
         let timestamp = value.created_at.parse::<DateTime<Utc>>().map_err(|e| OrderConversionError(e.to_string()))?;
-
+        let address = value.note.as_ref().and_then(|note| extract_address_from_memo(note.as_str()));
         Ok(Self {
             order_id: OrderId(value.id.to_string()),
             customer_id: value.email,
             currency: value.currency,
             memo: value.note,
+            address,
             created_at: timestamp,
             total_price,
         })

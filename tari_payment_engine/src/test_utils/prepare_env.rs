@@ -14,7 +14,7 @@ pub async fn prepare_test_env(url: &str) {
 }
 
 pub fn random_db_path() -> String {
-    format!("sqlite://../data/test_store_{}", rand::random::<u64>())
+    format!("sqlite://../data/test_store_{}.db", rand::random::<u64>())
 }
 
 pub async fn run_migrations(url: &str) {

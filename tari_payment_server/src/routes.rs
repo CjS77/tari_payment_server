@@ -171,11 +171,6 @@ pub async fn account<B: AccountManagement>(
         debug!("💻️ Could not parse address. {e}");
         ServerError::InvalidRequestPath(e.to_string())
     })?;
-    if !(claims.address == address || claims.roles.contains(&Role::ReadAll)) {
-        return Err(ServerError::InsufficientPermissions(
-            "You may only view your own account, or have the ReadAll role.".into(),
-        ));
-    }
     get_account(&address, api.as_ref()).await
 }
 

@@ -41,21 +41,6 @@ pub async fn update_status(
 }
 
 pub async fn fetch_payment(txid: &str, conn: &mut SqliteConnection) -> Result<Option<Payment>, SqliteDatabaseError> {
-    let payment = sqlx::query_as!(
-        Payment,
-        r#"SELECT
-        txid,
-        created_at as "created_at: _",
-        updated_at as "updated_at: _",
-        sender,
-        amount,
-        memo,
-        payment_type,
-        status
-     FROM payments WHERE txid = $1"#,
-        txid
-    )
-    .fetch_optional(conn)
-    .await?;
+    let payment = sqlx::query_as(r#"SELECT * FROM payments WHERE txid = ?"#).bind(txid).fetch_optional(conn).await?;
     Ok(payment)
 }

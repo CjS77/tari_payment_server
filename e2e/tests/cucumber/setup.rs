@@ -25,6 +25,7 @@ fn seed_orders() -> [NewOrder; 5] {
             currency: "XTR".into(),
             customer_id: "alice".into(),
             memo: Some("address: [b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d]".into()),
+            address: None,
             total_price: MicroTari::from_tari(100),
             created_at: Utc.with_ymd_and_hms(2024, 3, 10, 15, 0, 0).unwrap(),
         },
@@ -33,6 +34,7 @@ fn seed_orders() -> [NewOrder; 5] {
             currency: "XTR".into(),
             customer_id: "bob".into(),
             memo: Some("address: [680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b]".into()),
+            address: None,
             total_price: MicroTari::from_tari(200),
             created_at: Utc.with_ymd_and_hms(2024, 3, 10, 15, 30, 0).unwrap(),
         },
@@ -41,6 +43,7 @@ fn seed_orders() -> [NewOrder; 5] {
             currency: "XTR".into(),
             customer_id: "alice".into(),
             memo: Some("address: [b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d]".into()),
+            address: None,
             total_price: MicroTari::from_tari(65),
             created_at: Utc.with_ymd_and_hms(2024, 3, 11, 16, 0, 0).unwrap(),
         },
@@ -49,6 +52,7 @@ fn seed_orders() -> [NewOrder; 5] {
             currency: "XTR".into(),
             customer_id: "bob".into(),
             memo: Some("address: [680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b]".into()),
+            address: None,
             total_price: MicroTari::from_tari(350),
             created_at: Utc.with_ymd_and_hms(2024, 3, 11, 17, 0, 0).unwrap(),
         },
@@ -56,6 +60,7 @@ fn seed_orders() -> [NewOrder; 5] {
             order_id: OrderId::new("5"),
             currency: "XTR".into(),
             customer_id: "admin".into(),
+            address: None,
             memo: Some("address: [aa3c076152c1ae44ae86585eeba1d348badb845d1cab5ef12db98fafb4fea55d6c]".into()),
             total_price: MicroTari::from_tari(25),
             created_at: Utc.with_ymd_and_hms(2024, 3, 12, 18, 0, 0).unwrap(),
@@ -143,8 +148,9 @@ impl SeedUsers {
 async fn fresh_database(world: &mut TPGWorld) {
     world.start_database().await;
     let db = world.database();
-    for order in seed_orders() {
-        db.fetch_or_create_account(Some(order), None).await.unwrap();
+    for mut order in seed_orders() {
+        order.extract_address();
+        db.process_new_order_for_customer(order).await.unwrap();
     }
     world.start_server().await;
 }

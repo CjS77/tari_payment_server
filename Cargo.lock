@@ -1182,6 +1182,7 @@ dependencies = [
  "once_cell",
  "rand",
  "reqwest",
+ "serde_json",
  "tari-jwt",
  "tari_common_types",
  "tari_payment_engine",

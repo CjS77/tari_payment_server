@@ -69,7 +69,7 @@ where
         let service = Rc::clone(&self.service);
         let required_roles = self.required_roles.clone();
         async move {
-            debug!("🔐️ Checking ACL for request");
+            trace!("🔐️ Checking ACL for request");
             let jwt_claims = req
                 .extensions()
                 .get::<JwtClaims>()
@@ -79,7 +79,13 @@ where
                     ErrorInternalServerError("No JWT claims found in request extensions")
                 })?
                 .clone();
-            if required_roles.iter().all(|role| jwt_claims.roles.contains(role)) {
+            // SuperAdmin can access any route
+            let mut approved = jwt_claims.roles.contains(&Role::SuperAdmin);
+            if approved {
+                info!("🔐️ SuperAdmin access granted to {} for {}", jwt_claims.address, req.uri());
+            }
+            approved |= required_roles.iter().all(|role| jwt_claims.roles.contains(role));
+            if approved {
                 service.call(req).await
             } else {
                 warn!("🔐️ User '{}' did not have necessary permissions for {}", jwt_claims.address, req.uri());

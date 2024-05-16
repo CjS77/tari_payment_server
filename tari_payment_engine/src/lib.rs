@@ -23,6 +23,7 @@ mod order_manager;
 #[cfg(any(feature = "test_utils", test))]
 pub mod test_utils;
 
+pub use address_extractor::{extract_address_from_memo, extract_order_number_from_memo};
 pub use db::common::{
     AccountManagement,
     AuthManagement,

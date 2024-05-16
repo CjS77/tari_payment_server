@@ -7,11 +7,14 @@ use std::{
 use chrono::{DateTime, Utc};
 use log::error;
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, Type};
+use sqlx::{sqlite::SqliteRow, Error, FromRow, Row, Type};
 use tari_common_types::tari_address::TariAddress;
 use thiserror::Error;
 
-use crate::op;
+use crate::{
+    address_extractor::{extract_address_from_memo, extract_order_number_from_memo},
+    op,
+};
 
 //--------------------------------------     MicroTari       ---------------------------------------------------------
 #[derive(Debug, Clone, Copy, Default, Type, Ord, PartialOrd, Serialize, Deserialize)]
@@ -241,6 +244,8 @@ pub struct NewOrder {
     pub customer_id: String,
     /// An optional description supplied by the user for the order. Useful for matching orders with payments
     pub memo: Option<String>,
+    /// The public key of the user who made the payment, usually extracted from the memo
+    pub address: Option<TariAddress>,
     /// The total price of the order
     pub total_price: MicroTari,
     /// The currency of the order
@@ -251,7 +256,19 @@ pub struct NewOrder {
 
 impl NewOrder {
     pub fn new(order_id: OrderId, customer_id: String, total_price: MicroTari) -> Self {
-        Self { order_id, customer_id, memo: None, total_price, currency: "XTR".to_string(), created_at: Utc::now() }
+        Self {
+            order_id,
+            customer_id,
+            memo: None,
+            total_price,
+            currency: "XTR".to_string(),
+            created_at: Utc::now(),
+            address: None,
+        }
+    }
+
+    pub fn extract_address(&mut self) {
+        self.address = self.memo.as_ref().and_then(|s| extract_address_from_memo(s.as_str()))
     }
 
     pub fn is_equivalent(&self, order: &Order) -> bool {
@@ -314,13 +331,44 @@ pub struct Payment {
     /// The time the payment was updated
     pub updated_at: DateTime<Utc>,
     /// The public key of the user who made the payment
-    pub sender: PublicKey,
+    pub sender: TariAddress,
     /// The amount of the payment
     pub amount: MicroTari,
     /// The memo attached to the transfer
     pub memo: Option<String>,
+    /// The customer id associated with this order. Generally, this is extracted from the memo.
+    pub order_id: Option<OrderId>,
     pub payment_type: PaymentType,
     pub status: TransferStatus,
+}
+
+impl FromRow<'_, SqliteRow> for Payment {
+    fn from_row(row: &'_ SqliteRow) -> Result<Self, Error> {
+        let txid = row.try_get("txid")?;
+        let created_at = row
+            .try_get::<'_, &str, _>("created_at")?
+            .parse::<DateTime<Utc>>()
+            .map_err(|e| Error::Decode(Box::new(e)))?;
+        let updated_at = row
+            .try_get::<'_, &str, _>("updated_at")?
+            .parse::<DateTime<Utc>>()
+            .map_err(|e| Error::Decode(Box::new(e)))?;
+        let sender =
+            row.try_get::<'_, &str, _>("sender")?.parse::<TariAddress>().map_err(|e| Error::Decode(Box::new(e)))?;
+        let amount = row.try_get::<'_, i64, _>("amount").map(|amt| MicroTari::from(amt))?;
+        let memo = row.try_get("memo")?;
+        let order_id = row
+            .try_get::<'_, Option<String>, _>("order_id")
+            .map_err(|e| Error::Decode(Box::new(e)))?
+            .map(|oid| OrderId::new(oid));
+        let payment_type = row
+            .try_get::<'_, &str, _>("payment_type")?
+            .parse::<PaymentType>()
+            .map_err(|e| Error::Decode(Box::new(e)))?;
+        let status =
+            row.try_get::<'_, &str, _>("status")?.parse::<TransferStatus>().map_err(|e| Error::Decode(Box::new(e)))?;
+        Ok(Self { txid, created_at, updated_at, sender, amount, memo, order_id, payment_type, status })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -331,10 +379,18 @@ pub enum PaymentType {
 
 impl From<String> for PaymentType {
     fn from(value: String) -> Self {
-        match value.as_str() {
-            "OnChain" => Self::OnChain,
-            "Manual" => Self::Manual,
-            _ => panic!("Invalid payment type: {}", value),
+        value.as_str().parse().unwrap_or_else(|e| panic!("Invalid payment type: {}. {e}", value))
+    }
+}
+
+impl FromStr for PaymentType {
+    type Err = ConversionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "OnChain" => Ok(Self::OnChain),
+            "Manual" => Ok(Self::Manual),
+            s => Err(ConversionError(format!("Invalid payment type: {s}"))),
         }
     }
 }
@@ -358,16 +414,22 @@ pub struct NewPayment {
     pub txid: String,
     /// The memo attached to the transfer
     pub memo: Option<String>,
+    /// The order number associated with this payment. Generally extracted from the memo.
+    pub order_id: Option<OrderId>,
 }
 
 impl NewPayment {
     pub fn new(sender: TariAddress, amount: MicroTari, txid: String) -> Self {
-        Self { sender, amount, txid, memo: None }
+        Self { sender, amount, txid, memo: None, order_id: None }
     }
 
-    pub fn with_memo(mut self, memo: String) -> Self {
-        self.memo = Some(memo);
-        self
+    pub fn with_memo<S: Into<String>>(&mut self, memo: S) {
+        self.memo = Some(memo.into());
+        self.order_id = self.extract_order_id();
+    }
+
+    pub fn extract_order_id(&self) -> Option<OrderId> {
+        self.memo.as_ref().and_then(|s| extract_order_number_from_memo(s.as_str()))
     }
 }
 
@@ -391,11 +453,19 @@ impl Display for TransferStatus {
 
 impl From<String> for TransferStatus {
     fn from(value: String) -> Self {
-        match value.as_str() {
-            "Received" => Self::Received,
-            "Confirmed" => Self::Confirmed,
-            "Cancelled" => Self::Cancelled,
-            _ => panic!("Invalid transfer status: {}", value),
+        value.as_str().parse().unwrap_or_else(|e| panic!("Invalid transfer status: {value}. {e}"))
+    }
+}
+
+impl FromStr for TransferStatus {
+    type Err = ConversionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Received" => Ok(Self::Received),
+            "Confirmed" => Ok(Self::Confirmed),
+            "Cancelled" => Ok(Self::Cancelled),
+            s => Err(ConversionError(format!("Invalid transfer status: {s}"))),
         }
     }
 }
@@ -453,4 +523,22 @@ pub struct LoginToken {
     pub address: TariAddress,
     pub nonce: u64,
     pub desired_roles: Roles,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn extract_order_id() {
+        let mut payment = NewPayment::new(
+            TariAddress::from_str("02f671c8294931a6395b51a1f32921f429d22c1e34def8f9f81892034fe2963cf7").unwrap(),
+            MicroTari::from(100),
+            "txid".to_string(),
+        );
+        payment.with_memo("Order id: [1234]".to_string());
+        assert_eq!(payment.order_id, Some(OrderId::new("1234")));
+
+        payment.with_memo("Hey boet".to_string());
+        assert_eq!(payment.order_id, None);
+    }
 }
