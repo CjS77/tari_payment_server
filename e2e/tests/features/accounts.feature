@@ -1,4 +1,4 @@
-Feature: Accounts
+Feature: Accounts endpoint
   Background:
     Given a database with some accounts
 

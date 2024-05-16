@@ -355,12 +355,12 @@ impl FromRow<'_, SqliteRow> for Payment {
             .map_err(|e| Error::Decode(Box::new(e)))?;
         let sender =
             row.try_get::<'_, &str, _>("sender")?.parse::<TariAddress>().map_err(|e| Error::Decode(Box::new(e)))?;
-        let amount = row.try_get::<'_, i64, _>("amount").map(|amt| MicroTari::from(amt))?;
+        let amount = row.try_get::<'_, i64, _>("amount").map(MicroTari::from)?;
         let memo = row.try_get("memo")?;
         let order_id = row
             .try_get::<'_, Option<String>, _>("order_id")
             .map_err(|e| Error::Decode(Box::new(e)))?
-            .map(|oid| OrderId::new(oid));
+            .map(OrderId::new);
         let payment_type = row
             .try_get::<'_, &str, _>("payment_type")?
             .parse::<PaymentType>()

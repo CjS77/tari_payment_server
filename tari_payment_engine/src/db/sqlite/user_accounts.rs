@@ -313,7 +313,7 @@ async fn try_match_order_to_payments(
 
 async fn try_match_payment_to_orders(
     payment: &NewPayment,
-    conn: &mut SqliteConnection,
+    _conn: &mut SqliteConnection,
 ) -> Result<i64, SqliteDatabaseError> {
     trace!("🧑️ Trying to match payment {payment:?} to existing orders.");
     todo!()

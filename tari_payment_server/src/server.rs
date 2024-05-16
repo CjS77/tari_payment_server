@@ -49,13 +49,9 @@ pub fn create_server_instance(config: ServerConfig, db: SqliteDatabase) -> Resul
             .service(MyOrdersRoute::<SqliteDatabase>::new())
             .service(OrdersRoute::<SqliteDatabase>::new());
         app.use_jwt(authority.clone(), auth_scope)
-            //app.service(auth_scope)
             .service(health)
             .service(AuthRoute::<SqliteDatabase>::new())
-            .service(
-                web::scope("/shopify")
-                    .service(shopify_webhook)
-            )
+            .service(web::scope("/shopify").service(shopify_webhook))
     })
     .keep_alive(KeepAlive::Timeout(Duration::from_secs(600)))
     .bind((config.host.as_str(), config.port))?

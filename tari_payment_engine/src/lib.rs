@@ -38,5 +38,6 @@ pub use order_manager::{
     accounts_api::AccountApi,
     auth_api::AuthApi,
     errors::{AuthApiError, OrderManagerError},
+    order_objects,
     orders_api::OrderManagerApi,
 };

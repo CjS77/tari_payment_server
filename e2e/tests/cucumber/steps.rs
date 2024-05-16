@@ -1,7 +1,8 @@
 use std::str::FromStr;
 
 use cucumber::{gherkin::Step, then, when};
-use log::debug;
+use e2e::helpers::json_is_subset_of;
+use log::*;
 use reqwest::Method;
 use tari_payment_engine::db_types::Role;
 
@@ -44,8 +45,11 @@ async fn receive_response_code(world: &mut TPGWorld, status: u16, text: String) 
 #[then(expr = "I receive a partial JSON response:")]
 async fn receive_json_response(world: &mut TPGWorld, step: &Step) {
     let (_res_status, res_msg) = world.response.take().expect("No response received");
-    let expected = step.docstring().expect("No expected response");
-    assert!(json_is_subset_of(res_msg.as_str(), expected), "Expected response to be '{expected}', got '{res_msg}'");
+    let partial_match = step.docstring().expect("No expected response");
+    assert!(
+        json_is_subset_of(partial_match, res_msg.as_str()),
+        "Expected response to be '{partial_match}', got '{res_msg}'"
+    );
 }
 
 #[when(expr = "Super authenticates with nonce = {int}")]
@@ -91,6 +95,7 @@ async fn access_token_starts_with(world: &mut TPGWorld, prefix: String) {
 
 #[when(expr = "{word} {word}s to {string} with body")]
 async fn general_request(world: &mut TPGWorld, _user: String, method: String, url: String, step: &Step) {
+    world.response = None;
     let method = Method::from_str(method.as_str()).expect("Invalid method");
     let res = world
         .request(method, url.as_str(), |req| match step.docstring().cloned() {
@@ -98,6 +103,7 @@ async fn general_request(world: &mut TPGWorld, _user: String, method: String, ur
             None => req,
         })
         .await;
+    trace!("Got Response: {} {}", res.0, res.1);
     world.response = Some(res);
 }
 
@@ -113,17 +119,4 @@ fn extract_token(docstring: Option<&String>) -> (String, String) {
 
 fn extract_roles(roles: &str) -> Vec<Role> {
     roles.split(',').map(|s| s.trim()).map(|r| r.parse::<Role>().expect("Invalid role")).collect()
-}
-
-fn json_is_subset_of(part: &str, complete: &str) -> bool {
-    let part: serde_json::Value = serde_json::from_str(part).expect("Invalid JSON");
-    let complete: serde_json::Value = serde_json::from_str(complete).expect("Invalid JSON");
-    for (key, value) in part.as_object().expect("Not an object") {
-        if let Some(complete_value) = complete.get(key) {
-            if complete_value != value {
-                return false;
-            }
-        }
-    }
-    true
 }

@@ -31,7 +31,7 @@ use tari_payment_engine::{db_types::Role, AccountApi, AccountManagement, AuthApi
 
 use crate::{
     auth::{check_login_token_signature, JwtClaims, TokenIssuer},
-    data_objects::RoleUpdateRequest,
+    data_objects::{RoleUpdateRequest, SerializedTariAddress},
     errors::ServerError,
     shopify_order::ShopifyOrder,
 };
@@ -160,17 +160,11 @@ route!(account => Get "/account/{address}" impl AccountManagement where requires
 /// for this purpose.
 //#[get("/account/{address}")]
 pub async fn account<B: AccountManagement>(
-    claims: JwtClaims,
-    path: web::Path<String>,
+    path: web::Path<SerializedTariAddress>,
     api: web::Data<AccountApi<B>>,
 ) -> Result<HttpResponse, ServerError> {
-    let addr_s = path.into_inner();
-    debug!("💻️ GET account for {addr_s}");
-
-    let address = TariAddress::from_str(&addr_s).map_err(|e| {
-        debug!("💻️ Could not parse address. {e}");
-        ServerError::InvalidRequestPath(e.to_string())
-    })?;
+    let address = path.into_inner().to_address();
+    debug!("💻️ GET account for {address}");
     get_account(&address, api.as_ref()).await
 }
 
@@ -199,23 +193,13 @@ pub async fn my_orders<B: AccountManagement>(
 }
 
 //#[get("/orders/{address}")]
-route!(orders => Get "/orders/{address}" impl AccountManagement);
+route!(orders => Get "/orders/{address}" impl AccountManagement where requires [Role::ReadAll]);
 pub async fn orders<B: AccountManagement>(
-    claims: JwtClaims,
-    path: web::Path<String>,
+    path: web::Path<SerializedTariAddress>,
     api: web::Data<AccountApi<B>>,
 ) -> Result<HttpResponse, ServerError> {
-    let addr_s = path.into_inner();
-    debug!("💻️ GET orders for {addr_s}");
-    let address = TariAddress::from_str(&addr_s).map_err(|e| {
-        debug!("💻️ Could not parse address. {e}");
-        ServerError::InvalidRequestPath(e.to_string())
-    })?;
-    if !(claims.address == address || claims.roles.contains(&Role::ReadAll)) {
-        return Err(ServerError::InsufficientPermissions(
-            "You may only view your own orders, or have the ReadAll role.".into(),
-        ));
-    }
+    let address = path.into_inner().to_address();
+    debug!("💻️ GET orders for {address}");
     get_orders(&address, api.as_ref()).await
 }
 
@@ -255,7 +239,7 @@ pub async fn update_roles<B: AuthManagement>(
     api: web::Data<AuthApi<B>>,
     body: web::Json<Vec<RoleUpdateRequest>>,
 ) -> Result<HttpResponse, ServerError> {
-    for acl_request in body.into_inner().into_iter() {
+    for acl_request in body.into_inner() {
         let address = acl_request.address;
         let address = TariAddress::from_str(&address).map_err(|e| {
             debug!("💻️ Could not parse address. {e}");

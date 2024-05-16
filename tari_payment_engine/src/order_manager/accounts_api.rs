@@ -5,8 +5,8 @@ use std::fmt::Debug;
 use tari_common_types::tari_address::TariAddress;
 
 use crate::{
-    db_types::{Order, UserAccount},
-    order_manager::errors::AccountApiError,
+    db_types::{UserAccount},
+    order_manager::{errors::AccountApiError, order_objects::OrderResult},
     AccountManagement,
 };
 
@@ -37,12 +37,21 @@ where B: AccountManagement
         self.db.fetch_user_account_for_address(address).await.map_err(|e| AccountApiError::DatabaseError(e.to_string()))
     }
 
-    pub async fn orders_for_address(&self, address: &TariAddress) -> Result<Option<Vec<Order>>, AccountApiError> {
-        let id = match self.account_by_address(address).await {
-            Ok(Some(acc)) => acc.id,
-            Ok(None) => return Ok(None),
-            Err(e) => return Err(e),
-        };
-        self.db.fetch_orders_for_account(id).await.map(Some).map_err(|e| AccountApiError::DatabaseError(e.to_string()))
+    pub async fn orders_for_address(&self, address: &TariAddress) -> Result<Option<OrderResult>, AccountApiError> {
+        let mut result = OrderResult { address: address.clone(), total_orders: 0.into(), orders: vec![] };
+        match self.account_by_address(address).await {
+            Ok(Some(acc)) => {
+                result.total_orders = acc.total_orders;
+                let orders = self
+                    .db
+                    .fetch_orders_for_account(acc.id)
+                    .await
+                    .map_err(|e| AccountApiError::DatabaseError(e.to_string()))?;
+                result.orders = orders;
+                Ok(Some(result))
+            },
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 }
