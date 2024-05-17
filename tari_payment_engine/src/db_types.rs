@@ -12,7 +12,7 @@ use tari_common_types::tari_address::TariAddress;
 use thiserror::Error;
 
 use crate::{
-    address_extractor::{extract_address_from_memo, extract_order_number_from_memo},
+    helpers::{extract_address_from_memo, extract_order_number_from_memo},
     op,
 };
 
@@ -357,10 +357,8 @@ impl FromRow<'_, SqliteRow> for Payment {
             row.try_get::<'_, &str, _>("sender")?.parse::<TariAddress>().map_err(|e| Error::Decode(Box::new(e)))?;
         let amount = row.try_get::<'_, i64, _>("amount").map(MicroTari::from)?;
         let memo = row.try_get("memo")?;
-        let order_id = row
-            .try_get::<'_, Option<String>, _>("order_id")
-            .map_err(|e| Error::Decode(Box::new(e)))?
-            .map(OrderId::new);
+        let order_id =
+            row.try_get::<'_, Option<String>, _>("order_id").map_err(|e| Error::Decode(Box::new(e)))?.map(OrderId::new);
         let payment_type = row
             .try_get::<'_, &str, _>("payment_type")?
             .parse::<PaymentType>()

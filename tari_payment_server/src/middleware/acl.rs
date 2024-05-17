@@ -4,6 +4,12 @@
 //! It will check the incoming request for a valid JWT token and then check the claims in the token against the required
 //! roles for the route. If the token is valid and the user has the required roles, the request will be allowed to
 //! continue. Otherwise, a 403 Forbidden response will be returned.
+//!
+//! Specifically, the following checks are performed:
+//! * The JWT token signature is valid (user cannot manipulate the token claims)
+//! * The public key matches the one specified in the server config (User cannot simply generate their own signatures)
+//! * The token has not expired
+//! * The user has the required roles to access the route
 
 use std::rc::Rc;
 

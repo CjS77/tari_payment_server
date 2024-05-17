@@ -60,8 +60,8 @@ dependencies = [
 
 [[package]]
 name = "actix-jwt-auth-middleware"
-version = "0.4.0"
-source = "git+https://github.com/cjs77/actix-jwt-auth-middleware.git?branch=master#cdbfb41f2b16f9795795ec3282dbb46ef6d04873"
+version = "0.5.0"
+source = "git+https://github.com/cjs77/actix-jwt-auth-middleware.git?branch=master#ab5515f24883c015584b037b18ea3d12e9b3756f"
 dependencies = [
  "actix-jwt-auth-middleware-derive",
  "actix-web",
@@ -69,14 +69,13 @@ dependencies = [
  "derive_builder",
  "form_urlencoded",
  "jwt-compact",
- "log",
  "serde",
 ]
 
 [[package]]
 name = "actix-jwt-auth-middleware-derive"
 version = "0.2.0"
-source = "git+https://github.com/cjs77/actix-jwt-auth-middleware.git?branch=master#cdbfb41f2b16f9795795ec3282dbb46ef6d04873"
+source = "git+https://github.com/cjs77/actix-jwt-auth-middleware.git?branch=master#ab5515f24883c015584b037b18ea3d12e9b3756f"
 dependencies = [
  "derive-elves",
  "quote",

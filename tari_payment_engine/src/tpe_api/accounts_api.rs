@@ -5,8 +5,8 @@ use std::fmt::Debug;
 use tari_common_types::tari_address::TariAddress;
 
 use crate::{
-    db_types::{UserAccount},
-    order_manager::{errors::AccountApiError, order_objects::OrderResult},
+    db_types::{Order, OrderId, UserAccount},
+    tpe_api::{errors::AccountApiError, order_objects::OrderResult},
     AccountManagement,
 };
 
@@ -35,6 +35,10 @@ where B: AccountManagement
     /// Fetches the user account for the given Tari address.
     pub async fn account_by_address(&self, address: &TariAddress) -> Result<Option<UserAccount>, AccountApiError> {
         self.db.fetch_user_account_for_address(address).await.map_err(|e| AccountApiError::DatabaseError(e.to_string()))
+    }
+
+    pub async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, AccountApiError> {
+        self.db.fetch_order_by_order_id(order_id).await.map_err(|e| AccountApiError::DatabaseError(e.to_string()))
     }
 
     pub async fn orders_for_address(&self, address: &TariAddress) -> Result<Option<OrderResult>, AccountApiError> {

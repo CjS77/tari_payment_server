@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use log::*;
-use tari_payment_engine::{db_types::*, test_utils::prepare_env::prepare_test_env, OrderManagerApi, SqliteDatabase};
+use tari_payment_engine::{db_types::*, test_utils::prepare_env::prepare_test_env, OrderFlowApi, SqliteDatabase};
 use tokio::runtime::Runtime;
 
 const NUM_ORDERS: u64 = 20;
@@ -19,7 +19,7 @@ fn burst_orders() {
         let url = "sqlite://../data/test_burst_orders.db";
         prepare_test_env(url).await;
         let db = SqliteDatabase::new_with_url(url, 5).await.expect("Error creating database");
-        let api = OrderManagerApi::new(db);
+        let api = OrderFlowApi::new(db);
 
         let mut timer = tokio::time::interval(delay);
         info!("🚀️ Injecting {NUM_ORDERS} orders");

@@ -10,20 +10,20 @@ use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
     db_types::{MicroTari, NewOrder, NewPayment, OrderId},
     test_utils::prepare_env::{prepare_test_env, random_db_path},
-    OrderManagerApi,
+    OrderFlowApi,
     PaymentGatewayDatabase,
     SqliteDatabase,
 };
 use tokio::runtime::Runtime;
 
-async fn setup() -> OrderManagerApi<SqliteDatabase> {
+async fn setup() -> OrderFlowApi<SqliteDatabase> {
     let url = random_db_path();
     prepare_test_env(&url).await;
     let db = SqliteDatabase::new_with_url(&url, 1).await.expect("Error creating database");
-    OrderManagerApi::new(db)
+    OrderFlowApi::new(db)
 }
 
-async fn tear_down(mut api: OrderManagerApi<SqliteDatabase>) {
+async fn tear_down(mut api: OrderFlowApi<SqliteDatabase>) {
     if let Err(e) = api.db_mut().close().await {
         error!("🚀️ Failed to close database: {e}");
     }

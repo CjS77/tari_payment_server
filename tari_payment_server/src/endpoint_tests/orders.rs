@@ -60,15 +60,11 @@ async fn try_fetch_another_users_orders_as_admin() {
 async fn try_fetch_another_users_orders_as_normal_user() {
     let _ = env_logger::try_init().ok();
     let token = valid_token(vec![Role::User]);
-    let (status, body) =
+    let err =
         get_request(&token, "/orders/fc899cd4395e86e9409fc892f5b0a064373a4300321650e205e446374f6b8f073d", configure)
             .await
-            .expect("Request failed");
-    assert_eq!(status, StatusCode::FORBIDDEN);
-    assert_eq!(
-        body,
-        "{\"error\":\"Insufficient Permissions. You may only view your own orders, or have the ReadAll role.\"}"
-    );
+            .expect_err("Request should have failed");
+    assert_eq!(err, "Insufficient permissions.");
 }
 
 fn valid_token(roles: Vec<Role>) -> String {
@@ -122,4 +118,4 @@ fn orders_response() -> Vec<Order> {
     ]
 }
 
-const ORDERS_JSON: &str = r#"[{"id":0,"order_id":"0000001","customer_id":"1","memo":null,"total_price":100,"currency":"XTR","created_at":"2024-02-29T13:30:00Z","updated_at":"2024-02-29T13:30:00Z","status":"Paid"},{"id":1,"order_id":"0000002","customer_id":"1","memo":null,"total_price":150,"currency":"XTR","created_at":"2024-03-15T18:30:00Z","updated_at":"2024-03-16T11:20:00Z","status":"Cancelled"}]"#;
+const ORDERS_JSON: &str = r#"{"address":"b4db54f75421a02b0d0056fb7203df23c742b25e41283976bdaa7fe63de1ad234d","total_orders":0,"orders":[{"id":0,"order_id":"0000001","customer_id":"1","memo":null,"total_price":100,"currency":"XTR","created_at":"2024-02-29T13:30:00Z","updated_at":"2024-02-29T13:30:00Z","status":"Paid"},{"id":1,"order_id":"0000002","customer_id":"1","memo":null,"total_price":150,"currency":"XTR","created_at":"2024-03-15T18:30:00Z","updated_at":"2024-03-16T11:20:00Z","status":"Cancelled"}]}"#;

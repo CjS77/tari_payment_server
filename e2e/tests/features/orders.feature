@@ -70,3 +70,87 @@ Feature: Orders endpoint
       ]
     }
     """
+
+#--------------------------------------------------------------
+#                      Orders by ID
+#--------------------------------------------------------------
+
+  Scenario: Unauthorized user cannot access the `/order/id/{}` endpoint
+    Given some role assignments
+    When I GETs to "/api/order/id/1" with body
+    Then I receive a 401 Forbidden response with the message 'Please first authenticate with this application.'
+
+  Scenario: Standard user can access their own order by id
+    Given some role assignments
+    When Alice authenticates with nonce = 1 and roles = "user"
+    When Alice GETs to "/api/order/id/1" with body
+    Then I receive a 200 Ok response
+    Then I receive a partial JSON response:
+    """
+    {
+      "id":1,"order_id":"1","customer_id":"alice",
+      "memo":"address: [b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d]",
+      "total_price":100000000
+    }
+    """
+
+  Scenario: Standard user cannot access anyone else's order by id
+    Given some role assignments
+    When Alice authenticates with nonce = 1 and roles = "user"
+    When Alice GETs to "/api/order/id/2" with body
+    Then I receive a 200 Ok response with the message 'null'
+
+  Scenario: Standard user cannot enumerate the order/id endpoint
+    Given some role assignments
+    When Alice authenticates with nonce = 1 and roles = "user"
+    When Alice GETs to "/api/order/id/some_random_order" with body
+    Then I receive a 200 Ok response with the message 'null'
+
+  Scenario: User with ReadAll role can access another order by id
+    Given some role assignments
+    When Admin authenticates with nonce = 1 and roles = "user,read_all"
+    When Admin GETs to "/api/order/id/2" with body
+    Then I receive a 200 Ok response
+    Then I receive a partial JSON response:
+    """
+    {
+      "id":2,"order_id":"2","customer_id":"bob",
+      "memo":"address: [680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b]",
+      "total_price":200000000
+    }
+    """
+    When Admin GETs to "/api/order/id/1" with body
+    Then I receive a 200 Ok response
+    Then I receive a partial JSON response:
+    """
+    {
+        "id":1,"order_id":"1","customer_id":"alice",
+        "memo":"address: [b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d]",
+        "total_price":100000000
+    }
+    """
+
+  Scenario: SuperAdmin can access any order by id
+    Given a super-admin user (Super)
+    When Super authenticates with nonce = 1
+    When Super GETs to "/api/order/id/2" with body
+    Then I receive a 200 Ok response
+    Then I receive a partial JSON response:
+    """
+    {
+      "id":2,"order_id":"2","customer_id":"bob",
+      "memo":"address: [680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b]",
+      "total_price":200000000
+    }
+    """
+    When Super GETs to "/api/order/id/1" with body
+    Then I receive a 200 Ok response
+    Then I receive a partial JSON response:
+    """
+    {
+        "id":1,"order_id":"1","customer_id":"alice",
+        "memo":"address: [b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d]",
+        "total_price":100000000
+    }
+    """
+

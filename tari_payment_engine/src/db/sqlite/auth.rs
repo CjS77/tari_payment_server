@@ -1,3 +1,8 @@
+//! Sqlite database operations for the tari payment authentication
+//!
+//! Generally clients should never call these methods directly, and prefer to use the [`AuthManagement`] trait methods.
+//! that is implemented on the [`SqliteDatabase`] struct instead.
+
 use std::collections::HashMap;
 
 use log::{debug, error};

@@ -5,26 +5,29 @@ use log::*;
 
 use crate::{
     db_types::{NewOrder, NewPayment, Order, TransferStatus},
-    order_manager::OrderManagerError,
+    tpe_api::OrderManagerError,
     InsertOrderResult,
     PaymentGatewayDatabase,
 };
 
 pub type OrderCreatedHookFn = Box<dyn Fn(NewOrder) -> LocalBoxFuture<'static, ()> + Sync>;
 pub type PaymentCreatedHookFn = Box<dyn Fn(NewPayment) -> LocalBoxFuture<'static, ()> + Sync>;
-pub struct OrderManagerApi<B> {
+
+/// `OrderFlowApi` is the primary API for handling order and payment flows in response to merchant order events and
+/// wallet payment events.
+pub struct OrderFlowApi<B> {
     db: B,
     on_order_created: Option<OrderCreatedHookFn>,
     on_payment_created: Option<PaymentCreatedHookFn>,
 }
 
-impl<B> Debug for OrderManagerApi<B> {
+impl<B> Debug for OrderFlowApi<B> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "OrderManagerApi")
     }
 }
 
-impl<B> OrderManagerApi<B> {
+impl<B> OrderFlowApi<B> {
     pub fn new(db: B) -> Self {
         Self { db, on_order_created: None, on_payment_created: None }
     }
@@ -50,7 +53,7 @@ impl<B> OrderManagerApi<B> {
     }
 }
 
-impl<B> OrderManagerApi<B>
+impl<B> OrderFlowApi<B>
 where B: PaymentGatewayDatabase
 {
     /// Submit a new order to the order manager.
@@ -113,7 +116,9 @@ where B: PaymentGatewayDatabase
         Ok(paid_orders)
     }
 
-    pub async fn confirm_transaction(&self, txid: String) -> Result<Vec<Order>, OrderManagerError<B>> {
+    /// Update the status of a payment to "Confirmed". This happens when a transaction in the blockchain is deep enough
+    /// in the chain that a re-org and invalidation of the payment is unlikely.
+    pub async fn confirm_payment(&self, txid: String) -> Result<Vec<Order>, OrderManagerError<B>> {
         trace!("🔄️✅️ Payment {txid} is being marked as confirmed");
         let account_id = self
             .db
@@ -138,7 +143,8 @@ where B: PaymentGatewayDatabase
         Ok(paid_orders)
     }
 
-    pub async fn cancel_transaction(&self, txid: String) -> Result<(), OrderManagerError<B>> {
+    /// Mark a payment as cancelled and update orders and accounts as necessary.
+    pub async fn cancel_payment(&self, txid: String) -> Result<(), OrderManagerError<B>> {
         trace!("🔄️❌️ Payment {txid} is being marked as cancelled");
         self.db
             .update_payment_status(&txid, TransferStatus::Cancelled)

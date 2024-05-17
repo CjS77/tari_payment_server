@@ -31,10 +31,10 @@ mock! {
         type Error = MockErr;
         async fn fetch_user_account(&self, account_id: i64) -> Result<Option<UserAccount>, MockErr>;
         async fn fetch_user_account_for_order(&self, order_id: &OrderId) -> Result<Option<UserAccount>, MockErr>;
-        async fn search_for_user_account_by_memo(&self, memo_match: &str) -> Result<Option<i64>, MockErr>;
         async fn fetch_user_account_for_customer_id(&self, customer_id: &str) -> Result<Option<UserAccount>, MockErr>;
         async fn fetch_user_account_for_address(&self, address: &TariAddress) -> Result<Option<UserAccount>, MockErr>;
         async fn fetch_orders_for_account(&self, account_id: i64) -> Result<Vec<Order>, MockErr>;
+        async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, MockErr>;
     }
 }
 

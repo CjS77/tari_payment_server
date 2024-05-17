@@ -78,15 +78,11 @@ async fn fetch_account_from_user() {
         roles: vec![Role::User],
     };
     let token = issue_token(claims, Utc::now() + Days::new(1));
-    let (status, body) =
+    let err =
         get_request(&token, "/account/fc899cd4395e86e9409fc892f5b0a064373a4300321650e205e446374f6b8f073d", configure)
             .await
-            .expect("Request should have succeeded");
-    assert_eq!(status, StatusCode::FORBIDDEN);
-    assert_eq!(
-        body,
-        r#"{"error":"Insufficient Permissions. You may only view your own account, or have the ReadAll role."}"#
-    );
+            .expect_err("Request should have failed");
+    assert_eq!(err, "Insufficient permissions.");
 }
 
 #[actix_web::test]
@@ -96,10 +92,7 @@ async fn fetch_account_from_users_own_address() {
         roles: vec![Role::User],
     };
     let token = issue_token(claims, Utc::now() + Days::new(1));
-    let (status, body) =
-        get_request(&token, "/account/b4db54f75421a02b0d0056fb7203df23c742b25e41283976bdaa7fe63de1ad234d", configure)
-            .await
-            .expect("Request should have succeeded");
+    let (status, body) = get_request(&token, "/account", configure).await.expect("Request should have succeeded");
     assert_eq!(status, StatusCode::OK);
     let json = r#"
     {"id":1,"created_at":"2024-03-01T10:30:00Z","updated_at":"2024-03-01T10:30:00Z","total_received":1000000,"total_pending":0,"current_balance":1000000,"total_orders":0}

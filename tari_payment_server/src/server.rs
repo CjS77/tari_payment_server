@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use actix_jwt_auth_middleware::use_jwt::UseJWTOnApp;
 use actix_web::{dev::Server, http::KeepAlive, middleware::Logger, web, App, HttpServer};
-use tari_payment_engine::{AccountApi, AuthApi, OrderManagerApi, SqliteDatabase};
+use tari_payment_engine::{AccountApi, AuthApi, OrderFlowApi, SqliteDatabase};
 
 use crate::{
     auth::{build_tps_authority, TokenIssuer},
@@ -15,6 +15,7 @@ use crate::{
         AuthRoute,
         MyAccountRoute,
         MyOrdersRoute,
+        OrderByIdRoute,
         OrdersRoute,
         UpdateRolesRoute,
     },
@@ -30,7 +31,7 @@ pub async fn run_server(config: ServerConfig) -> Result<(), ServerError> {
 
 pub fn create_server_instance(config: ServerConfig, db: SqliteDatabase) -> Result<Server, ServerError> {
     let srv = HttpServer::new(move || {
-        let orders_api = OrderManagerApi::new(db.clone());
+        let orders_api = OrderFlowApi::new(db.clone());
         let auth_api = AuthApi::new(db.clone());
         let jwt_signer = TokenIssuer::new(&config.auth);
         let authority = build_tps_authority(config.auth.clone());
@@ -47,7 +48,8 @@ pub fn create_server_instance(config: ServerConfig, db: SqliteDatabase) -> Resul
             .service(MyAccountRoute::<SqliteDatabase>::new())
             .service(AccountRoute::<SqliteDatabase>::new())
             .service(MyOrdersRoute::<SqliteDatabase>::new())
-            .service(OrdersRoute::<SqliteDatabase>::new());
+            .service(OrdersRoute::<SqliteDatabase>::new())
+            .service(OrderByIdRoute::<SqliteDatabase>::new());
         app.use_jwt(authority.clone(), auth_scope)
             .service(health)
             .service(AuthRoute::<SqliteDatabase>::new())

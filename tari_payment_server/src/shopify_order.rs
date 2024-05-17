@@ -3,7 +3,7 @@ use rand::{Rng, RngCore};
 use serde::{Deserialize, Serialize};
 use tari_payment_engine::{
     db_types::{MicroTari, NewOrder, OrderId},
-    extract_address_from_memo,
+    helpers::extract_address_from_memo,
 };
 use tpg_common::TARI_CURRENCY_CODE_LOWER;
 

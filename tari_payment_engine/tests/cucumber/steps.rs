@@ -33,19 +33,19 @@ async fn wallet_payment(world: &mut ShopifyWorld, txid: String, pubkey: String, 
     let pk = TariAddress::from_str(&pubkey).expect("Not a valid Tari address");
     let mut payment = NewPayment::new(pk, amount, txid);
     if let Some(memo) = memo {
-        payment = payment.with_memo(memo);
+        payment.with_memo(memo);
     }
     let _res = world.api().process_new_payment(payment).await.expect("Error processing payment");
 }
 
 #[when(expr = "payment [{word}] confirms")]
 async fn confirm_payment(world: &mut ShopifyWorld, txid: String) {
-    let _res = world.api().confirm_transaction(txid).await.expect("Error confirming payment");
+    let _res = world.api().confirm_payment(txid).await.expect("Error confirming payment");
 }
 
 #[when(expr = "payment [{word}] is cancelled")]
 async fn cancel_payment(world: &mut ShopifyWorld, txid: String) {
-    world.api().cancel_transaction(txid).await.expect("Error cancelling payment");
+    world.api().cancel_payment(txid).await.expect("Error cancelling payment");
 }
 
 #[when(expr = "I pause for {int}ms")]

@@ -27,7 +27,13 @@ use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use log::*;
 use paste::paste;
 use tari_common_types::tari_address::TariAddress;
-use tari_payment_engine::{db_types::Role, AccountApi, AccountManagement, AuthApi, AuthManagement};
+use tari_payment_engine::{
+    db_types::{OrderId, Role},
+    AccountApi,
+    AccountManagement,
+    AuthApi,
+    AuthManagement,
+};
 
 use crate::{
     auth::{check_login_token_signature, JwtClaims, TokenIssuer},
@@ -66,7 +72,7 @@ macro_rules! route {
         }}
     };
 
-    ($name:ident => $method:ident $path:literal impl $($bounds:ty),+ where requires [$($roles:ty),+])  => {
+    ($name:ident => $method:ident $path:literal impl $($bounds:ty),+ where requires [$($roles:ty),*])  => {
         paste! { pub struct [<$name:camel Route>]<A>(PhantomData<fn() -> A>);}
         paste! { impl<A> [<$name:camel Route>]<A> {
             #[allow(clippy::new_without_default)]
@@ -201,6 +207,37 @@ pub async fn orders<B: AccountManagement>(
     let address = path.into_inner().to_address();
     debug!("💻️ GET orders for {address}");
     get_orders(&address, api.as_ref()).await
+}
+
+//#[get("/orders/{address}")]
+// Additional role requirements are checked below
+route!(order_by_id => Get "/order/id/{order_id}" impl AccountManagement where requires [Role::User]);
+pub async fn order_by_id<B: AccountManagement>(
+    claims: JwtClaims,
+    path: web::Path<OrderId>,
+    api: web::Data<AccountApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let order_id = path.into_inner();
+    debug!("💻️ GET order by id for {order_id}");
+    let address = claims.address;
+
+    // There's no particular ACL on this route, so check that the order belongs to the user,
+    // OR they have the `ReadAll`/`SuperAdmin` role
+    let is_admin = claims.roles.contains(&Role::ReadAll) || claims.roles.contains(&Role::SuperAdmin);
+    if is_admin {
+        let order = api.as_ref().fetch_order_by_order_id(&order_id).await.map_err(|e| {
+            debug!("💻️ Could not fetch order. {e}");
+            ServerError::BackendError(e.to_string())
+        })?;
+        return Ok(HttpResponse::Ok().json(order));
+    }
+    // We need to do some extra checks to make sure the user may see this order
+    let orders = api.orders_for_address(&address).await.map_err(|e| {
+        debug!("💻️ Could not fetch order. {e}");
+        ServerError::BackendError(e.to_string())
+    })?;
+    let result = orders.and_then(|orders| orders.orders.into_iter().find(|o| o.order_id == order_id));
+    Ok(HttpResponse::Ok().json(result))
 }
 
 pub async fn get_orders<B: AccountManagement>(

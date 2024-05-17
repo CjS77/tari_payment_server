@@ -2,7 +2,7 @@ use log::{debug, trace};
 use sqlx::{QueryBuilder, SqliteConnection};
 
 use crate::{
-    db::{common::InsertOrderResult, sqlite::SqliteDatabaseError},
+    db::{sqlite::SqliteDatabaseError, traits::InsertOrderResult},
     db_types::{NewOrder, Order, OrderId, OrderStatusType, OrderUpdate},
 };
 
@@ -43,7 +43,7 @@ async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<In
     Ok(InsertOrderResult::Inserted(record.id))
 }
 
-/// Returns the last entry i the orders table for the corresponding `order_id`
+/// Returns the last entry in the orders table for the corresponding `order_id`
 pub async fn fetch_order_by_order_id(
     order_id: &OrderId,
     conn: &mut SqliteConnection,

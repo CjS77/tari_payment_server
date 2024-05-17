@@ -2,7 +2,7 @@ use cucumber::World;
 use log::*;
 use tari_payment_engine::{
     test_utils::prepare_env::{create_database, random_db_path, run_migrations},
-    OrderManagerApi,
+    OrderFlowApi,
     SqliteDatabase,
 };
 use tokio::time::sleep;
@@ -15,11 +15,11 @@ pub struct ShopifyWorld {
 #[derive(Debug)]
 pub struct OrderManagementSystem {
     pub db_path: String,
-    pub api: OrderManagerApi<SqliteDatabase>,
+    pub api: OrderFlowApi<SqliteDatabase>,
 }
 
 impl ShopifyWorld {
-    pub fn api(&self) -> &OrderManagerApi<SqliteDatabase> {
+    pub fn api(&self) -> &OrderFlowApi<SqliteDatabase> {
         &self.system.as_ref().expect("OrderManagerApi not initialised").api
     }
 }
@@ -30,7 +30,7 @@ impl OrderManagementSystem {
         let db = SqliteDatabase::new_with_url(&url, 1).await.expect("Error creating connection to database");
         debug!("Created database: {url}");
         sleep(std::time::Duration::from_millis(50)).await;
-        let api = OrderManagerApi::new(db);
+        let api = OrderFlowApi::new(db);
         Self { db_path: url, api }
     }
 }

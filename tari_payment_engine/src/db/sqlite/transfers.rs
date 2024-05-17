@@ -1,7 +1,7 @@
 use sqlx::SqliteConnection;
 
 use crate::{
-    db::{common::InsertPaymentResult, sqlite::SqliteDatabaseError},
+    db::{sqlite::SqliteDatabaseError, traits::InsertPaymentResult},
     db_types::{NewPayment, Payment, TransferStatus},
 };
 

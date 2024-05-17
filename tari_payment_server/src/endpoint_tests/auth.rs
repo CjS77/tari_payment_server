@@ -94,6 +94,7 @@ fn configure_app(config: AuthConfig, update_nonce_result: Result<(), AuthApiErro
     move |cfg| {
         let mut auth_manager = MockAuthManager::new();
         auth_manager.expect_update_nonce_for_address().return_const(update_nonce_result);
+        auth_manager.expect_check_auth_account_exists().returning(move |_| Ok(true));
         auth_manager.expect_check_address_has_roles().returning(|_a, _b| Ok(()));
         let auth_api = AuthApi::new(auth_manager);
         let jwt_signer = TokenIssuer::new(&config.clone());

@@ -1,3 +1,6 @@
+//! `SqliteDatabase` is a concrete implementation of a Tari Payment engine backend.
+//!
+//! Unsurprisingly, it uses SQLite as the backend and implements all the traits defined in the [`traits`] module.
 use std::fmt::Debug;
 
 use log::*;
@@ -7,8 +10,8 @@ use tari_common_types::tari_address::TariAddress;
 use super::{auth, db_url, new_pool, orders, transfers, user_accounts, SqliteDatabaseError};
 use crate::{
     db::{
-        common::{AccountManagement, AuthManagement, OrderManagement, PaymentGatewayDatabase},
         sqlite::orders::OrderQueryFilter,
+        traits::{AccountManagement, InsertOrderResult, InsertPaymentResult, PaymentGatewayDatabase},
     },
     db_types::{
         MicroTari,
@@ -24,8 +27,8 @@ use crate::{
         UserAccount,
     },
     AuthApiError,
-    InsertOrderResult,
-    InsertPaymentResult,
+    AuthManagement,
+    OrderManagement,
 };
 
 #[derive(Clone)]
@@ -244,6 +247,11 @@ impl AccountManagement for SqliteDatabase {
         let mut conn = self.pool.acquire().await?;
         let query = OrderQueryFilter::default().with_account_id(account_id);
         orders::fetch_orders(query, &mut conn).await
+    }
+
+    async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, Self::Error> {
+        let mut conn = self.pool.acquire().await?;
+        orders::fetch_order_by_order_id(order_id, &mut conn).await
     }
 }
 

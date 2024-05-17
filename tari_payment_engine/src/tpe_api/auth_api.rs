@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use tari_common_types::tari_address::TariAddress;
 
-use crate::{db::common::AuthManagement, db_types::Role, AuthApiError};
+use crate::{db_types::Role, AuthApiError, AuthManagement};
 
 pub struct AuthApi<B> {
     db: B,
