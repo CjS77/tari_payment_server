@@ -50,6 +50,28 @@ pub async fn health() -> impl Responder {
 
 // Web-actix cannot handle generics in handlers, so it's implemented manually using the `route!` macro
 macro_rules! route {
+    ($name:ident => $method:ident $path:literal requires [$($roles:ty),*]) => {
+        paste! { pub struct [<$name:camel Route>];}
+        paste! {
+                impl [<$name:camel Route>] {
+                #[allow(clippy::new_without_default)]
+                pub fn new() -> Self { Self }
+            }
+        }
+        paste! {
+            impl actix_web::dev::HttpServiceFactory for [<$name:camel Route>] {
+                fn register(self, config: &mut actix_web::dev::AppService) {
+                    let res = actix_web::Resource::new($path)
+                        .name(stringify!($name))
+                        .guard(actix_web::guard::$method())
+                        .to($name)
+                        .wrap(crate::middleware::AclMiddlewareFactory::new(&[$($roles),+]));
+                    actix_web::dev::HttpServiceFactory::register(res, config);
+                }
+            }
+        }
+    };
+
     ($name:ident => $method:ident $path:literal impl $($bounds:ty),+) => {
         paste! { pub struct [<$name:camel Route>]<A>(PhantomData<fn() -> A>);}
         paste! { impl<A> [<$name:camel Route>]<A> {
@@ -287,4 +309,10 @@ pub async fn update_roles<B: AuthManagement>(
         api.remove_roles(&address, &acl_request.revoke).await?;
     }
     Ok(HttpResponse::Ok().finish())
+}
+
+route!(check_token => Get "/check_token" requires [Role::User]);
+pub async fn check_token(claims: JwtClaims) -> Result<HttpResponse, ServerError> {
+    debug!("💻️ GET check_token for {}", claims.address);
+    Ok(HttpResponse::Ok().body("Token is valid."))
 }

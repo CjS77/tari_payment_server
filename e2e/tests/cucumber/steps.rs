@@ -1,10 +1,22 @@
-use std::str::FromStr;
+use std::{
+    ops::{Sub, SubAssign},
+    str::FromStr,
+};
 
+use chrono::{Duration, Utc};
 use cucumber::{gherkin::Step, then, when};
 use e2e::helpers::json_is_subset_of;
 use log::*;
 use reqwest::Method;
-use tari_payment_engine::db_types::Role;
+use tari_jwt::{
+    jwt_compact::{AlgorithmExt, Claims, Header, UntrustedToken},
+    tari_crypto::tari_utilities::message_format::MessageFormat,
+    Ristretto256,
+    Ristretto256SigningKey,
+};
+use tari_payment_engine::db_types::{LoginToken, Role};
+use tari_payment_server::auth::{build_jwt_signer, JwtClaims, TokenIssuer};
+use tokio::time::sleep;
 
 use crate::cucumber::{
     setup::{SeedUsers, SuperAdmin},
@@ -105,6 +117,70 @@ async fn general_request(world: &mut TPGWorld, _user: String, method: String, ur
         .await;
     trace!("Got Response: {} {}", res.0, res.1);
     world.response = Some(res);
+}
+
+#[when(expr = "{word} modifies the {word} on the access token to {string}")]
+async fn modify_token(world: &mut TPGWorld, _user: String, field: String, value: String) {
+    let token = world.access_token.take().expect("No access token");
+    debug!("Modifying token: {token}");
+    let new_token = match field.as_str() {
+        "signature" => modify_signature(token, &value),
+        "roles" => modify_roles(token, &value),
+        _ => panic!("Invalid field: {field}"),
+    };
+    debug!("Modified token: {new_token}");
+    world.access_token = Some(new_token);
+}
+
+#[when(expr = "{word} creates a self-signed SuperAdmin access token")]
+async fn create_access_token(world: &mut TPGWorld, user: String) {
+    let users = SeedUsers::new();
+    let user = users.user(&user);
+    let claims = JwtClaims {
+        address: user.address.clone(),
+        roles: vec![Role::User, Role::ReadAll, Role::Write, Role::SuperAdmin],
+    };
+    let claims = Claims::new(claims);
+    let header = Header::empty().with_token_type("JWT");
+    let token = Ristretto256
+        .token(&header, &claims, &Ristretto256SigningKey(user.secret.clone()))
+        .expect("Failed to sign token");
+    world.access_token = Some(token);
+}
+
+#[when(expr = "the access token expires")]
+async fn expire_access_token(world: &mut TPGWorld) {
+    let token = world.access_token.take().expect("No access token");
+    let mut claims = UntrustedToken::new(&token)
+        .expect("Invalid token")
+        .deserialize_claims_unchecked::<JwtClaims>()
+        .expect("Invalid claims");
+    let key = world.config.auth.jwt_signing_key.clone();
+    let signer = build_jwt_signer(key);
+    let token =
+        signer.create_signed_token(&claims.custom, std::time::Duration::default()).expect("Failed to sign token");
+    sleep(tokio::time::Duration::from_secs(1)).await;
+    world.access_token = Some(token);
+}
+
+fn modify_signature(token: String, value: &str) -> String {
+    let mut parts = token.split('.').map(|s| s.to_owned()).collect::<Vec<_>>();
+    let n = value.len();
+    let sig = parts.iter_mut().nth(2).expect("No signature");
+    sig.replace_range(0..n, value);
+    format!("{}.{}.{}", parts[0], parts[1], parts[2])
+}
+
+fn modify_roles(orig_token: String, roles: &str) -> String {
+    let token = UntrustedToken::new(&orig_token).expect("Invalid token");
+    let mut claims = token.deserialize_claims_unchecked::<JwtClaims>().expect("Invalid claims");
+    claims.custom.roles = extract_roles(roles);
+    let new_token = (Ristretto256 {})
+        .token(token.header(), &claims, &Ristretto256SigningKey::default())
+        .expect("Failed to sign token");
+    let new_parts = new_token.split('.').collect::<Vec<_>>();
+    let orig_parts = orig_token.split('.').collect::<Vec<_>>();
+    format!("{}.{}.{}", orig_parts[0], new_parts[1], orig_parts[2])
 }
 
 fn extract_token(docstring: Option<&String>) -> (String, String) {

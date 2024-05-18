@@ -155,6 +155,11 @@ async fn fresh_database(world: &mut TPGWorld) {
     world.start_server().await;
 }
 
+#[given("the user is not logged in")]
+async fn user_not_logged_in(_world: &mut TPGWorld) {
+    // No-op
+}
+
 #[given("some role assignments")]
 async fn roles_assignments(world: &mut TPGWorld) {
     setup_roles_assignments(world).await;

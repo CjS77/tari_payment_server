@@ -13,6 +13,7 @@ use crate::{
         shopify_webhook,
         AccountRoute,
         AuthRoute,
+        CheckTokenRoute,
         MyAccountRoute,
         MyOrdersRoute,
         OrderByIdRoute,
@@ -49,7 +50,8 @@ pub fn create_server_instance(config: ServerConfig, db: SqliteDatabase) -> Resul
             .service(AccountRoute::<SqliteDatabase>::new())
             .service(MyOrdersRoute::<SqliteDatabase>::new())
             .service(OrdersRoute::<SqliteDatabase>::new())
-            .service(OrderByIdRoute::<SqliteDatabase>::new());
+            .service(OrderByIdRoute::<SqliteDatabase>::new())
+            .service(CheckTokenRoute::new());
         app.use_jwt(authority.clone(), auth_scope)
             .service(health)
             .service(AuthRoute::<SqliteDatabase>::new())
