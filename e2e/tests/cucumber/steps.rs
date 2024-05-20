@@ -1,21 +1,19 @@
 use std::{
-    ops::{Sub, SubAssign},
     str::FromStr,
 };
 
-use chrono::{Duration, Utc};
+
 use cucumber::{gherkin::Step, then, when};
 use e2e::helpers::json_is_subset_of;
 use log::*;
 use reqwest::Method;
 use tari_jwt::{
     jwt_compact::{AlgorithmExt, Claims, Header, UntrustedToken},
-    tari_crypto::tari_utilities::message_format::MessageFormat,
     Ristretto256,
     Ristretto256SigningKey,
 };
-use tari_payment_engine::db_types::{LoginToken, Role};
-use tari_payment_server::auth::{build_jwt_signer, JwtClaims, TokenIssuer};
+use tari_payment_engine::db_types::{Role};
+use tari_payment_server::auth::{build_jwt_signer, JwtClaims};
 use tokio::time::sleep;
 
 use crate::cucumber::{
@@ -151,7 +149,7 @@ async fn create_access_token(world: &mut TPGWorld, user: String) {
 #[when(expr = "the access token expires")]
 async fn expire_access_token(world: &mut TPGWorld) {
     let token = world.access_token.take().expect("No access token");
-    let mut claims = UntrustedToken::new(&token)
+    let claims = UntrustedToken::new(&token)
         .expect("Invalid token")
         .deserialize_claims_unchecked::<JwtClaims>()
         .expect("Invalid claims");

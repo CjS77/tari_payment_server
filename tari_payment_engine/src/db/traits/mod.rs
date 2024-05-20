@@ -30,7 +30,6 @@ mod data_objects;
 pub use account_management::AccountManagement;
 pub use auth_management::AuthManagement;
 pub use data_objects::{InsertOrderResult, InsertPaymentResult};
-pub use order_management::OrderManagement;
 pub use payment_gateway_database::PaymentGatewayDatabase;
 
 #[macro_export]

@@ -11,7 +11,7 @@ use tari_jwt::{
     Ristretto256SigningKey,
 };
 use tari_payment_engine::{
-    db_types::{LoginToken, MicroTari, NewOrder, OrderId, Role},
+    db_types::{LoginToken, MicroTari, NewOrder, NewPayment, OrderId, Role},
     AuthManagement,
     PaymentGatewayDatabase,
 };
@@ -64,6 +64,46 @@ fn seed_orders() -> [NewOrder; 5] {
             memo: Some("address: [aa3c076152c1ae44ae86585eeba1d348badb845d1cab5ef12db98fafb4fea55d6c]".into()),
             total_price: MicroTari::from_tari(25),
             created_at: Utc.with_ymd_and_hms(2024, 3, 12, 18, 0, 0).unwrap(),
+        },
+    ]
+}
+
+fn seed_payments() -> [NewPayment; 5] {
+    [
+        NewPayment {
+            sender: "b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d".parse().unwrap(), // Alice
+            amount: MicroTari::from_tari(15),
+            txid: "alicepayment001".to_string(),
+            memo: None,
+            order_id: None,
+        },
+        NewPayment {
+            sender: "b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d".parse().unwrap(), // Alice
+            amount: MicroTari::from_tari(100),
+            txid: "alicepayment002".to_string(),
+            memo: None,
+            order_id: None,
+        },
+        NewPayment {
+            sender: "680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b".parse().unwrap(), // Bob
+            amount: MicroTari::from_tari(50),
+            txid: "bobpayment001".to_string(),
+            memo: None,
+            order_id: None,
+        },
+        NewPayment {
+            sender: "680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b".parse().unwrap(), // Bob
+            amount: MicroTari::from_tari(500),
+            txid: "bobpayment002".to_string(),
+            memo: None,
+            order_id: None,
+        },
+        NewPayment {
+            sender: "c483a8f207d30d92633f4efc5e6a48a2e14aa45f94a4dd183749232e6bc39d64f7".parse().unwrap(), // Anon
+            amount: MicroTari::from_tari(700),
+            txid: "anonpayment001".to_string(),
+            memo: None,
+            order_id: None,
         },
     ]
 }
@@ -153,6 +193,14 @@ async fn fresh_database(world: &mut TPGWorld) {
         db.process_new_order_for_customer(order).await.unwrap();
     }
     world.start_server().await;
+}
+
+#[given("some payments are received")]
+async fn payments_received(world: &mut TPGWorld) {
+    let db = world.database();
+    for payment in seed_payments() {
+        db.process_new_payment_for_pubkey(payment).await.expect("Error persisting payment");
+    }
 }
 
 #[given("the user is not logged in")]

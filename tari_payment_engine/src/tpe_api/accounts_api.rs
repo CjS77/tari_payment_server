@@ -2,11 +2,12 @@
 
 use std::fmt::Debug;
 
+use log::trace;
 use tari_common_types::tari_address::TariAddress;
 
 use crate::{
     db_types::{Order, OrderId, UserAccount},
-    tpe_api::{errors::AccountApiError, order_objects::OrderResult},
+    tpe_api::{errors::AccountApiError, order_objects::OrderResult, payment_objects::PaymentsResult},
     AccountManagement,
 };
 
@@ -41,6 +42,8 @@ where B: AccountManagement
         self.db.fetch_order_by_order_id(order_id).await.map_err(|e| AccountApiError::DatabaseError(e.to_string()))
     }
 
+    /// Fetches all orders associated with the given Tari address, and wraps them in an `OrderResult`, which includes
+    /// the metadata of the address and the sum of the orders' values.
     pub async fn orders_for_address(&self, address: &TariAddress) -> Result<Option<OrderResult>, AccountApiError> {
         let mut result = OrderResult { address: address.clone(), total_orders: 0.into(), orders: vec![] };
         match self.account_by_address(address).await {
@@ -57,5 +60,19 @@ where B: AccountManagement
             Ok(None) => Ok(None),
             Err(e) => Err(e),
         }
+    }
+
+    /// Fetches all payments associated with the given Tari address, and wraps them in a `PaymentsResult`, which
+    /// includes the metadata of the address and the sum of the payments' values.
+    pub async fn payments_for_address(&self, address: &TariAddress) -> Result<PaymentsResult, AccountApiError> {
+        let payments = self
+            .db
+            .fetch_payments_for_address(address)
+            .await
+            .map_err(|e| AccountApiError::DatabaseError(e.to_string()))?;
+        trace!("Payments for address: {:?}", payments);
+        let total_payments = payments.iter().map(|p| p.amount).sum();
+        trace!("Total payments for address: {:?}", total_payments);
+        Ok(PaymentsResult { address: address.clone().into(), total_payments, payments })
     }
 }

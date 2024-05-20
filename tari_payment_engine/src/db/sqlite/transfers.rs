@@ -1,4 +1,5 @@
 use sqlx::SqliteConnection;
+use tari_common_types::tari_address::TariAddress;
 
 use crate::{
     db::{sqlite::SqliteDatabaseError, traits::InsertPaymentResult},
@@ -41,6 +42,28 @@ pub async fn update_status(
 }
 
 pub async fn fetch_payment(txid: &str, conn: &mut SqliteConnection) -> Result<Option<Payment>, SqliteDatabaseError> {
-    let payment = sqlx::query_as(r#"SELECT * FROM payments WHERE txid = ?"#).bind(txid).fetch_optional(conn).await?;
+    let payment = sqlx::query_as(
+        r#"SELECT txid, sender, amount, memo, order_id, payment_type, status,
+    created_at as "created_at: chrono::DateTime<chrono::Utc>",
+    updated_at as "updated_at: chrono::DateTime<chrono::Utc>"
+    FROM payments WHERE txid = ?"#,
+    )
+    .bind(txid)
+    .fetch_optional(conn)
+    .await?;
     Ok(payment)
+}
+
+pub async fn fetch_payments_for_address(
+    address: &TariAddress,
+    conn: &mut SqliteConnection,
+) -> Result<Vec<Payment>, SqliteDatabaseError> {
+    let payments = sqlx::query_as(
+        r#"SELECT *
+    FROM payments WHERE sender = ?"#,
+    )
+    .bind(address.to_hex())
+    .fetch_all(conn)
+    .await?;
+    Ok(payments)
 }

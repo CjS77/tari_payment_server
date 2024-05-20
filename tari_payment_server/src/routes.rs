@@ -28,7 +28,7 @@ use log::*;
 use paste::paste;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
-    db_types::{OrderId, Role},
+    db_types::{OrderId, Role, SerializedTariAddress},
     AccountApi,
     AccountManagement,
     AuthApi,
@@ -37,16 +37,10 @@ use tari_payment_engine::{
 
 use crate::{
     auth::{check_login_token_signature, JwtClaims, TokenIssuer},
-    data_objects::{RoleUpdateRequest, SerializedTariAddress},
+    data_objects::RoleUpdateRequest,
     errors::ServerError,
     shopify_order::ShopifyOrder,
 };
-
-#[get("/health")]
-pub async fn health() -> impl Responder {
-    trace!("💻️ Received health check request");
-    HttpResponse::Ok().body("👍️\n")
-}
 
 // Web-actix cannot handle generics in handlers, so it's implemented manually using the `route!` macro
 macro_rules! route {
@@ -118,6 +112,14 @@ macro_rules! route {
     };
 }
 
+// ----------------------------------------------   Health  ----------------------------------------------------
+#[get("/health")]
+pub async fn health() -> impl Responder {
+    trace!("💻️ Received health check request");
+    HttpResponse::Ok().body("👍️\n")
+}
+
+//----------------------------------------------   Auth  ----------------------------------------------------
 route!(auth => Post "/auth" impl AuthManagement);
 /// Route handler for the auth endpoint
 ///
@@ -161,6 +163,8 @@ where
     Ok(HttpResponse::Ok().content_type("application/json").body(access_token))
 }
 
+//----------------------------------------------   Account  ----------------------------------------------------
+
 route!(my_account => Get "/account" impl AccountManagement);
 /// Route handler for the account endpoint
 ///
@@ -180,8 +184,7 @@ pub async fn my_account<B: AccountManagement>(
 route!(account => Get "/account/{address}" impl AccountManagement where requires [Role::ReadAll]);
 /// Route handler for the account/{address} endpoint
 ///
-/// This route is used to fetch account information for a given address. The address that is queried is the one that
-/// is supplied in the path.
+/// This route is used to fetch account information for the address supplied in the query path
 ///
 /// To access other accounts, the user must have the `ReadAll` role and can use the `/account/{address}` endpoint.
 /// Otherwise, the user can only access their own account. It is usually more convenient to use the `/account` endpoint
@@ -210,7 +213,14 @@ pub async fn get_account<B: AccountManagement>(
     }
 }
 
-//#[get("/orders")]
+//----------------------------------------------   Orders  ----------------------------------------------------
+
+/// Route handler for the orders endpoint
+///
+/// Authenticated users can fetch their own orders using this endpoint. The Tari address for the account is extracted
+/// from the JWT token supplied in the `tpg_access_token` header.
+///
+/// Admin users (ReadAll and SuperAdmin roles) can use the `/orders/{address}` endpoint to fetch orders for any account.
 route!(my_orders => Get "/orders" impl AccountManagement);
 pub async fn my_orders<B: AccountManagement>(
     claims: JwtClaims,
@@ -220,7 +230,9 @@ pub async fn my_orders<B: AccountManagement>(
     get_orders(&claims.address, api.as_ref()).await
 }
 
-//#[get("/orders/{address}")]
+/// Route handler for the orders/{address} endpoint
+///
+/// Admin users (ReadAll and SuperAdmin roles) can fetch orders for any account using this endpoint.
 route!(orders => Get "/orders/{address}" impl AccountManagement where requires [Role::ReadAll]);
 pub async fn orders<B: AccountManagement>(
     path: web::Path<SerializedTariAddress>,
@@ -231,8 +243,13 @@ pub async fn orders<B: AccountManagement>(
     get_orders(&address, api.as_ref()).await
 }
 
-//#[get("/orders/{address}")]
-// Additional role requirements are checked below
+/// User `/order/id/{order_id}` to fetch a specific order by its order_id.
+///
+/// Authenticated users can fetch their own orders using this endpoint. The Tari address for the account is extracted
+/// from the JWT token supplied in the `tpg_access_token` header. Any other order ids supplied return null, whether they
+/// exist or not.
+///
+/// Admin users (ReadAll and SuperAdmin roles) will be able to retrieve any order by its order_id.
 route!(order_by_id => Get "/order/id/{order_id}" impl AccountManagement where requires [Role::User]);
 pub async fn order_by_id<B: AccountManagement>(
     claims: JwtClaims,
@@ -276,6 +293,51 @@ pub async fn get_orders<B: AccountManagement>(
     }
 }
 
+//----------------------------------------------   Payments  ----------------------------------------------------
+
+/// Route handler for the payments endpoint
+///
+/// Authenticated users can fetch their own payments using this endpoint. The Tari address for the account is extracted
+/// from the JWT token supplied in the `tpg_access_token` header.
+///
+/// Admin users (ReadAll and SuperAdmin roles) can use the `/payments/{address}` endpoint to fetch payments for any
+/// wallet address.
+route!(my_payments => Get "/payments" impl AccountManagement);
+pub async fn my_payments<B: AccountManagement>(
+    claims: JwtClaims,
+    api: web::Data<AccountApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    debug!("💻️ GET my_payments for {}", claims.address);
+    get_payments(&claims.address, api.as_ref()).await
+}
+
+/// Route handler for the payments/{address} endpoint
+///
+/// Admin users (ReadAll and SuperAdmin roles) can fetch payments for any account using this endpoint. Other users
+/// will receive a 401 Unauthorized response.
+route!(payments => Get "/payments/{address}" impl AccountManagement where requires [Role::ReadAll]);
+pub async fn payments<B: AccountManagement>(
+    path: web::Path<SerializedTariAddress>,
+    api: web::Data<AccountApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let address = path.into_inner().to_address();
+    debug!("💻️ GET orders for {address}");
+    get_payments(&address, api.as_ref()).await
+}
+
+async fn get_payments<B>(address: &TariAddress, api: &AccountApi<B>) -> Result<HttpResponse, ServerError>
+where B: AccountManagement {
+    match api.payments_for_address(address).await {
+        Ok(payments) => Ok(HttpResponse::Ok().json(payments)),
+        Err(e) => {
+            debug!("💻️ Could not fetch payments. {e}");
+            Err(ServerError::BackendError(e.to_string()))
+        },
+    }
+}
+
+//----------------------------------------------   Checkout  ----------------------------------------------------
+
 #[post("/webhook/checkout_create")]
 pub async fn shopify_webhook(req: HttpRequest, body: web::Bytes) -> Result<HttpResponse, ServerError> {
     trace!("💻️ Received webhook request: {}", req.uri());
@@ -292,7 +354,7 @@ pub async fn shopify_webhook(req: HttpRequest, body: web::Bytes) -> Result<HttpR
     Ok(HttpResponse::Ok().finish())
 }
 
-//#[post("/roles/")]
+//----------------------------------------------   Roles  ----------------------------------------------------
 route!(update_roles => Post "/roles" impl AuthManagement where requires [Role::SuperAdmin]);
 pub async fn update_roles<B: AuthManagement>(
     api: web::Data<AuthApi<B>>,
@@ -311,6 +373,7 @@ pub async fn update_roles<B: AuthManagement>(
     Ok(HttpResponse::Ok().finish())
 }
 
+//----------------------------------------------  Check Token  ----------------------------------------------------
 route!(check_token => Get "/check_token" requires [Role::User]);
 pub async fn check_token(claims: JwtClaims) -> Result<HttpResponse, ServerError> {
     debug!("💻️ GET check_token for {}", claims.address);

@@ -35,5 +35,6 @@ pub mod auth_api;
 pub mod errors;
 pub mod order_flow_api;
 pub mod order_objects;
+pub mod payment_objects;
 
 pub use errors::OrderManagerError;

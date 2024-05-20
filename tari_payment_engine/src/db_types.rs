@@ -1,19 +1,21 @@
 use std::{
     fmt::Display,
+    iter::Sum,
     ops::{Add, Neg, Sub, SubAssign},
     str::FromStr,
 };
 
 use chrono::{DateTime, Utc};
-use log::error;
+use log::{error};
 use serde::{Deserialize, Serialize};
-use sqlx::{sqlite::SqliteRow, Error, FromRow, Row, Type};
-use tari_common_types::tari_address::TariAddress;
+use sqlx::{database::HasValueRef, Database, Decode, FromRow, Sqlite, Type};
+use tari_common_types::tari_address::{TariAddress, TariAddressError};
 use thiserror::Error;
 
 use crate::{
     helpers::{extract_address_from_memo, extract_order_number_from_memo},
     op,
+    tpe_api::order_objects::{address_to_hex, str_to_address},
 };
 
 //--------------------------------------     MicroTari       ---------------------------------------------------------
@@ -27,6 +29,12 @@ op!(binary MicroTari, Add, add);
 op!(binary MicroTari, Sub, sub);
 op!(inplace MicroTari, SubAssign, sub_assign);
 op!(unary MicroTari, Neg, neg);
+
+impl Sum for MicroTari {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.fold(Self::default(), Add::add)
+    }
+}
 
 #[derive(Debug, Clone, Error)]
 #[error("Value cannot be represented in microTari: {0}")]
@@ -91,6 +99,64 @@ impl Display for PublicKey {
 impl<S: Into<String>> From<S> for PublicKey {
     fn from(value: S) -> Self {
         Self(value.into())
+    }
+}
+
+//--------------------------------------     TariAddress       ---------------------------------------------------------
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SerializedTariAddress(
+    #[serde(serialize_with = "address_to_hex", deserialize_with = "str_to_address")] TariAddress,
+);
+
+impl SerializedTariAddress {
+    pub fn to_address(self) -> TariAddress {
+        self.0
+    }
+
+    pub fn as_address(&self) -> &TariAddress {
+        &self.0
+    }
+}
+
+impl AsRef<TariAddress> for SerializedTariAddress {
+    fn as_ref(&self) -> &TariAddress {
+        &self.0
+    }
+}
+
+impl TryFrom<String> for SerializedTariAddress {
+    type Error = TariAddressError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.parse::<TariAddress>().map(Self)
+    }
+}
+
+impl From<TariAddress> for SerializedTariAddress {
+    fn from(value: TariAddress) -> Self {
+        Self(value)
+    }
+}
+
+impl<'r, DB: Database> Decode<'r, DB> for SerializedTariAddress
+// we want to delegate some of the work to string
+// decoding so let's make sure strings are supported by
+// the database
+where &'r str: Decode<'r, DB>
+{
+    fn decode(
+        value: <DB as HasValueRef<'r>>::ValueRef,
+    ) -> Result<SerializedTariAddress, Box<dyn std::error::Error + 'static + Send + Sync>> {
+        let value = <&str as Decode<DB>>::decode(value)?;
+        let addr = value.parse::<TariAddress>()?;
+        Ok(addr.into())
+    }
+}
+
+impl Type<Sqlite> for SerializedTariAddress {
+    fn type_info() -> <Sqlite as Database>::TypeInfo {
+        <String as Type<Sqlite>>::type_info()
     }
 }
 
@@ -323,7 +389,7 @@ impl OrderUpdate {
 }
 
 //--------------------------------------        Payment       ---------------------------------------------------------
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Payment {
     pub txid: String,
     /// The time the payment was received
@@ -331,7 +397,7 @@ pub struct Payment {
     /// The time the payment was updated
     pub updated_at: DateTime<Utc>,
     /// The public key of the user who made the payment
-    pub sender: TariAddress,
+    pub sender: SerializedTariAddress,
     /// The amount of the payment
     pub amount: MicroTari,
     /// The memo attached to the transfer
@@ -342,34 +408,45 @@ pub struct Payment {
     pub status: TransferStatus,
 }
 
-impl FromRow<'_, SqliteRow> for Payment {
-    fn from_row(row: &'_ SqliteRow) -> Result<Self, Error> {
-        let txid = row.try_get("txid")?;
-        let created_at = row
-            .try_get::<'_, &str, _>("created_at")?
-            .parse::<DateTime<Utc>>()
-            .map_err(|e| Error::Decode(Box::new(e)))?;
-        let updated_at = row
-            .try_get::<'_, &str, _>("updated_at")?
-            .parse::<DateTime<Utc>>()
-            .map_err(|e| Error::Decode(Box::new(e)))?;
-        let sender =
-            row.try_get::<'_, &str, _>("sender")?.parse::<TariAddress>().map_err(|e| Error::Decode(Box::new(e)))?;
-        let amount = row.try_get::<'_, i64, _>("amount").map(MicroTari::from)?;
-        let memo = row.try_get("memo")?;
-        let order_id =
-            row.try_get::<'_, Option<String>, _>("order_id").map_err(|e| Error::Decode(Box::new(e)))?.map(OrderId::new);
-        let payment_type = row
-            .try_get::<'_, &str, _>("payment_type")?
-            .parse::<PaymentType>()
-            .map_err(|e| Error::Decode(Box::new(e)))?;
-        let status =
-            row.try_get::<'_, &str, _>("status")?.parse::<TransferStatus>().map_err(|e| Error::Decode(Box::new(e)))?;
-        Ok(Self { txid, created_at, updated_at, sender, amount, memo, order_id, payment_type, status })
-    }
-}
+// impl FromRow<'_, SqliteRow> for Payment {
+//     fn from_row(row: &'_ SqliteRow) -> Result<Self, Error> {
+//         let txid = row.try_get("txid")?;
+//         trace!("txid: {}", txid);
+//         let created_at = row
+//             .try_get::<'_, &str, _>("created_at")?
+//             .parse::<DateTime<Utc>>()
+//             .map_err(|e| Error::Decode(Box::new(e)))?;
+//         trace!("Created at: {}", created_at);
+//         let updated_at = row
+//             .try_get::<'_, &str, _>("updated_at")?
+//             .parse::<DateTime<Utc>>()
+//             .map_err(|e| Error::Decode(Box::new(e)))?;
+//         trace!("Updated at: {}", updated_at);
+//         let sender: SerializedTariAddress =
+//             row.try_get::<'_, &str, _>("sender")?.parse::<TariAddress>().map_err(|e| Error::Decode(Box::new(e)))?
+//                 .into();
+//         trace!("Sender: {}", sender.as_address());
+//         let amount = row.try_get::<'_, i64, _>("amount").map(MicroTari::from)?;
+//         trace!("Amount: {}", amount.0);
+//         let memo = row.try_get("memo")?;
+//         trace!("Memo: {:?}", memo);
+//         let order_id =
+//             row.try_get::<'_, Option<String>, _>("order_id").map_err(|e|
+// Error::Decode(Box::new(e)))?.map(OrderId::new);         trace!("Order id: {:?}", order_id);
+//         let payment_type = row
+//             .try_get::<'_, &str, _>("payment_type")?
+//             .parse::<PaymentType>()
+//             .map_err(|e| Error::Decode(Box::new(e)))?;
+//         trace!("Payment type: {:?}", payment_type);
+//         let status =
+//             row.try_get::<'_, &str, _>("status")?.parse::<TransferStatus>().map_err(|e| Error::Decode(Box::new(e)))?;
+//         trace!("Status: {:?}", status);
+//         Ok(Self { txid, created_at, updated_at, sender, amount, memo, order_id, payment_type, status })
+//     }
+// }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
 pub enum PaymentType {
     OnChain,
     Manual,
@@ -432,7 +509,8 @@ impl NewPayment {
 }
 
 //-----------------------------------------   PaymentStatus   ---------------------------------------------------------
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
 pub enum TransferStatus {
     Received,
     Confirmed,

@@ -28,7 +28,6 @@ use crate::{
     },
     AuthApiError,
     AuthManagement,
-    OrderManagement,
 };
 
 #[derive(Clone)]
@@ -59,7 +58,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
 
     async fn fetch_or_create_account_for_payment(&self, payment: &Payment) -> Result<i64, Self::Error> {
         let mut conn = self.pool.acquire().await?;
-        let pubkey = Some(payment.sender.clone());
+        let pubkey = Some(payment.sender.clone().to_address());
         let customer_id = match payment.order_id.as_ref() {
             Some(oid) => orders::fetch_order_by_order_id(oid, &mut conn).await?.map(|o| o.customer_id),
             None => None,
@@ -253,6 +252,11 @@ impl AccountManagement for SqliteDatabase {
         let mut conn = self.pool.acquire().await?;
         orders::fetch_order_by_order_id(order_id, &mut conn).await
     }
+
+    async fn fetch_payments_for_address(&self, address: &TariAddress) -> Result<Vec<Payment>, Self::Error> {
+        let mut conn = self.pool.acquire().await?;
+        transfers::fetch_payments_for_address(address, &mut conn).await
+    }
 }
 
 impl AuthManagement for SqliteDatabase {
@@ -298,15 +302,6 @@ impl AuthManagement for SqliteDatabase {
     async fn remove_roles(&self, address: &TariAddress, roles: &[Role]) -> Result<u64, AuthApiError> {
         let mut conn = self.pool.acquire().await.map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
         auth::remove_roles(address, roles, &mut conn).await
-    }
-}
-
-impl OrderManagement for SqliteDatabase {
-    type Error = SqliteDatabaseError;
-
-    async fn order_by_id(&self, oid: &OrderId) -> Result<Option<Order>, Self::Error> {
-        let mut conn = self.pool.acquire().await?;
-        orders::fetch_order_by_order_id(oid, &mut conn).await
     }
 }
 

@@ -1,7 +1,7 @@
 use mockall::mock;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
-    db_types::{Order, OrderId, Role, UserAccount},
+    db_types::{Order, OrderId, Payment, Role, UserAccount},
     AccountManagement,
     AuthApiError,
     AuthManagement,
@@ -35,6 +35,7 @@ mock! {
         async fn fetch_user_account_for_address(&self, address: &TariAddress) -> Result<Option<UserAccount>, MockErr>;
         async fn fetch_orders_for_account(&self, account_id: i64) -> Result<Vec<Order>, MockErr>;
         async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, MockErr>;
+        async fn fetch_payments_for_address(&self, address: &TariAddress) -> Result<Vec<Payment>, MockErr>;
     }
 }
 

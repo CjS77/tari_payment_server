@@ -32,7 +32,6 @@ pub use db::traits::{
     AuthManagement,
     InsertOrderResult,
     InsertPaymentResult,
-    OrderManagement,
     PaymentGatewayDatabase,
 };
 pub use tpe_api::{
