@@ -85,6 +85,7 @@ where
                     ErrorInternalServerError("No JWT claims found in request extensions")
                 })?
                 .clone();
+            trace!("🔐️ Claims decoded. {jwt_claims:?}");
             // SuperAdmin can access any route
             let mut approved = jwt_claims.roles.contains(&Role::SuperAdmin);
             if approved {
@@ -92,6 +93,7 @@ where
             }
             approved |= required_roles.iter().all(|role| jwt_claims.roles.contains(role));
             if approved {
+                trace!("🔐️ User approved for endpoint {}", req.uri());
                 service.call(req).await
             } else {
                 warn!("🔐️ User '{}' did not have necessary permissions for {}", jwt_claims.address, req.uri());

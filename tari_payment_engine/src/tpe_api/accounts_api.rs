@@ -7,6 +7,7 @@ use tari_common_types::tari_address::TariAddress;
 
 use crate::{
     db_types::{Order, OrderId, UserAccount},
+    order_objects::OrderQueryFilter,
     tpe_api::{errors::AccountApiError, order_objects::OrderResult, payment_objects::PaymentsResult},
     AccountManagement,
 };
@@ -74,5 +75,9 @@ where B: AccountManagement
         let total_payments = payments.iter().map(|p| p.amount).sum();
         trace!("Total payments for address: {:?}", total_payments);
         Ok(PaymentsResult { address: address.clone().into(), total_payments, payments })
+    }
+
+    pub async fn search_orders(&self, query: OrderQueryFilter) -> Result<Vec<Order>, AccountApiError> {
+        self.db.search_orders(query).await.map_err(|e| AccountApiError::DatabaseError(e.to_string()))
     }
 }

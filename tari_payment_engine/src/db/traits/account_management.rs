@@ -1,6 +1,9 @@
 use tari_common_types::tari_address::TariAddress;
 
-use crate::db_types::{Order, OrderId, Payment, UserAccount};
+use crate::{
+    db_types::{Order, OrderId, Payment, UserAccount},
+    order_objects::OrderQueryFilter,
+};
 
 /// The `AccountManagement` trait defines behaviour for managing accounts.
 /// An account is a record that associates one or more Tari wallets (via their address) and their associated
@@ -29,4 +32,6 @@ pub trait AccountManagement {
     async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, Self::Error>;
 
     async fn fetch_payments_for_address(&self, address: &TariAddress) -> Result<Vec<Payment>, Self::Error>;
+
+    async fn search_orders(&self, query: OrderQueryFilter) -> Result<Vec<Order>, Self::Error>;
 }

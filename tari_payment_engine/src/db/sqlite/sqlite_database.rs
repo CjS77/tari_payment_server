@@ -9,10 +9,7 @@ use tari_common_types::tari_address::TariAddress;
 
 use super::{auth, db_url, new_pool, orders, transfers, user_accounts, SqliteDatabaseError};
 use crate::{
-    db::{
-        sqlite::orders::OrderQueryFilter,
-        traits::{AccountManagement, InsertOrderResult, InsertPaymentResult, PaymentGatewayDatabase},
-    },
+    db::traits::{AccountManagement, InsertOrderResult, InsertPaymentResult, PaymentGatewayDatabase},
     db_types::{
         MicroTari,
         NewOrder,
@@ -26,6 +23,7 @@ use crate::{
         TransferStatus,
         UserAccount,
     },
+    order_objects::OrderQueryFilter,
     AuthApiError,
     AuthManagement,
 };
@@ -121,7 +119,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             .await?
             .ok_or_else(|| SqliteDatabaseError::AccountNotFound(account_id))?;
         let query = OrderQueryFilter::default().with_account_id(account_id).with_status(OrderStatusType::New);
-        let unpaid_orders = orders::fetch_orders(query, &mut tx).await?;
+        let unpaid_orders = orders::search_orders(query, &mut tx).await?;
         let balance = account.current_balance;
         trace!("🗃️ Account #{account_id} has {} unpaid orders and a balance of {}.", unpaid_orders.len(), balance);
         let (paid_orders, _new_balance) =
@@ -245,7 +243,7 @@ impl AccountManagement for SqliteDatabase {
     async fn fetch_orders_for_account(&self, account_id: i64) -> Result<Vec<Order>, Self::Error> {
         let mut conn = self.pool.acquire().await?;
         let query = OrderQueryFilter::default().with_account_id(account_id);
-        orders::fetch_orders(query, &mut conn).await
+        orders::search_orders(query, &mut conn).await
     }
 
     async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, Self::Error> {
@@ -256,6 +254,11 @@ impl AccountManagement for SqliteDatabase {
     async fn fetch_payments_for_address(&self, address: &TariAddress) -> Result<Vec<Payment>, Self::Error> {
         let mut conn = self.pool.acquire().await?;
         transfers::fetch_payments_for_address(address, &mut conn).await
+    }
+
+    async fn search_orders(&self, query: OrderQueryFilter) -> Result<Vec<Order>, Self::Error> {
+        let mut conn = self.pool.acquire().await?;
+        orders::search_orders(query, &mut conn).await
     }
 }
 
@@ -340,7 +343,7 @@ impl SqliteDatabase {
             .with_status(OrderStatusType::New)
             .with_currency("XTR".to_string());
         let mut conn = self.pool.acquire().await?;
-        let orders = orders::fetch_orders(where_clause, &mut conn).await?;
+        let orders = orders::search_orders(where_clause, &mut conn).await?;
         Ok(orders)
     }
 }

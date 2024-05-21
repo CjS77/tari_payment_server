@@ -4,6 +4,7 @@ use sqlx::{QueryBuilder, SqliteConnection};
 use crate::{
     db::{sqlite::SqliteDatabaseError, traits::InsertOrderResult},
     db_types::{NewOrder, Order, OrderId, OrderStatusType, OrderUpdate},
+    order_objects::OrderQueryFilter,
 };
 
 pub async fn idempotent_insert(
@@ -27,8 +28,9 @@ async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<In
                 customer_id,
                 memo,
                 total_price,
-                currency
-            ) VALUES ($1, $2, $3, $4, $5)
+                currency,
+                created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING id;
         "#,
         order.order_id,
@@ -36,6 +38,7 @@ async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<In
         order.memo,
         order.total_price,
         order.currency,
+        order.created_at
     )
     .fetch_one(conn)
     .await?;
@@ -83,49 +86,10 @@ pub async fn order_exists(order_id: &OrderId, conn: &mut SqliteConnection) -> Re
     fetch_order_by_order_id(order_id, conn).await.map(|o| o.map(|o| o.id))
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct OrderQueryFilter {
-    memo: Option<String>,
-    order_id: Option<OrderId>,
-    account_id: Option<i64>,
-    currency: Option<String>,
-    statuses: Vec<OrderStatusType>,
-}
-
-impl OrderQueryFilter {
-    pub fn with_memo(mut self, memo: String) -> Self {
-        self.memo = Some(memo);
-        self
-    }
-
-    pub fn with_account_id(mut self, account_id: i64) -> Self {
-        self.account_id = Some(account_id);
-        self
-    }
-
-    pub fn with_currency(mut self, currency: String) -> Self {
-        self.currency = Some(currency);
-        self
-    }
-
-    pub fn with_status(mut self, status: OrderStatusType) -> Self {
-        self.statuses.push(status);
-        self
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.memo.is_none() &&
-            self.order_id.is_none() &&
-            self.account_id.is_none() &&
-            self.currency.is_none() &&
-            self.statuses.is_empty()
-    }
-}
-
 /// Fetches orders according to criteria specified in the `OrderQueryFilter`
 ///
 /// Resulting orders are ordered by `created_at` in ascending order
-pub async fn fetch_orders(
+pub async fn search_orders(
     query: OrderQueryFilter,
     conn: &mut SqliteConnection,
 ) -> Result<Vec<Order>, SqliteDatabaseError> {
@@ -139,8 +103,8 @@ pub async fn fetch_orders(
     }
     let mut where_clause = builder.separated(" AND ");
     if let Some(memo) = query.memo {
-        where_clause.push("memo = ");
-        where_clause.push_bind_unseparated(memo);
+        where_clause.push("memo LIKE ");
+        where_clause.push_bind_unseparated(format!("%{memo}%"));
     }
     if let Some(order_id) = query.order_id {
         where_clause.push("order_id = ");
@@ -151,17 +115,29 @@ pub async fn fetch_orders(
         where_clause.push_bind_unseparated(id);
         where_clause.push_unseparated(")");
     }
+    if let Some(cid) = query.customer_id {
+        where_clause.push("customer_id=");
+        where_clause.push_bind_unseparated(cid);
+    }
     if let Some(currency) = query.currency {
-        where_clause.push("currency = ");
+        where_clause.push("currency=");
         where_clause.push_bind_unseparated(currency);
     }
-    if !query.statuses.is_empty() {
+    if query.status.as_ref().map(|s| !s.is_empty()).unwrap_or(false) {
         let mut statuses = vec![];
-        query.statuses.iter().for_each(|s| {
+        query.status.as_ref().unwrap().iter().for_each(|s| {
             statuses.push(format!("'{s}'"));
         });
         let status_clause = statuses.join(",");
         where_clause.push(format!("status IN ({status_clause})"));
+    }
+    if let Some(since) = query.since {
+        where_clause.push("created_at >= ");
+        where_clause.push_bind_unseparated(since);
+    }
+    if let Some(until) = query.until {
+        where_clause.push("created_at <= ");
+        where_clause.push_bind_unseparated(until);
     }
     builder.push(" ORDER BY created_at ASC");
 

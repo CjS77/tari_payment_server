@@ -58,7 +58,7 @@ fn seed_orders() -> [NewOrder; 5] {
         },
         NewOrder {
             order_id: OrderId::new("5"),
-            currency: "XTR".into(),
+            currency: "XMR".into(),
             customer_id: "admin".into(),
             address: None,
             memo: Some("address: [aa3c076152c1ae44ae86585eeba1d348badb845d1cab5ef12db98fafb4fea55d6c]".into()),

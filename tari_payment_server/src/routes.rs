@@ -29,6 +29,7 @@ use paste::paste;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
     db_types::{OrderId, Role, SerializedTariAddress},
+    order_objects::OrderQueryFilter,
     AccountApi,
     AccountManagement,
     AuthApi,
@@ -215,13 +216,13 @@ pub async fn get_account<B: AccountManagement>(
 
 //----------------------------------------------   Orders  ----------------------------------------------------
 
+route!(my_orders => Get "/orders" impl AccountManagement);
 /// Route handler for the orders endpoint
 ///
 /// Authenticated users can fetch their own orders using this endpoint. The Tari address for the account is extracted
 /// from the JWT token supplied in the `tpg_access_token` header.
 ///
 /// Admin users (ReadAll and SuperAdmin roles) can use the `/orders/{address}` endpoint to fetch orders for any account.
-route!(my_orders => Get "/orders" impl AccountManagement);
 pub async fn my_orders<B: AccountManagement>(
     claims: JwtClaims,
     api: web::Data<AccountApi<B>>,
@@ -230,10 +231,24 @@ pub async fn my_orders<B: AccountManagement>(
     get_orders(&claims.address, api.as_ref()).await
 }
 
+route!(orders_search => Get "/search/orders" impl AccountManagement where requires [Role::ReadAll]);
+pub async fn orders_search<B: AccountManagement>(
+    query: web::Query<OrderQueryFilter>,
+    api: web::Data<AccountApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    debug!("💻️ GET orders search for [{query}]");
+    let query = query.into_inner();
+    let orders = api.search_orders(query).await.map_err(|e| {
+        debug!("💻️ Could not fetch orders. {e}");
+        ServerError::BackendError(e.to_string())
+    })?;
+    Ok(HttpResponse::Ok().json(orders))
+}
+
+route!(orders => Get "/orders/{address}" impl AccountManagement where requires [Role::ReadAll]);
 /// Route handler for the orders/{address} endpoint
 ///
 /// Admin users (ReadAll and SuperAdmin roles) can fetch orders for any account using this endpoint.
-route!(orders => Get "/orders/{address}" impl AccountManagement where requires [Role::ReadAll]);
 pub async fn orders<B: AccountManagement>(
     path: web::Path<SerializedTariAddress>,
     api: web::Data<AccountApi<B>>,
@@ -243,6 +258,7 @@ pub async fn orders<B: AccountManagement>(
     get_orders(&address, api.as_ref()).await
 }
 
+route!(order_by_id => Get "/order/id/{order_id}" impl AccountManagement where requires [Role::User]);
 /// User `/order/id/{order_id}` to fetch a specific order by its order_id.
 ///
 /// Authenticated users can fetch their own orders using this endpoint. The Tari address for the account is extracted
@@ -250,7 +266,6 @@ pub async fn orders<B: AccountManagement>(
 /// exist or not.
 ///
 /// Admin users (ReadAll and SuperAdmin roles) will be able to retrieve any order by its order_id.
-route!(order_by_id => Get "/order/id/{order_id}" impl AccountManagement where requires [Role::User]);
 pub async fn order_by_id<B: AccountManagement>(
     claims: JwtClaims,
     path: web::Path<OrderId>,
@@ -295,6 +310,7 @@ pub async fn get_orders<B: AccountManagement>(
 
 //----------------------------------------------   Payments  ----------------------------------------------------
 
+route!(my_payments => Get "/payments" impl AccountManagement);
 /// Route handler for the payments endpoint
 ///
 /// Authenticated users can fetch their own payments using this endpoint. The Tari address for the account is extracted
@@ -302,7 +318,6 @@ pub async fn get_orders<B: AccountManagement>(
 ///
 /// Admin users (ReadAll and SuperAdmin roles) can use the `/payments/{address}` endpoint to fetch payments for any
 /// wallet address.
-route!(my_payments => Get "/payments" impl AccountManagement);
 pub async fn my_payments<B: AccountManagement>(
     claims: JwtClaims,
     api: web::Data<AccountApi<B>>,
@@ -311,11 +326,11 @@ pub async fn my_payments<B: AccountManagement>(
     get_payments(&claims.address, api.as_ref()).await
 }
 
+route!(payments => Get "/payments/{address}" impl AccountManagement where requires [Role::ReadAll]);
 /// Route handler for the payments/{address} endpoint
 ///
 /// Admin users (ReadAll and SuperAdmin roles) can fetch payments for any account using this endpoint. Other users
 /// will receive a 401 Unauthorized response.
-route!(payments => Get "/payments/{address}" impl AccountManagement where requires [Role::ReadAll]);
 pub async fn payments<B: AccountManagement>(
     path: web::Path<SerializedTariAddress>,
     api: web::Data<AccountApi<B>>,

@@ -1,7 +1,4 @@
-use std::{
-    str::FromStr,
-};
-
+use std::str::FromStr;
 
 use cucumber::{gherkin::Step, then, when};
 use e2e::helpers::json_is_subset_of;
@@ -12,7 +9,7 @@ use tari_jwt::{
     Ristretto256,
     Ristretto256SigningKey,
 };
-use tari_payment_engine::db_types::{Role};
+use tari_payment_engine::db_types::Role;
 use tari_payment_server::auth::{build_jwt_signer, JwtClaims};
 use tokio::time::sleep;
 

@@ -19,6 +19,7 @@ use crate::{
         MyPaymentsRoute,
         OrderByIdRoute,
         OrdersRoute,
+        OrdersSearchRoute,
         PaymentsRoute,
         UpdateRolesRoute,
     },
@@ -55,6 +56,7 @@ pub fn create_server_instance(config: ServerConfig, db: SqliteDatabase) -> Resul
             .service(OrderByIdRoute::<SqliteDatabase>::new())
             .service(MyPaymentsRoute::<SqliteDatabase>::new())
             .service(PaymentsRoute::<SqliteDatabase>::new())
+            .service(OrdersSearchRoute::<SqliteDatabase>::new())
             .service(CheckTokenRoute::new());
         app.use_jwt(authority.clone(), auth_scope)
             .service(health)

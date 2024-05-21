@@ -6,7 +6,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use log::{error};
+use log::error;
 use serde::{Deserialize, Serialize};
 use sqlx::{database::HasValueRef, Database, Decode, FromRow, Sqlite, Type};
 use tari_common_types::tari_address::{TariAddress, TariAddressError};
@@ -265,7 +265,7 @@ impl From<String> for OrderId {
 
 impl Display for OrderId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "#{}", self.0)
+        write!(f, "{}", self.0)
     }
 }
 
@@ -407,43 +407,6 @@ pub struct Payment {
     pub payment_type: PaymentType,
     pub status: TransferStatus,
 }
-
-// impl FromRow<'_, SqliteRow> for Payment {
-//     fn from_row(row: &'_ SqliteRow) -> Result<Self, Error> {
-//         let txid = row.try_get("txid")?;
-//         trace!("txid: {}", txid);
-//         let created_at = row
-//             .try_get::<'_, &str, _>("created_at")?
-//             .parse::<DateTime<Utc>>()
-//             .map_err(|e| Error::Decode(Box::new(e)))?;
-//         trace!("Created at: {}", created_at);
-//         let updated_at = row
-//             .try_get::<'_, &str, _>("updated_at")?
-//             .parse::<DateTime<Utc>>()
-//             .map_err(|e| Error::Decode(Box::new(e)))?;
-//         trace!("Updated at: {}", updated_at);
-//         let sender: SerializedTariAddress =
-//             row.try_get::<'_, &str, _>("sender")?.parse::<TariAddress>().map_err(|e| Error::Decode(Box::new(e)))?
-//                 .into();
-//         trace!("Sender: {}", sender.as_address());
-//         let amount = row.try_get::<'_, i64, _>("amount").map(MicroTari::from)?;
-//         trace!("Amount: {}", amount.0);
-//         let memo = row.try_get("memo")?;
-//         trace!("Memo: {:?}", memo);
-//         let order_id =
-//             row.try_get::<'_, Option<String>, _>("order_id").map_err(|e|
-// Error::Decode(Box::new(e)))?.map(OrderId::new);         trace!("Order id: {:?}", order_id);
-//         let payment_type = row
-//             .try_get::<'_, &str, _>("payment_type")?
-//             .parse::<PaymentType>()
-//             .map_err(|e| Error::Decode(Box::new(e)))?;
-//         trace!("Payment type: {:?}", payment_type);
-//         let status =
-//             row.try_get::<'_, &str, _>("status")?.parse::<TransferStatus>().map_err(|e| Error::Decode(Box::new(e)))?;
-//         trace!("Status: {:?}", status);
-//         Ok(Self { txid, created_at, updated_at, sender, amount, memo, order_id, payment_type, status })
-//     }
-// }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]

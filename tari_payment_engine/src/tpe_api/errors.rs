@@ -28,4 +28,6 @@ pub enum AuthApiError {
 pub enum AccountApiError {
     #[error("Database error: {0}")]
     DatabaseError(String),
+    #[error("User error constructing query: {0}")]
+    QueryError(String),
 }
