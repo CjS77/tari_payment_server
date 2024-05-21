@@ -86,7 +86,7 @@ pub fn create_server_instance(config: ServerConfig, db: SqliteDatabase) -> Resul
                     .get("X-Forwarded-For")
                     .and_then(|v| use_x_forwarded_for.then(|| v.to_str().ok()).flatten())
                     .or_else(|| {
-                        req.headers().get("X-Real-IP").and_then(|v| use_forwarded.then(|| v.to_str().ok()).flatten())
+                        req.headers().get("Forwarded").and_then(|v| use_forwarded.then(|| v.to_str().ok()).flatten())
                     })
                     .or_else(|| peer_addr.as_ref().map(|s| s.as_str()))
                     .and_then(|s| SocketAddr::from_str(s).ok());

@@ -36,6 +36,33 @@ Set the TPG_JWT_SIGNING_KEY and TPG_JWT_VERIFICATION_KEY environment variables i
 🚨️🚨️🚨️
 ```
 
+## Shopify whitelisting
+
+Orders are submitted to the server via the `/shopify/webhook/*` endpoints. This are called by shopify's webhook system.
+However, if anyone could make calls to that endpoint, they could submit fake orders to the server. 
+One set of protections against this is to whitelist the IP addresses of Shopify's webhook servers.
+
+All endpoints under the `/shopify` scope are checked against the shopify IP whitelist. These are configured via the
+`TPG_SHOPIFY_IP_WHITELIST` environment variable. This is a comma-separated list of IP addresses.
+For example, 
+```
+TPG_SHOPIFY_IP_WHITELIST=192.168.1.1,192.168.1.5,10.0.0.2
+```
+
+When an incoming request is made, the server will check the IP address of the request against the whitelist. The IP is taken
+from the remote peer of the connection. If the Tari payment server is behind a load balancer, this might cause the check
+to fail, since the IP address of the load balancer will be checked, rather than the IP address of the Shopify server.
+
+To work around this, you can set the `TPG_USE_X_FORWARDED_FOR` or `TPG_USE_FORWARDED` environment variables to `1` or `true`. 
+The server will then use the IP address in the `X-Forwarded-For` or `Forwarded` headers, respectively.
+
+Your proxy or load balancer must then be configured to set these headers and should take precautions against header spoofing.
+
+🚨️🚨️🚨️ **WARNING** 🚨️🚨️🚨️
+
+Attackers can trivially spoof `X-Forwarded-For` or `Forwarded` headers. So be careful if using these options and ensure that 
+your proxy or load balancer takes precautions to detect spoofing (such as comparing against the remote peer's IP address).
+
 ## Server configuration
 
 The server is configured via the following environment variables:
