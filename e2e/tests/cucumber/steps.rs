@@ -9,7 +9,7 @@ use tari_jwt::{
     Ristretto256,
     Ristretto256SigningKey,
 };
-use tari_payment_engine::db_types::Role;
+use tari_payment_engine::db_types::{MicroTari, OrderId, Role};
 use tari_payment_server::auth::{build_jwt_signer, JwtClaims};
 use tokio::time::sleep;
 
@@ -158,6 +158,23 @@ async fn expire_access_token(world: &mut TPGWorld) {
     world.access_token = Some(token);
 }
 
+#[when(expr = "{word} places an order \"{word}\" for {int} XTR, memo = {string}")]
+async fn place_short_order(world: &mut TPGWorld, customer_id: String, order_id: String, amount: i64, memo: String) {
+    let now = chrono::Utc::now();
+    place_order(world, customer_id, order_id, amount, memo, now.to_rfc3339()).await;
+}
+
+#[when(expr = "{word} places an order \"{word}\" for {int} XTR, memo = {string} at {string}")]
+async fn place_order(
+    world: &mut TPGWorld,
+    customer_id: String,
+    order_id: String,
+    amount: i64,
+    memo: String,
+    address: String,
+) {
+    let order_id = OrderId(order_id);
+}
 fn modify_signature(token: String, value: &str) -> String {
     let mut parts = token.split('.').map(|s| s.to_owned()).collect::<Vec<_>>();
     let n = value.len();

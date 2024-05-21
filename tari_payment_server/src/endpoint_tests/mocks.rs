@@ -1,8 +1,8 @@
 use mockall::mock;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
-    order_objects::OrderQueryFilter,
     db_types::{Order, OrderId, Payment, Role, UserAccount},
+    order_objects::OrderQueryFilter,
     AccountManagement,
     AuthApiError,
     AuthManagement,

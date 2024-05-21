@@ -1,4 +1,4 @@
-use std::{env, io::Write};
+use std::{env, io::Write, net::SocketAddr};
 
 use log::*;
 use rand::thread_rng;
@@ -26,6 +26,14 @@ pub struct ServerConfig {
     pub shopify_api_key: String,
     pub database_url: String,
     pub auth: AuthConfig,
+    /// If supplied, requests against /shopify endpoints will be checked against a whitelist of Shopify IP addresses.
+    pub shopify_whitelist: Option<Vec<SocketAddr>>,
+    /// If true, the X-Forwarded-For header will be used to determine the client's IP address, rather than the
+    /// connection's remote address.
+    pub use_x_forwarded_for: bool,
+    /// If true, the X-Forwarded-Proto header will be used to determine the client's protocol, rather than the
+    /// connection's remote address.
+    pub use_forwarded: bool,
 }
 
 impl Default for ServerConfig {
@@ -36,6 +44,9 @@ impl Default for ServerConfig {
             shopify_api_key: String::default(),
             database_url: String::default(),
             auth: AuthConfig::default(),
+            shopify_whitelist: None,
+            use_x_forwarded_for: false,
+            use_forwarded: false,
         }
     }
 }
@@ -65,7 +76,23 @@ impl ServerConfig {
             error!("TPG_DATABASE_URL is not set. Please set it to the URL for the TPG database.");
             String::default()
         });
-        Self { host, port, shopify_api_key, auth, database_url }
+        let shopify_whitelist = env::var("TPG_SHOPIFY_IP_WHITELIST")
+            .map(|s| {
+                s.split(',')
+                    .filter_map(|s| {
+                        s.parse()
+                            .map_err(|e| {
+                                warn!("Ignoring invalid IP address ({s}) in TPG_SHOPIFY_IP_WHITELIST: {e}");
+                                None::<SocketAddr>
+                            })
+                            .ok()
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .ok();
+        let use_x_forwarded_for = env::var("TPG_USE_X_FORWARDED_FOR").map(|s| &s == "1" || &s == "true").is_ok();
+        let use_forwarded = env::var("TPG_USE_FORWARDED").map(|s| &s == "1" || &s == "true").is_ok();
+        Self { host, port, shopify_api_key, auth, database_url, shopify_whitelist, use_forwarded, use_x_forwarded_for }
     }
 }
 

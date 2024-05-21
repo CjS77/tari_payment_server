@@ -51,6 +51,7 @@ impl ResponseError for ServerError {
                 AuthError::ValidationError(_) => StatusCode::UNAUTHORIZED,
                 AuthError::PoorlyFormattedToken(_) => StatusCode::BAD_REQUEST,
                 AuthError::AccountNotFound => StatusCode::FORBIDDEN,
+                AuthError::ForbiddenPeer => StatusCode::FORBIDDEN,
             },
             Self::InitializeError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::BackendError(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -88,6 +89,8 @@ pub enum AuthError {
     PoorlyFormattedToken(String),
     #[error("User account not found.")]
     AccountNotFound,
+    #[error("Request was made from a forbidden peer")]
+    ForbiddenPeer,
 }
 
 impl From<AuthApiError> for ServerError {

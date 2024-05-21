@@ -39,6 +39,9 @@ impl Default for TPGWorld {
             shopify_api_key: String::default(),
             database_url: url.clone(),
             auth: AuthConfig::default(),
+            shopify_whitelist: None,
+            use_x_forwarded_for: false,
+            use_forwarded: false,
         };
         Self {
             config,

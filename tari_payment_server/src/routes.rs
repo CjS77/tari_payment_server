@@ -23,17 +23,19 @@
 //! ```
 use std::{marker::PhantomData, str::FromStr};
 
-use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
 use log::*;
 use paste::paste;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
-    db_types::{OrderId, Role, SerializedTariAddress},
+    db_types::{NewOrder, OrderId, Role, SerializedTariAddress},
     order_objects::OrderQueryFilter,
     AccountApi,
     AccountManagement,
     AuthApi,
     AuthManagement,
+    OrderFlowApi,
+    PaymentGatewayDatabase,
 };
 
 use crate::{
@@ -353,19 +355,26 @@ where B: AccountManagement {
 
 //----------------------------------------------   Checkout  ----------------------------------------------------
 
-#[post("/webhook/checkout_create")]
-pub async fn shopify_webhook(req: HttpRequest, body: web::Bytes) -> Result<HttpResponse, ServerError> {
+route!(shopify_webhook => Post "webhook/checkout_create" impl PaymentGatewayDatabase);
+pub async fn shopify_webhook<B: PaymentGatewayDatabase>(
+    req: HttpRequest,
+    body: web::Json<ShopifyOrder>,
+    api: web::Data<OrderFlowApi<B>>,
+) -> Result<HttpResponse, ServerError> {
     trace!("💻️ Received webhook request: {}", req.uri());
-    let payload = std::str::from_utf8(body.as_ref()).map_err(|e| ServerError::InvalidRequestBody(e.to_string()))?;
-    trace!("💻️ Decoded payload body. {} bytes", payload.bytes().len());
-    let _order: ShopifyOrder = serde_json::from_str(payload).map_err(|e| {
-        error!("💻️ Could not deserialize order payload. {e}");
-        debug!("💻️ JSON payload: {payload}");
-        ServerError::CouldNotDeserializePayload
-    })?;
-    // let new_order = ShopifyOrder::try_from(order)?;
-    // TODO - Send the new order to payment engine
-
+    let order = body.into_inner();
+    let new_order = NewOrder::try_from(order)?;
+    match api.process_new_order(new_order.clone()).await {
+        Ok(orders) => {
+            info!("💻️ Order {} processed successfully.", new_order.order_id);
+            let ids = orders.iter().map(|o| o.order_id.as_str()).collect::<Vec<_>>().join(", ");
+            info!("💻️ {} orders were paid. {}", orders.len(), ids);
+        },
+        Err(e) => {
+            warn!("💻️ Could not process order {}. {e}", new_order.order_id);
+            debug!("💻️ Failed order: {new_order}");
+        },
+    }
     Ok(HttpResponse::Ok().finish())
 }
 
