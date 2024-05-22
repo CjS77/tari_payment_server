@@ -3,10 +3,17 @@ Feature: Order flow
     Given a blank slate
 
   Scenario: Standard order flow
-    When Alice places an order "alice001" on the store. Memo "": "Item A" for 100T, "Item B" for 200T
-    Then Alice's account has a balance of 300 Tari
-    Then Alice's order "alice001" is pending
-    When Alice's sends a payment of 300 Tari
+    When Customer #1 ["alice"] places order "alice001" for 2500 XTR, with memo
+    """
+    { "address": "b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d",
+      "order_id": "alice001",
+      "signature": "deadbeef34534534534534543435345"
+    }
+    """
+    Then Customer #1 has a balance of 2500 Tari
+    Then order "alice001" is in state pending
+    When Alice sends a payment of 2525 Tari
     Then order "alice001" is fulfilled
+    And Alice has a balance of 25 Tari
 
 

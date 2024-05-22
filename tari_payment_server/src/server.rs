@@ -1,20 +1,15 @@
-use std::{future::ready, net::SocketAddr, str::FromStr, time::Duration};
+use std::{net::SocketAddr, str::FromStr, time::Duration};
 
 use actix_jwt_auth_middleware::use_jwt::UseJWTOnApp;
 use actix_web::{
-    dev::{Server, Service},
+    dev::{Server, Service, ServiceRequest},
     http::KeepAlive,
     middleware::Logger,
     web,
     App,
-    Error,
-    HttpResponse,
     HttpServer,
 };
-use futures::{
-    future::{ok, Either, LocalBoxFuture},
-    FutureExt,
-};
+use futures::{future::ok, FutureExt};
 use log::{info, warn};
 use tari_payment_engine::{AccountApi, AuthApi, OrderFlowApi, SqliteDatabase};
 
@@ -77,30 +72,7 @@ pub fn create_server_instance(config: ServerConfig, db: SqliteDatabase) -> Resul
         let shopify_whitelist = config.shopify_whitelist.clone();
         let shopify_scope = web::scope("/shopify")
             .wrap_fn(move |req, srv| {
-                // Collect peer IP from x-forwarded-for, or forwarded headers _if_ `use_nnn` has been set to true
-                // in the configuration. Otherwise, use the peer address from the connection info.
-                let peer_addr = req.connection_info().peer_addr().map(|a| a.to_string());
-
-                let peer_ip = req
-                    .headers()
-                    .get("X-Forwarded-For")
-                    .and_then(|v| use_x_forwarded_for.then(|| v.to_str().ok()).flatten())
-                    .or_else(|| {
-                        req.headers().get("Forwarded").and_then(|v| use_forwarded.then(|| v.to_str().ok()).flatten())
-                    })
-                    .or_else(|| peer_addr.as_ref().map(|s| s.as_str()))
-                    .and_then(|s| SocketAddr::from_str(s).ok());
-                let whitelisted = match (peer_ip, &shopify_whitelist) {
-                    (Some(ip), Some(whitelist)) => {
-                        info!("Shopify webhook from {ip}");
-                        whitelist.contains(&ip)
-                    },
-                    (_, None) => true,
-                    (None, Some(_)) => {
-                        warn!("No IP address found in shopify remote peer request, denying access.");
-                        false
-                    },
-                };
+                let whitelisted = is_whitelisted(use_x_forwarded_for, use_forwarded, &shopify_whitelist, &req);
                 if whitelisted {
                     srv.call(req)
                 } else {
@@ -117,4 +89,33 @@ pub fn create_server_instance(config: ServerConfig, db: SqliteDatabase) -> Resul
     .bind((config.host.as_str(), config.port))?
     .run();
     Ok(srv)
+}
+
+fn is_whitelisted(
+    use_x_forwarded_for: bool,
+    use_forwarded: bool,
+    shopify_whitelist: &Option<Vec<SocketAddr>>,
+    req: &ServiceRequest,
+) -> bool {
+    // Collect peer IP from x-forwarded-for, or forwarded headers _if_ `use_nnn` has been set to true
+    // in the configuration. Otherwise, use the peer address from the connection info.
+    let peer_addr = req.connection_info().peer_addr().map(|a| a.to_string());
+    let peer_ip = req
+        .headers()
+        .get("X-Forwarded-For")
+        .and_then(|v| use_x_forwarded_for.then(|| v.to_str().ok()).flatten())
+        .or_else(|| req.headers().get("Forwarded").and_then(|v| use_forwarded.then(|| v.to_str().ok()).flatten()))
+        .or_else(|| peer_addr.as_ref().map(|s| s.as_str()))
+        .and_then(|s| SocketAddr::from_str(s).ok());
+    match (peer_ip, &shopify_whitelist) {
+        (Some(ip), Some(whitelist)) => {
+            info!("Shopify webhook from {ip}");
+            whitelist.contains(&ip)
+        },
+        (_, None) => true,
+        (None, Some(_)) => {
+            warn!("No IP address found in shopify remote peer request, denying access.");
+            false
+        },
+    }
 }

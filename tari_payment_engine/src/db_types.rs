@@ -125,6 +125,14 @@ impl AsRef<TariAddress> for SerializedTariAddress {
     }
 }
 
+impl FromStr for SerializedTariAddress {
+    type Err = TariAddressError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse::<TariAddress>().map(Self)
+    }
+}
+
 impl TryFrom<String> for SerializedTariAddress {
     type Error = TariAddressError;
 

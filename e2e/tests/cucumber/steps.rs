@@ -10,7 +10,10 @@ use tari_jwt::{
     Ristretto256SigningKey,
 };
 use tari_payment_engine::db_types::{MicroTari, OrderId, Role};
-use tari_payment_server::auth::{build_jwt_signer, JwtClaims};
+use tari_payment_server::{
+    auth::{build_jwt_signer, JwtClaims},
+    shopify_order::ShopifyOrder,
+};
 use tokio::time::sleep;
 
 use crate::cucumber::{
@@ -158,23 +161,42 @@ async fn expire_access_token(world: &mut TPGWorld) {
     world.access_token = Some(token);
 }
 
-#[when(expr = "{word} places an order \"{word}\" for {int} XTR, memo = {string}")]
-async fn place_short_order(world: &mut TPGWorld, customer_id: String, order_id: String, amount: i64, memo: String) {
+#[when(expr = "Customer #{int} [{string}] places order \"{word}\" for {int} XTR, with memo")]
+async fn place_short_order(world: &mut TPGWorld, user: i64, email: String, order_id: String, amount: i64, step: &Step) {
     let now = chrono::Utc::now();
-    place_order(world, customer_id, order_id, amount, memo, now.to_rfc3339()).await;
+    place_order(world, user, email, order_id, amount, now.to_rfc3339(), step).await;
 }
 
-#[when(expr = "{word} places an order \"{word}\" for {int} XTR, memo = {string} at {string}")]
+#[when(expr = "Customer #{int} [{string}] places order \"{word}\" for {int} XTR at {string}, with memo")]
 async fn place_order(
     world: &mut TPGWorld,
-    customer_id: String,
+    user: i64,
+    email: String,
     order_id: String,
     amount: i64,
-    memo: String,
-    address: String,
+    created_at: String,
+    step: &Step,
 ) {
-    let order_id = OrderId(order_id);
+    let memo = step.docstring().map(String::from);
+    world.response = None;
+    let res = world
+        .request(Method::POST, "/shopify/webhook/checkout_create", |req| {
+            let mut order = ShopifyOrder::default();
+            order.created_at = created_at;
+            order.name = order_id;
+            order.note = memo;
+            order.currency = "XTR".to_string();
+            order.total_price = MicroTari::from(amount).value().to_string();
+            order.user_id = Some(user);
+            order.email = email;
+            let order = serde_json::to_string(&order).expect("Failed to serialize order");
+            req.body(order).header("Content-Type", "application/json")
+        })
+        .await;
+    trace!("Got Response: {} {}", res.0, res.1);
+    world.response = Some(res);
 }
+
 fn modify_signature(token: String, value: &str) -> String {
     let mut parts = token.split('.').map(|s| s.to_owned()).collect::<Vec<_>>();
     let n = value.len();
