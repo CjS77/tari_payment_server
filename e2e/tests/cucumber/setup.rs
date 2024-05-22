@@ -1,4 +1,4 @@
-use std::{collections::HashMap, convert::Into};
+use std::collections::HashMap;
 
 use chrono::{TimeZone, Utc};
 use cucumber::{given, then};
@@ -189,7 +189,7 @@ async fn fresh_database(world: &mut TPGWorld) {
     world.start_database().await;
     let db = world.database();
     for mut order in seed_orders() {
-        order.extract_address();
+        order.try_extract_address().expect("Error extracting address");
         db.process_new_order_for_customer(order).await.unwrap();
     }
     world.start_server().await;

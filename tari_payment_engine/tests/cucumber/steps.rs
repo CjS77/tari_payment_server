@@ -86,9 +86,9 @@ async fn check_customer_total_received(world: &mut ShopifyWorld, customer_id: St
 }
 
 #[then(expr = "the account for customer '{word}' has total pending of {int} XTR")]
-async fn check_customer_total_pending(world: &mut ShopifyWorld, customer_id: String, value: i64) {
+async fn check_customer_current_pending(world: &mut ShopifyWorld, customer_id: String, value: i64) {
     let account = fetch_customer_account(world, &customer_id).await.expect("Account for {customer_id} does not exist");
-    assert_eq!(account.total_pending, MicroTari::from(value * 1_000_000), "Total received is incorrect");
+    assert_eq!(account.current_pending, MicroTari::from(value * 1_000_000), "Total received is incorrect");
 }
 
 #[then(expr = "the account for customer '{word}' has current balance of {int} XTR")]
@@ -110,9 +110,9 @@ async fn check_account_total_received(world: &mut ShopifyWorld, pubkey: String, 
 }
 
 #[then(expr = "the account for address '{word}' has total pending of {int} XTR")]
-async fn check_account_total_pending(world: &mut ShopifyWorld, pubkey: String, value: i64) {
+async fn check_account_current_pending(world: &mut ShopifyWorld, pubkey: String, value: i64) {
     let account = fetch_account_for_address(world, pubkey).await.expect("Account {pubkey} does not exist");
-    assert_eq!(account.total_pending, MicroTari::from(value * 1_000_000), "Total pending is incorrect");
+    assert_eq!(account.current_pending, MicroTari::from(value * 1_000_000), "Total pending is incorrect");
 }
 
 #[then(expr = "the account for address '{word}' has current balance of {int} XTR")]

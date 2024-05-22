@@ -56,7 +56,6 @@ pub mod helpers;
 
 pub mod middleware;
 
-pub mod memo_signature;
 pub mod routes;
 pub mod server;
 

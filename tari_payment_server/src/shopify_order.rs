@@ -38,16 +38,17 @@ impl TryFrom<ShopifyOrder> for NewOrder {
     fn try_from(value: ShopifyOrder) -> Result<Self, Self::Error> {
         trace!("Converting ShopifyOrder to NewOrder: {:?}", value);
         if value.currency.as_str().to_lowercase() != TARI_CURRENCY_CODE_LOWER {
-            return Err(OrderConversionError(format!("Unsupported currency: {}", value.currency)));
+            return Err(OrderConversionError::UnsupportedCurrency(value.currency));
         }
         let total_price = value
             .total_price
             .parse::<u64>()
-            .map_err(|e| OrderConversionError(e.to_string()))
+            .map_err(|e| OrderConversionError::FormatError(e.to_string()))
             .map(MicroTari::try_from)?
-            .map_err(|e| OrderConversionError(e.to_string()))?;
+            .map_err(|e| OrderConversionError::FormatError(e.to_string()))?;
 
-        let timestamp = value.created_at.parse::<DateTime<Utc>>().map_err(|e| OrderConversionError(e.to_string()))?;
+        let timestamp =
+            value.created_at.parse::<DateTime<Utc>>().map_err(|e| OrderConversionError::FormatError(e.to_string()))?;
         let memo = value.note;
         let mut order = Self {
             order_id: OrderId(value.name),
@@ -58,7 +59,7 @@ impl TryFrom<ShopifyOrder> for NewOrder {
             created_at: timestamp,
             total_price,
         };
-        order.extract_address();
+        order.try_extract_address()?;
         Ok(order)
     }
 }

@@ -1,6 +1,6 @@
 use tari_common_types::tari_address::TariAddress;
-use tari_jwt::tari_crypto::{ristretto::RistrettoSecretKey, tari_utilities::hex::Hex};
-use tari_payment_server::memo_signature::MemoSignature;
+use tari_crypto::{ristretto::RistrettoSecretKey, tari_utilities::hex::Hex};
+use tari_payment_engine::helpers::MemoSignature;
 
 fn main() {
     let mut args = std::env::args();

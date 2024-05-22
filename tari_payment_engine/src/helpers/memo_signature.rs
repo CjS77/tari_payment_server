@@ -30,14 +30,15 @@
 
 use serde::{Deserialize, Serialize};
 use tari_common_types::tari_address::TariAddress;
-use tari_jwt::tari_crypto::{
+use tari_crypto::{
     hash_domain,
     ristretto::{RistrettoPublicKey, RistrettoSchnorrWithDomain, RistrettoSecretKey},
     signatures::SchnorrSignatureError,
-    tari_utilities::{hex::Hex, message_format::MessageFormat},
+    tari_utilities::hex::Hex,
 };
-use tari_payment_engine::db_types::SerializedTariAddress;
 use thiserror::Error;
+
+use crate::db_types::{NewOrder, SerializedTariAddress};
 
 hash_domain!(MemoSignatureDomain, "MemoSignature");
 
@@ -81,12 +82,6 @@ impl MemoSignature {
     pub fn is_valid(&self) -> bool {
         let message = self.message();
         let pubkey = self.address.as_address().public_key();
-        println!(
-            "Verifying. pubkey: {:x}. nonce: {:x}, sig:{}",
-            pubkey,
-            self.signature.get_public_nonce(),
-            self.signature.get_signature().reveal().to_string()
-        );
         self.signature.verify(pubkey, message)
     }
 
@@ -129,6 +124,20 @@ pub fn hex_to_memo_schnorr(s: &str) -> Result<MemoSchnorr, MemoSignatureError> {
     Ok(MemoSchnorr::new(nonce, sig))
 }
 
+pub fn extract_and_verify_memo_signature(order: &NewOrder) -> Result<MemoSignature, MemoSignatureError> {
+    let json = order.memo.as_ref().ok_or_else(|| MemoSignatureError("Memo signature is missing".into()))?;
+    let sig = serde_json::from_str::<MemoSignature>(json)
+        .map_err(|e| MemoSignatureError(format!("Failed to deserialize memo signature. {e}")))?;
+    if sig.order_id.as_str() != order.order_id.as_str() {
+        return Err(MemoSignatureError("Order ID in memo signature does not match order ID".into()));
+    }
+    if sig.is_valid() {
+        Ok(sig)
+    } else {
+        Err(MemoSignatureError("Memo object was valid, but signature was invalid".into()))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use log::info;
@@ -155,7 +164,6 @@ mod test {
             .expect("Failed to parse TariAddress");
         let sig =
             MemoSignature::create(address, "oid554432".into(), &secret_key()).expect("Failed to create memo signature");
-        println!("{}", sig.as_json());
         let msg = signature_message(&sig.address, &sig.order_id);
         assert_eq!(msg, "a8d523755de41b9c14de709ca59d52bc1772658258962ef5bbefa8c59082e54733:oid554432");
         assert_eq!(

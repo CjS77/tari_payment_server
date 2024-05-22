@@ -9,7 +9,10 @@ use tari_jwt::{
     Ristretto256,
     Ristretto256SigningKey,
 };
-use tari_payment_engine::db_types::{MicroTari, OrderId, Role};
+use tari_payment_engine::{
+    db_types::{MicroTari, OrderId, OrderStatusType, Role},
+    AccountManagement,
+};
 use tari_payment_server::{
     auth::{build_jwt_signer, JwtClaims},
     shopify_order::ShopifyOrder,
@@ -186,7 +189,7 @@ async fn place_order(
             order.name = order_id;
             order.note = memo;
             order.currency = "XTR".to_string();
-            order.total_price = MicroTari::from(amount).value().to_string();
+            order.total_price = MicroTari::from_tari(amount).value().to_string();
             order.user_id = Some(user);
             order.email = email;
             let order = serde_json::to_string(&order).expect("Failed to serialize order");
@@ -195,6 +198,38 @@ async fn place_order(
         .await;
     trace!("Got Response: {} {}", res.0, res.1);
     world.response = Some(res);
+}
+
+#[then(expr = "Customer #{int} has current orders worth {int} XTR")]
+async fn check_current_orders(world: &mut TPGWorld, account_id: i64, total: i64) {
+    let db = world.db.as_ref().expect("No database connection");
+    let account = db.fetch_user_account(account_id).await.expect("Failed to fetch account").expect("No account found");
+    trace!("User account: {account:?}");
+    let expected_current_orders = MicroTari::from_tari(total);
+    assert_eq!(account.current_orders, expected_current_orders);
+}
+
+#[then(expr = "order \"{word}\" is in state {word}")]
+async fn check_order_state(world: &mut TPGWorld, order_id: String, state: String) {
+    let db = world.db.as_ref().expect("No database connection");
+    let oid = OrderId::from(order_id);
+    let order = db.fetch_order_by_order_id(&oid).await.expect("Failed to fetch order").expect("No order found");
+    let status = state.parse().expect("Invalid order status");
+    assert_eq!(order.status, status);
+}
+
+#[then(expr = "{word} has a balance of {int} Tari")]
+async fn check_balance(world: &mut TPGWorld, user: String, balance: i64) {
+    let db = world.db.as_ref().expect("No database connection");
+    let users = SeedUsers::new();
+    let user = users.user(&user);
+    let account = db
+        .fetch_user_account_for_address(&user.address)
+        .await
+        .expect("Failed to fetch account")
+        .expect("No account found");
+    let expected_balance = MicroTari::from_tari(balance);
+    assert_eq!(account.current_balance, expected_balance);
 }
 
 fn modify_signature(token: String, value: &str) -> String {

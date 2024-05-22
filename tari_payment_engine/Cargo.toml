@@ -18,6 +18,7 @@ thiserror = "1.0.32"
 tokio = { version = "1.20.1", features = ["full"] }
 regex = "1.10.3"
 tari_common_types = "1.0.0-pre.10"
+tari_crypto = { version = "0.20.1", default-features = false }
 
 [features]
 default = ["sqlite"]

@@ -6,14 +6,14 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use log::error;
+use log::{error, trace};
 use serde::{Deserialize, Serialize};
 use sqlx::{database::HasValueRef, Database, Decode, FromRow, Sqlite, Type};
 use tari_common_types::tari_address::{TariAddress, TariAddressError};
 use thiserror::Error;
 
 use crate::{
-    helpers::{extract_address_from_memo, extract_order_number_from_memo},
+    helpers::{extract_and_verify_memo_signature, extract_order_number_from_memo, MemoSignatureError},
     op,
     tpe_api::order_objects::{address_to_hex, str_to_address},
 };
@@ -175,9 +175,10 @@ pub struct UserAccount {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub total_received: MicroTari,
-    pub total_pending: MicroTari,
+    pub current_pending: MicroTari,
     pub current_balance: MicroTari,
     pub total_orders: MicroTari,
+    pub current_orders: MicroTari,
 }
 
 //-------------------------------------- UserAccountPublicKey --------------------------------------------------------
@@ -341,8 +342,12 @@ impl NewOrder {
         }
     }
 
-    pub fn extract_address(&mut self) {
-        self.address = self.memo.as_ref().and_then(|s| extract_address_from_memo(s.as_str()))
+    /// Tries to extract the address from the memo
+    pub fn try_extract_address(&mut self) -> Result<(), MemoSignatureError> {
+        let sig = extract_and_verify_memo_signature(&self)?;
+        trace!("Extracted address from memo and confirmed signature was correct");
+        self.address = Some(sig.address.to_address());
+        Ok(())
     }
 
     pub fn is_equivalent(&self, order: &Order) -> bool {

@@ -4,7 +4,7 @@ use tari_common_types::tari_address::TariAddress;
 
 use crate::{
     db::sqlite::SqliteDatabaseError,
-    db_types::{MicroTari, NewOrder, NewPayment, OrderId, UserAccount},
+    db_types::{MicroTari, OrderId, UserAccount},
 };
 
 pub async fn user_account_by_id(
@@ -19,9 +19,10 @@ pub async fn user_account_by_id(
             created_at as "created_at: chrono::DateTime<chrono::Utc>",
             updated_at as "updated_at: chrono::DateTime<chrono::Utc>",
             total_received,
-            total_pending,
+            current_pending,
             current_balance,
-            total_orders
+            total_orders,
+            current_orders
         FROM user_accounts
         WHERE user_accounts.id = $1"#,
         account_id
@@ -48,9 +49,10 @@ pub async fn user_account_for_order(
             created_at as "created_at: chrono::DateTime<chrono::Utc>",
             updated_at as "updated_at: chrono::DateTime<chrono::Utc>",
             total_received,
-            total_pending,
+            current_pending,
             current_balance,
-            total_orders
+            total_orders,
+            current_orders
         FROM user_accounts
         WHERE user_accounts.id = (
             SELECT user_account_id
@@ -82,9 +84,10 @@ pub async fn user_account_for_tx(
             created_at as "created_at: chrono::DateTime<chrono::Utc>",
             updated_at as "updated_at: chrono::DateTime<chrono::Utc>",
             total_received,
-            total_pending,
+            current_pending,
             current_balance,
-            total_orders
+            total_orders,
+            current_orders
         FROM user_accounts
         WHERE user_accounts.id = (
             SELECT user_account_id
@@ -114,9 +117,10 @@ pub async fn user_account_for_customer_id(
             created_at as "created_at: chrono::DateTime<chrono::Utc>",
             updated_at as "updated_at: chrono::DateTime<chrono::Utc>",
             total_received,
-            total_pending,
+            current_pending,
             current_balance,
-            total_orders
+            total_orders,
+            current_orders
         FROM user_accounts
         WHERE user_accounts.id = (
             SELECT user_account_id
@@ -151,9 +155,10 @@ pub async fn user_account_for_address(
             created_at as "created_at: chrono::DateTime<chrono::Utc>",
             updated_at as "updated_at: chrono::DateTime<chrono::Utc>",
             total_received,
-            total_pending,
+            current_pending,
             current_balance,
-            total_orders
+            total_orders,
+            current_orders
         FROM user_accounts
         WHERE user_accounts.id = (
             SELECT user_account_id
@@ -299,26 +304,7 @@ pub async fn fetch_or_create_account(
     Ok(id)
 }
 
-async fn try_match_order_to_payments(
-    order: &NewOrder,
-    conn: &mut SqliteConnection,
-) -> Result<Option<i64>, SqliteDatabaseError> {
-    trace!("🧑️ Trying to match order {order:?} to existing payments.");
-    if order.address.is_none() {
-        return Ok(None);
-    }
-    let pubkey = order.address.as_ref().unwrap();
-    acc_id_for_pubkey(pubkey, conn).await
-}
-
-async fn try_match_payment_to_orders(
-    payment: &NewPayment,
-    _conn: &mut SqliteConnection,
-) -> Result<i64, SqliteDatabaseError> {
-    trace!("🧑️ Trying to match payment {payment:?} to existing orders.");
-    todo!()
-}
-
+// Sets the current balance for the given account id, rather than adding a delta to it
 pub async fn update_user_balance(
     account_id: i64,
     balance: MicroTari,
@@ -352,7 +338,7 @@ pub async fn adjust_balances(
         r#"UPDATE user_accounts SET
        current_balance = current_balance + $1,
        total_received = total_received + $2,
-       total_pending = total_pending + $3,
+       current_pending = current_pending + $3,
        updated_at = CURRENT_TIMESTAMP
        WHERE id = $4
        "#,
@@ -366,20 +352,24 @@ pub async fn adjust_balances(
     Ok(())
 }
 
-pub async fn incr_total_orders(
+pub async fn incr_order_totals(
     account_id: i64,
-    delta: MicroTari,
+    delta_total: MicroTari,
+    delta_current: MicroTari,
     conn: &mut SqliteConnection,
 ) -> Result<MicroTari, SqliteDatabaseError> {
-    let value = delta.value();
+    let value_total = delta_total.value();
+    let value_current = delta_current.value();
     let result = sqlx::query!(
         r#"UPDATE user_accounts SET
        total_orders = total_orders + $1,
+       current_orders = current_orders + $2,
        updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2
+       WHERE id = $3
        RETURNING total_orders
        "#,
-        value,
+        value_total,
+        value_current,
         account_id
     )
     .fetch_one(conn)

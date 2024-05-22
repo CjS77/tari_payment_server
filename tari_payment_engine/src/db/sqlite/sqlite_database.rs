@@ -76,7 +76,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         debug!("🗃️ Order #{} has been saved in the DB with id {id}", order.order_id);
         let account_id =
             user_accounts::fetch_or_create_account(Some(order.customer_id.clone()), order.address, &mut tx).await?;
-        user_accounts::incr_total_orders(account_id, price, &mut tx).await?;
+        user_accounts::incr_order_totals(account_id, price, price, &mut tx).await?;
         tx.commit().await?;
         Ok(account_id)
     }
@@ -149,8 +149,11 @@ impl PaymentGatewayDatabase for SqliteDatabase {
                 result.push(order.clone());
             }
         }
+        let total_paid = account.current_balance - new_balance;
         user_accounts::update_user_balance(account_id, new_balance, &mut tx).await?;
         trace!("Account {account_id} balance updated from {} to {new_balance}", account.current_balance);
+        user_accounts::incr_order_totals(account_id, MicroTari::from(0), -total_paid, &mut tx).await?;
+        trace!("🗃️ Adjusted account #{account_id} orders outstanding by {total_paid}.");
         tx.commit().await?;
         Ok(result)
     }

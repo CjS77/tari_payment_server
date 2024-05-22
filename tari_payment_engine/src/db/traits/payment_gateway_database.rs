@@ -47,7 +47,7 @@ pub trait PaymentGatewayDatabase: Clone {
     /// If no orders can be fulfilled, an empty vector is returned.
     async fn fetch_payable_orders(&self, account_id: i64) -> Result<Vec<Order>, Self::Error>;
 
-    /// Tries to fulfil the list of arders given from the given account.
+    /// Tries to fulfil the list of orders given from the given account.
     ///
     /// Any order that has enough credit in the account
     /// * Will be marked as Paid

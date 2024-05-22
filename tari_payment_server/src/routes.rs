@@ -35,13 +35,14 @@ use tari_payment_engine::{
     AuthApi,
     AuthManagement,
     OrderFlowApi,
+    OrderManagerError,
     PaymentGatewayDatabase,
 };
 
 use crate::{
     auth::{check_login_token_signature, JwtClaims, TokenIssuer},
     data_objects::RoleUpdateRequest,
-    errors::ServerError,
+    errors::{OrderConversionError, ServerError},
     shopify_order::ShopifyOrder,
 };
 
@@ -363,19 +364,39 @@ pub async fn shopify_webhook<B: PaymentGatewayDatabase>(
 ) -> Result<HttpResponse, ServerError> {
     trace!("💻️ Received webhook request: {}", req.uri());
     let order = body.into_inner();
-    let new_order = NewOrder::try_from(order)?;
-    match api.process_new_order(new_order.clone()).await {
-        Ok(orders) => {
-            info!("💻️ Order {} processed successfully.", new_order.order_id);
-            let ids = orders.iter().map(|o| o.order_id.as_str()).collect::<Vec<_>>().join(", ");
-            info!("💻️ {} orders were paid. {}", orders.len(), ids);
+    // Webhook responses must always be in 200 range, otherwise Shopify will retry
+    let response = match NewOrder::try_from(order) {
+        Err(OrderConversionError::FormatError(s)) => {
+            warn!("💻️ Could not convert order. {s}");
+            HttpResponse::Accepted().body(s)
         },
-        Err(e) => {
-            warn!("💻️ Could not process order {}. {e}", new_order.order_id);
-            debug!("💻️ Failed order: {new_order}");
+        Err(OrderConversionError::InvalidMemoSignature(e)) => {
+            warn!("💻️ Could not verify memo signature. {e}");
+            HttpResponse::Accepted().body(e.to_string())
         },
-    }
-    Ok(HttpResponse::Ok().finish())
+        Err(OrderConversionError::UnsupportedCurrency(cur)) => {
+            info!("💻️ Unsupported currency in incoming order. {cur}");
+            HttpResponse::Accepted().body(format!("Unsupported currency: {cur}"))
+        },
+        Ok(new_order) => match api.process_new_order(new_order.clone()).await {
+            Ok(orders) => {
+                info!("💻️ Order {} processed successfully.", new_order.order_id);
+                let ids = orders.iter().map(|o| o.order_id.as_str()).collect::<Vec<_>>().join(", ");
+                info!("💻️ {} orders were paid. {}", orders.len(), ids);
+                HttpResponse::Ok().finish()
+            },
+            Err(OrderManagerError::DatabaseError(e)) => {
+                warn!("💻️ Could not process order {}. {e}", new_order.order_id);
+                debug!("💻️ Failed order: {new_order}");
+                HttpResponse::Accepted().body(format!("Order could not be processed. {e}"))
+            },
+            Err(OrderManagerError::OrderAlreadyExists(id)) => {
+                info!("💻️ Order {} already exists with id {id}.", new_order.order_id);
+                HttpResponse::Ok().finish()
+            },
+        },
+    };
+    Ok(response)
 }
 
 //----------------------------------------------   Roles  ----------------------------------------------------

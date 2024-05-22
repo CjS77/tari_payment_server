@@ -57,15 +57,6 @@ impl Default for TPGWorld {
 }
 
 impl TPGWorld {
-    pub fn set_auth_config(&mut self, auth: AuthConfig) {
-        self.config.auth = auth;
-    }
-
-    pub fn refresh_auth_config(&mut self) -> AuthConfig {
-        self.config.auth = AuthConfig::default();
-        self.config.auth.clone()
-    }
-
     pub async fn start_database(&mut self) {
         let url = create_random_test_database().await;
         let db = SqliteDatabase::new_with_url(&url, 1).await.expect("Error creating connection to database");

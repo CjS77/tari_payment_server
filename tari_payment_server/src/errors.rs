@@ -4,7 +4,7 @@ use actix_web::{
     HttpResponse,
 };
 use log::error;
-use tari_payment_engine::AuthApiError;
+use tari_payment_engine::{helpers::MemoSignatureError, AuthApiError};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -75,7 +75,14 @@ impl ResponseError for ServerError {
 
 #[derive(Debug, Error)]
 #[error("Could not convert shopify order into a new order. {0}.")]
-pub struct OrderConversionError(pub String);
+pub enum OrderConversionError {
+    #[error("The Shopify order contained invalid data. {0}")]
+    FormatError(String),
+    #[error("{0} is not a supported currency.")]
+    UnsupportedCurrency(String),
+    #[error("The memo signature was invalid. {0}")]
+    InvalidMemoSignature(#[from] MemoSignatureError),
+}
 
 #[derive(Debug, Clone, Error)]
 pub enum AuthError {
