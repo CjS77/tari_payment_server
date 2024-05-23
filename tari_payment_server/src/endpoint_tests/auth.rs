@@ -6,7 +6,7 @@ use tari_jwt::{
     Ristretto256,
     Ristretto256VerifyingKey,
 };
-use tari_payment_engine::{db_types::Role, AuthApi, AuthApiError};
+use tari_payment_engine::{db_types::Role, traits::AuthApiError, AuthApi};
 
 use super::mocks::*;
 use crate::{

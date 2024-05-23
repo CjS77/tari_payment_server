@@ -1,6 +1,7 @@
 use tari_common_types::tari_address::TariAddress;
+use thiserror::Error;
 
-use crate::{db_types::Role, AuthApiError};
+use crate::db_types::Role;
 
 /// The `AuthManagement` trait defines behaviour for managing authentication and authorisation.
 ///
@@ -50,4 +51,24 @@ pub trait AuthManagement {
     /// Removes the given roles from the address. The number of roles actually removed is returned. This function must
     /// be idempotent.
     async fn remove_roles(&self, address: &TariAddress, roles: &[Role]) -> Result<u64, AuthApiError>;
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum AuthApiError {
+    #[error("Database error: {0}")]
+    DatabaseError(String),
+    #[error("Nonce is not strictly increasing.")]
+    InvalidNonce,
+    #[error("Tari address not found")]
+    AddressNotFound,
+    #[error("User requested at least {0} roles that are not allowed")]
+    RoleNotAllowed(usize),
+    #[error("The requested role does not exist")]
+    RoleNotFound,
+}
+
+impl From<sqlx::Error> for AuthApiError {
+    fn from(e: sqlx::Error) -> Self {
+        AuthApiError::DatabaseError(e.to_string())
+    }
 }

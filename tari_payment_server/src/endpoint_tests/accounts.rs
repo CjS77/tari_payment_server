@@ -108,6 +108,7 @@ fn configure(cfg: &mut ServiceConfig) {
         total_received: MicroTari::from(1_000_000),
         current_pending: Default::default(),
         current_balance: MicroTari::from(1_000_000),
+        current_orders: Default::default(),
         total_orders: Default::default(),
     };
     let mut account_manager = MockAccountManager::new();

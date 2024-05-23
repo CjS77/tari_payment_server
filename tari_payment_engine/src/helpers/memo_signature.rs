@@ -32,6 +32,7 @@ use serde::{Deserialize, Serialize};
 use tari_common_types::tari_address::TariAddress;
 use tari_crypto::{
     hash_domain,
+    hashing::DomainSeparation,
     ristretto::{RistrettoPublicKey, RistrettoSchnorrWithDomain, RistrettoSecretKey},
     signatures::SchnorrSignatureError,
     tari_utilities::hex::Hex,
@@ -47,6 +48,12 @@ pub type MemoSchnorr = RistrettoSchnorrWithDomain<MemoSignatureDomain>;
 #[derive(Debug, Clone, Error)]
 #[error("Invalid memo signature: {0}")]
 pub struct MemoSignatureError(String);
+
+impl From<String> for MemoSignatureError {
+    fn from(e: String) -> Self {
+        Self(e)
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoSignature {
@@ -70,7 +77,7 @@ impl MemoSignature {
 
     pub fn new(address: &str, order_id: &str, signature: &str) -> Result<Self, MemoSignatureError> {
         let address = address.parse::<SerializedTariAddress>().map_err(|e| MemoSignatureError(e.to_string()))?;
-        let signature = hex_to_memo_schnorr(signature).map_err(|e| MemoSignatureError(e.to_string()))?;
+        let signature = hex_to_schnorr::<_, MemoSignatureError>(signature)?;
         let order_id = order_id.to_string();
         Ok(Self { address, order_id, signature })
     }
@@ -110,18 +117,18 @@ where S: serde::Serializer {
 pub fn de_sig<'de, D>(d: D) -> Result<MemoSchnorr, D::Error>
 where D: serde::Deserializer<'de> {
     let s = String::deserialize(d)?;
-    hex_to_memo_schnorr(&s).map_err(serde::de::Error::custom)
+    hex_to_schnorr::<_, String>(&s).map_err(|s| serde::de::Error::custom(s))
 }
 
-pub fn hex_to_memo_schnorr(s: &str) -> Result<MemoSchnorr, MemoSignatureError> {
+pub fn hex_to_schnorr<H: DomainSeparation, E: From<String>>(s: &str) -> Result<RistrettoSchnorrWithDomain<H>, E> {
     if s.len() != 128 {
-        return Err(MemoSignatureError("Invalid signature length".into()));
+        return Err(E::from("Invalid signature length".into()));
     }
     let nonce = RistrettoPublicKey::from_hex(&s[..64])
-        .map_err(|e| MemoSignatureError(format!("Signature contains an invalid public nonce. {e}")))?;
+        .map_err(|e| E::from(format!("Signature contains an invalid public nonce. {e}")))?;
     let sig = RistrettoSecretKey::from_hex(&s[64..])
-        .map_err(|e| MemoSignatureError(format!("Signature contains an invalid signature key. {e}")))?;
-    Ok(MemoSchnorr::new(nonce, sig))
+        .map_err(|e| E::from(format!("Signature contains an invalid signature key. {e}")))?;
+    Ok(RistrettoSchnorrWithDomain::new(nonce, sig))
 }
 
 pub fn extract_and_verify_memo_signature(order: &NewOrder) -> Result<MemoSignature, MemoSignatureError> {
@@ -140,8 +147,6 @@ pub fn extract_and_verify_memo_signature(order: &NewOrder) -> Result<MemoSignatu
 
 #[cfg(test)]
 mod test {
-    use log::info;
-
     use super::*;
 
     // These tests use this address

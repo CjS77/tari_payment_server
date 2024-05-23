@@ -19,7 +19,7 @@ pub fn random_db_path() -> String {
 
 pub async fn run_migrations(url: &str) {
     let db = SqliteDatabase::new_with_url(url, 5).await.expect("Error creating connection to database");
-    migrate!("./src/db/sqlite/migrations").run(db.pool()).await.expect("Error running DB migrations");
+    migrate!("./src/sqlite/migrations").run(db.pool()).await.expect("Error running DB migrations");
     info!("🚀️ Migrations complete");
 }
 

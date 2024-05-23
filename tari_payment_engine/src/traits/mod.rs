@@ -22,43 +22,13 @@
 //! * [`AccountManagement`] provides methods for querying information about user accounts, orders and payments.
 mod account_management;
 mod auth_management;
-mod order_management;
 mod payment_gateway_database;
+mod wallet_management;
 
 mod data_objects;
 
-pub use account_management::AccountManagement;
-pub use auth_management::AuthManagement;
-pub use data_objects::{InsertOrderResult, InsertPaymentResult};
-pub use payment_gateway_database::PaymentGatewayDatabase;
-
-#[macro_export]
-macro_rules! op {
-    (binary $for_struct:ident, $impl_trait:ident, $impl_fn:ident) => {
-        impl $impl_trait for $for_struct {
-            type Output = Self;
-
-            fn $impl_fn(self, rhs: Self) -> Self::Output {
-                Self(self.0.$impl_fn(rhs.0))
-            }
-        }
-    };
-
-    (inplace $for_struct:ident, $impl_trait:ident, $impl_fn:ident) => {
-        impl $impl_trait for $for_struct {
-            fn $impl_fn(&mut self, rhs: Self) {
-                self.0.$impl_fn(rhs.0)
-            }
-        }
-    };
-
-    (unary $for_struct:ident, $impl_trait:ident, $impl_fn:ident) => {
-        impl $impl_trait for $for_struct {
-            type Output = Self;
-
-            fn $impl_fn(self) -> Self::Output {
-                Self(self.0.$impl_fn())
-            }
-        }
-    };
-}
+pub use account_management::{AccountApiError, AccountManagement};
+pub use auth_management::{AuthApiError, AuthManagement};
+pub use data_objects::{NewWalletInfo, UpdateWalletInfo, WalletInfo};
+pub use payment_gateway_database::{PaymentGatewayDatabase, PaymentGatewayError};
+pub use wallet_management::{WalletAuth, WalletAuthApiError, WalletManagement};

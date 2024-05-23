@@ -28,20 +28,17 @@ use log::*;
 use paste::paste;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
-    db_types::{NewOrder, OrderId, Role, SerializedTariAddress},
+    db_types::{NewOrder, NewPayment, OrderId, Role, SerializedTariAddress},
     order_objects::OrderQueryFilter,
+    traits::{AccountManagement, AuthManagement, PaymentGatewayDatabase, PaymentGatewayError},
     AccountApi,
-    AccountManagement,
     AuthApi,
-    AuthManagement,
     OrderFlowApi,
-    OrderManagerError,
-    PaymentGatewayDatabase,
 };
 
 use crate::{
     auth::{check_login_token_signature, JwtClaims, TokenIssuer},
-    data_objects::RoleUpdateRequest,
+    data_objects::{JsonResponse, RoleUpdateRequest},
     errors::{OrderConversionError, ServerError},
     shopify_order::ShopifyOrder,
 };
@@ -361,42 +358,78 @@ pub async fn shopify_webhook<B: PaymentGatewayDatabase>(
     req: HttpRequest,
     body: web::Json<ShopifyOrder>,
     api: web::Data<OrderFlowApi<B>>,
-) -> Result<HttpResponse, ServerError> {
+) -> HttpResponse {
     trace!("💻️ Received webhook request: {}", req.uri());
     let order = body.into_inner();
     // Webhook responses must always be in 200 range, otherwise Shopify will retry
-    let response = match NewOrder::try_from(order) {
+    let result = match NewOrder::try_from(order) {
         Err(OrderConversionError::FormatError(s)) => {
             warn!("💻️ Could not convert order. {s}");
-            HttpResponse::Accepted().body(s)
+            JsonResponse::failure(s)
         },
         Err(OrderConversionError::InvalidMemoSignature(e)) => {
             warn!("💻️ Could not verify memo signature. {e}");
-            HttpResponse::Accepted().body(e.to_string())
+            JsonResponse::failure(e)
         },
         Err(OrderConversionError::UnsupportedCurrency(cur)) => {
             info!("💻️ Unsupported currency in incoming order. {cur}");
-            HttpResponse::Accepted().body(format!("Unsupported currency: {cur}"))
+            JsonResponse::failure(format!("Unsupported currency: {cur}"))
         },
         Ok(new_order) => match api.process_new_order(new_order.clone()).await {
             Ok(orders) => {
                 info!("💻️ Order {} processed successfully.", new_order.order_id);
                 let ids = orders.iter().map(|o| o.order_id.as_str()).collect::<Vec<_>>().join(", ");
                 info!("💻️ {} orders were paid. {}", orders.len(), ids);
-                HttpResponse::Ok().finish()
+                JsonResponse::success("Order processed successfully.")
             },
-            Err(OrderManagerError::DatabaseError(e)) => {
+            Err(PaymentGatewayError::DatabaseError(e)) => {
                 warn!("💻️ Could not process order {}. {e}", new_order.order_id);
                 debug!("💻️ Failed order: {new_order}");
-                HttpResponse::Accepted().body(format!("Order could not be processed. {e}"))
+                JsonResponse::failure(e)
             },
-            Err(OrderManagerError::OrderAlreadyExists(id)) => {
+            Err(PaymentGatewayError::OrderAlreadyExists(id)) => {
                 info!("💻️ Order {} already exists with id {id}.", new_order.order_id);
-                HttpResponse::Ok().finish()
+                JsonResponse::success("Order already exists.")
+            },
+            Err(e) => {
+                warn!("💻️ Unexpected error while handling incoming order notification. {e}");
+                JsonResponse::failure("Unexpected error handling order.")
             },
         },
     };
-    Ok(response)
+    HttpResponse::Ok().json(result)
+}
+
+//------------------------------------------   Incoming payments  ---------------------------------------------
+route!(incoming_payment_notification => Post "/incoming_payment" impl PaymentGatewayDatabase);
+pub async fn incoming_payment_notification<B: PaymentGatewayDatabase>(
+    api: web::Data<OrderFlowApi<B>>,
+    body: web::Json<NewPayment>,
+) -> HttpResponse {
+    trace!("💻️ Received incoming payment notification");
+    let payment = body.into_inner();
+    info!("💻️ New payment received from {} for {}.", payment.sender.as_address(), payment.amount);
+    let result = match api.process_new_payment(payment).await {
+        Ok(orders) => {
+            let ids = orders.iter().map(|o| o.order_id.as_str()).collect::<Vec<_>>().join(", ");
+            let msg = format!("{} orders were paid. {}", orders.len(), ids);
+            info!("💻️ {msg}");
+            JsonResponse::success(msg)
+        },
+        Err(PaymentGatewayError::DatabaseError(e)) => {
+            warn!("💻️ Could not process payment. {e}");
+            JsonResponse::failure(e)
+        },
+        Err(PaymentGatewayError::PaymentAlreadyExists(id)) => {
+            info!("💻️ Payment already exists with id {id}.");
+            JsonResponse::success("Payment already exists.")
+        },
+        Err(e) => {
+            warn!("💻️ Unexpected error handling incoming payment notification. {e}");
+            JsonResponse::failure("Unexpected error handling payment.")
+        },
+    };
+    HttpResponse::Ok().json(result)
 }
 
 //----------------------------------------------   Roles  ----------------------------------------------------

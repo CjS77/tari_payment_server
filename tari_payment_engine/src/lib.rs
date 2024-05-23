@@ -15,29 +15,23 @@
 //! The engine also provides a set of events that can be subscribed to. These events are emitted when certain actions
 //! occur within the payment engine. For example, when a new order is created, an `OrderCreated` event is emitted.
 //! A simple Actor framework is used so that you can easily hook into these events and perform custom actions.
-mod db;
+
+#[cfg(feature = "sqlite")]
+mod sqlite;
+
+#[cfg(feature = "postgres")]
+mod postgres;
 
 pub mod db_types;
 pub mod events;
 pub mod helpers;
 mod tpe_api;
 
+pub mod traits;
+
 #[cfg(any(feature = "test_utils", test))]
 pub mod test_utils;
 
 #[cfg(feature = "sqlite")]
-pub use db::sqlite::SqliteDatabase;
-pub use db::traits::{
-    AccountManagement,
-    AuthManagement,
-    InsertOrderResult,
-    InsertPaymentResult,
-    PaymentGatewayDatabase,
-};
-pub use tpe_api::{
-    accounts_api::AccountApi,
-    auth_api::AuthApi,
-    errors::{AuthApiError, OrderManagerError},
-    order_flow_api::OrderFlowApi,
-    order_objects,
-};
+pub use sqlite::SqliteDatabase;
+pub use tpe_api::{accounts_api::AccountApi, auth_api::AuthApi, order_flow_api::OrderFlowApi, order_objects};

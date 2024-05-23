@@ -4,7 +4,7 @@ use actix_web::{
     HttpResponse,
 };
 use log::error;
-use tari_payment_engine::{helpers::MemoSignatureError, AuthApiError};
+use tari_payment_engine::{helpers::MemoSignatureError, traits::AuthApiError};
 use thiserror::Error;
 
 #[derive(Debug, Error)]

@@ -469,10 +469,10 @@ impl Display for PaymentType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NewPayment {
     /// The public key of the user who made the payment
-    pub sender: TariAddress,
+    pub sender: SerializedTariAddress,
     /// The amount of the payment
     pub amount: MicroTari,
     /// The transaction identifier. Typically, the kernel signature in Tari
@@ -485,7 +485,7 @@ pub struct NewPayment {
 
 impl NewPayment {
     pub fn new(sender: TariAddress, amount: MicroTari, txid: String) -> Self {
-        Self { sender, amount, txid, memo: None, order_id: None }
+        Self { sender: sender.into(), amount, txid, memo: None, order_id: None }
     }
 
     pub fn with_memo<S: Into<String>>(&mut self, memo: S) {

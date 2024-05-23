@@ -2,25 +2,21 @@ use log::{debug, trace};
 use sqlx::{QueryBuilder, SqliteConnection};
 
 use crate::{
-    db::{sqlite::SqliteDatabaseError, traits::InsertOrderResult},
     db_types::{NewOrder, Order, OrderId, OrderStatusType, OrderUpdate},
     order_objects::OrderQueryFilter,
+    traits::PaymentGatewayError,
 };
 
-pub async fn idempotent_insert(
-    order: NewOrder,
-    conn: &mut SqliteConnection,
-) -> Result<InsertOrderResult, SqliteDatabaseError> {
-    let result = match order_exists(&order.order_id, conn).await? {
-        Some(id) => InsertOrderResult::AlreadyExists(id),
-        None => insert_order(order, conn).await?,
-    };
-    Ok(result)
+pub async fn idempotent_insert(order: NewOrder, conn: &mut SqliteConnection) -> Result<i64, PaymentGatewayError> {
+    match order_exists(&order.order_id, conn).await? {
+        Some(id) => Err(PaymentGatewayError::OrderAlreadyExists(id)),
+        None => insert_order(order, conn).await,
+    }
 }
 
 /// Inserts a new order into the database using the given connection. This is not atomic. You can embedd this call
 /// inside a transaction if you need to ensure atomicity, and pass `&mut *tx` as the connection argument.
-async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<InsertOrderResult, SqliteDatabaseError> {
+async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<i64, PaymentGatewayError> {
     let record = sqlx::query!(
         r#"
             INSERT INTO orders (
@@ -43,14 +39,14 @@ async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<In
     .fetch_one(conn)
     .await?;
     // The DB should trigger an automatic status entry for the order
-    Ok(InsertOrderResult::Inserted(record.id))
+    Ok(record.id)
 }
 
 /// Returns the last entry in the orders table for the corresponding `order_id`
 pub async fn fetch_order_by_order_id(
     order_id: &OrderId,
     conn: &mut SqliteConnection,
-) -> Result<Option<Order>, SqliteDatabaseError> {
+) -> Result<Option<Order>, sqlx::Error> {
     let order = sqlx::query_as!(
         Order,
         r#"
@@ -82,17 +78,15 @@ pub async fn fetch_order_by_order_id(
 
 /// Checks whether the order with the given `OrderId` already exists in the database. If it does exist, the `id` of the
 /// order is returned. If it does not exist, `None` is returned.
-pub async fn order_exists(order_id: &OrderId, conn: &mut SqliteConnection) -> Result<Option<i64>, SqliteDatabaseError> {
-    fetch_order_by_order_id(order_id, conn).await.map(|o| o.map(|o| o.id))
+pub async fn order_exists(order_id: &OrderId, conn: &mut SqliteConnection) -> Result<Option<i64>, PaymentGatewayError> {
+    let order = fetch_order_by_order_id(order_id, conn).await?;
+    Ok(order.map(|o| o.id))
 }
 
 /// Fetches orders according to criteria specified in the `OrderQueryFilter`
 ///
 /// Resulting orders are ordered by `created_at` in ascending order
-pub async fn search_orders(
-    query: OrderQueryFilter,
-    conn: &mut SqliteConnection,
-) -> Result<Vec<Order>, SqliteDatabaseError> {
+pub async fn search_orders(query: OrderQueryFilter, conn: &mut SqliteConnection) -> Result<Vec<Order>, sqlx::Error> {
     let mut builder = QueryBuilder::new(
         r#"
     SELECT id, order_id, customer_id, memo, total_price, currency, created_at, updated_at, status FROM orders
@@ -152,12 +146,11 @@ pub(crate) async fn update_order_status(
     order_id: i64,
     status: OrderStatusType,
     conn: &mut SqliteConnection,
-) -> Result<(), SqliteDatabaseError> {
+) -> Result<(), PaymentGatewayError> {
     let status = status.to_string();
-    let _ =
-        sqlx::query!("UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", status, order_id)
-            .execute(conn)
-            .await?;
+    sqlx::query!("UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", status, order_id)
+        .execute(conn)
+        .await?;
     Ok(())
 }
 
@@ -165,7 +158,7 @@ pub(crate) async fn update_order(
     id: &OrderId,
     update: OrderUpdate,
     conn: &mut SqliteConnection,
-) -> Result<(), SqliteDatabaseError> {
+) -> Result<(), PaymentGatewayError> {
     if update.is_empty() {
         debug!("📝️ No fields to update for order {id}. Update request skipped.");
         return Ok(());

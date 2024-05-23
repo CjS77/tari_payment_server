@@ -80,6 +80,9 @@ pub fn create_server_instance(config: ServerConfig, db: SqliteDatabase) -> Resul
                 }
             })
             .service(ShopifyWebhookRoute::<SqliteDatabase>::new());
+        let wallet_scope = web::scope("/wallet").wrap_fn(move |req, srv| {
+            // let wallet_info = get_wallet_info(&req);
+        });
         app.use_jwt(authority.clone(), auth_scope)
             .service(health)
             .service(AuthRoute::<SqliteDatabase>::new())

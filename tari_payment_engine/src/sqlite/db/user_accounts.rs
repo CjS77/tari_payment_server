@@ -3,14 +3,14 @@ use sqlx::SqliteConnection;
 use tari_common_types::tari_address::TariAddress;
 
 use crate::{
-    db::sqlite::SqliteDatabaseError,
     db_types::{MicroTari, OrderId, UserAccount},
+    traits::AccountApiError,
 };
 
 pub async fn user_account_by_id(
     account_id: i64,
     conn: &mut SqliteConnection,
-) -> Result<Option<UserAccount>, SqliteDatabaseError> {
+) -> Result<Option<UserAccount>, AccountApiError> {
     let result = sqlx::query_as!(
         UserAccount,
         r#"
@@ -39,7 +39,7 @@ pub async fn user_account_by_id(
 pub async fn user_account_for_order(
     order_id: &OrderId,
     conn: &mut SqliteConnection,
-) -> Result<Option<UserAccount>, SqliteDatabaseError> {
+) -> Result<Option<UserAccount>, AccountApiError> {
     trace!("🧑️ Fetching user account for order [{order_id}]");
     let result = sqlx::query_as!(
         UserAccount,
@@ -72,10 +72,7 @@ pub async fn user_account_for_order(
     }
 }
 
-pub async fn user_account_for_tx(
-    txid: &str,
-    conn: &mut SqliteConnection,
-) -> Result<Option<UserAccount>, SqliteDatabaseError> {
+pub async fn user_account_for_tx(txid: &str, conn: &mut SqliteConnection) -> Result<Option<UserAccount>, sqlx::Error> {
     let result = sqlx::query_as!(
         UserAccount,
         r#"
@@ -108,7 +105,7 @@ pub async fn user_account_for_tx(
 pub async fn user_account_for_customer_id(
     customer_id: &str,
     conn: &mut SqliteConnection,
-) -> Result<Option<UserAccount>, SqliteDatabaseError> {
+) -> Result<Option<UserAccount>, AccountApiError> {
     let result = sqlx::query_as!(
         UserAccount,
         r#"
@@ -145,7 +142,7 @@ pub async fn user_account_for_customer_id(
 pub async fn user_account_for_address(
     public_key: &TariAddress,
     conn: &mut SqliteConnection,
-) -> Result<Option<UserAccount>, SqliteDatabaseError> {
+) -> Result<Option<UserAccount>, AccountApiError> {
     let pk = public_key.to_hex();
     let result = sqlx::query_as!(
         UserAccount,
@@ -174,7 +171,7 @@ pub async fn user_account_for_address(
 }
 
 /// Returns the internal account id for the given public key, if it exists, or None if it does not exist.
-async fn acc_id_for_pubkey(pk: &TariAddress, conn: &mut SqliteConnection) -> Result<Option<i64>, SqliteDatabaseError> {
+async fn acc_id_for_pubkey(pk: &TariAddress, conn: &mut SqliteConnection) -> Result<Option<i64>, AccountApiError> {
     let pk = pk.to_hex();
     let id = sqlx::query!("SELECT user_account_id FROM user_account_public_keys WHERE public_key = $1 LIMIT 1", pk)
         .fetch_optional(conn)
@@ -187,7 +184,7 @@ async fn acc_id_for_pubkey(pk: &TariAddress, conn: &mut SqliteConnection) -> Res
 }
 
 /// Returns the internal account id for the given customer id, if it exists, or None if it does not exist.
-async fn acc_id_for_cust_id(cid: &str, conn: &mut SqliteConnection) -> Result<Option<i64>, SqliteDatabaseError> {
+async fn acc_id_for_cust_id(cid: &str, conn: &mut SqliteConnection) -> Result<Option<i64>, AccountApiError> {
     let id = sqlx::query!("SELECT user_account_id FROM user_account_customer_ids WHERE customer_id = $1 LIMIT 1", cid)
         .fetch_optional(conn)
         .await?
@@ -203,7 +200,7 @@ async fn create_account_with_links(
     cid: Option<String>,
     pk: Option<TariAddress>,
     tx: &mut SqliteConnection,
-) -> Result<i64, SqliteDatabaseError> {
+) -> Result<i64, AccountApiError> {
     let row = sqlx::query!("INSERT INTO user_accounts DEFAULT VALUES RETURNING id").fetch_one(&mut *tx).await?;
     let account_id = row.id;
     debug!("📝️ Created new user account with id #{account_id}");
@@ -216,7 +213,7 @@ async fn link_accounts(
     cid: Option<String>,
     pk: Option<TariAddress>,
     tx: &mut SqliteConnection,
-) -> Result<i64, SqliteDatabaseError> {
+) -> Result<i64, AccountApiError> {
     if let Some(cid) = cid {
         let result = sqlx::query!(
             "INSERT INTO user_account_customer_ids (user_account_id, customer_id) VALUES ($1, $2)",
@@ -258,9 +255,9 @@ pub async fn fetch_or_create_account(
     cust_id: Option<String>,
     pubkey: Option<TariAddress>,
     conn: &mut SqliteConnection,
-) -> Result<i64, SqliteDatabaseError> {
+) -> Result<i64, AccountApiError> {
     if cust_id.is_none() && pubkey.is_none() {
-        return Err(SqliteDatabaseError::AccountCreationError(
+        return Err(AccountApiError::QueryError(
             "🧑️ Nothing to do. Both cid and pubkey are None. I don't want to create an orphan account".to_string(),
         ));
     }
@@ -292,7 +289,7 @@ pub async fn fetch_or_create_account(
             if acc_cid == acc_pk {
                 Ok(acc_cid)
             } else {
-                Err(SqliteDatabaseError::AccountCreationError(
+                Err(AccountApiError::QueryError(
                     "🧑️ Customer_id and public_key are linked to different accounts".to_string(),
                 ))
             }
@@ -309,7 +306,7 @@ pub async fn update_user_balance(
     account_id: i64,
     balance: MicroTari,
     conn: &mut SqliteConnection,
-) -> Result<(), SqliteDatabaseError> {
+) -> Result<(), AccountApiError> {
     let _ = sqlx::query!(
         r#"UPDATE user_accounts SET
        current_balance = $1,
@@ -330,7 +327,7 @@ pub async fn adjust_balances(
     pending_delta: MicroTari,
     balance_delta: MicroTari,
     conn: &mut SqliteConnection,
-) -> Result<(), SqliteDatabaseError> {
+) -> Result<(), AccountApiError> {
     let d_rec = received_delta.value();
     let d_pend = pending_delta.value();
     let d_bal = balance_delta.value();
@@ -357,7 +354,7 @@ pub async fn incr_order_totals(
     delta_total: MicroTari,
     delta_current: MicroTari,
     conn: &mut SqliteConnection,
-) -> Result<MicroTari, SqliteDatabaseError> {
+) -> Result<MicroTari, AccountApiError> {
     let value_total = delta_total.value();
     let value_current = delta_current.value();
     let result = sqlx::query!(

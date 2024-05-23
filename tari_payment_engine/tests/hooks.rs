@@ -10,8 +10,8 @@ use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
     db_types::{MicroTari, NewOrder, NewPayment, OrderId},
     test_utils::prepare_env::{prepare_test_env, random_db_path},
+    traits::PaymentGatewayDatabase,
     OrderFlowApi,
-    PaymentGatewayDatabase,
     SqliteDatabase,
 };
 use tokio::runtime::Runtime;

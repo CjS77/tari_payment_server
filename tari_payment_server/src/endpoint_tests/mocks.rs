@@ -3,9 +3,7 @@ use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
     db_types::{Order, OrderId, Payment, Role, UserAccount},
     order_objects::OrderQueryFilter,
-    AccountManagement,
-    AuthApiError,
-    AuthManagement,
+    traits::{AccountApiError, AccountManagement, AuthApiError, AuthManagement},
 };
 use thiserror::Error;
 
@@ -29,15 +27,14 @@ impl std::fmt::Display for MockErr {
 mock! {
     pub AccountManager {}
     impl AccountManagement for AccountManager {
-        type Error = MockErr;
-        async fn fetch_user_account(&self, account_id: i64) -> Result<Option<UserAccount>, MockErr>;
-        async fn fetch_user_account_for_order(&self, order_id: &OrderId) -> Result<Option<UserAccount>, MockErr>;
-        async fn fetch_user_account_for_customer_id(&self, customer_id: &str) -> Result<Option<UserAccount>, MockErr>;
-        async fn fetch_user_account_for_address(&self, address: &TariAddress) -> Result<Option<UserAccount>, MockErr>;
-        async fn fetch_orders_for_account(&self, account_id: i64) -> Result<Vec<Order>, MockErr>;
-        async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, MockErr>;
-        async fn fetch_payments_for_address(&self, address: &TariAddress) -> Result<Vec<Payment>, MockErr>;
-        async fn search_orders(&self, query: OrderQueryFilter) -> Result<Vec<Order>, MockErr>;
+        async fn fetch_user_account(&self, account_id: i64) -> Result<Option<UserAccount>, AccountApiError>;
+        async fn fetch_user_account_for_order(&self, order_id: &OrderId) -> Result<Option<UserAccount>, AccountApiError>;
+        async fn fetch_user_account_for_customer_id(&self, customer_id: &str) -> Result<Option<UserAccount>, AccountApiError>;
+        async fn fetch_user_account_for_address(&self, address: &TariAddress) -> Result<Option<UserAccount>, AccountApiError>;
+        async fn fetch_orders_for_account(&self, account_id: i64) -> Result<Vec<Order>, AccountApiError>;
+        async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, AccountApiError>;
+        async fn fetch_payments_for_address(&self, address: &TariAddress) -> Result<Vec<Payment>, AccountApiError>;
+        async fn search_orders(&self, query: OrderQueryFilter) -> Result<Vec<Order>, AccountApiError>;
     }
 }
 

@@ -10,6 +10,7 @@
 //! * [`auth_api`] manages nonce state for authentication tokens, and managing user [`Role`]s
 //! * [`order_flow_api`] is the primary API for handling order and payment flows in response to merchant order events
 //!   and wallet payment events.
+//! * [`wallet_api`] provides methods for interacting with the hot wallet authorization and authentication.
 //!
 //! The other submodules in this module are support and utility functions and types.
 //!
@@ -32,9 +33,8 @@
 
 pub mod accounts_api;
 pub mod auth_api;
-pub mod errors;
 pub mod order_flow_api;
 pub mod order_objects;
 pub mod payment_objects;
 
-pub use errors::OrderManagerError;
+pub mod wallet_api;

@@ -9,24 +9,22 @@ use log::{debug, error};
 use sqlx::{QueryBuilder, Row, SqliteConnection};
 use tari_common_types::tari_address::TariAddress;
 
-use crate::{
-    db_types::{ConversionError, Role},
-    AuthApiError,
-};
+use crate::{db_types::Role, traits::AuthApiError};
 
 pub async fn auth_account_exists(address: &TariAddress, conn: &mut SqliteConnection) -> Result<bool, AuthApiError> {
     let address = address.to_hex();
     let row = sqlx::query!(r#"SELECT count(address) as "count" FROM auth_log WHERE address = ?"#, address)
         .fetch_one(conn)
-        .await
-        .map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
+        .await?;
     let count = row.count;
     match count {
         0 => Ok(false),
         1 => Ok(true),
         n => {
             error!("Account {address} appears multiple {n} times in database. This must be 0|1!");
-            Err(AuthApiError::DatabaseError("Internal error. Report this to the developers".to_string()))
+            Err(AuthApiError::DatabaseError(
+                "Account appears multiple times in database. Report this to the developers".to_string(),
+            ))
         },
     }
 }
@@ -45,9 +43,8 @@ pub async fn roles_for_address(address: &TariAddress, conn: &mut SqliteConnectio
     let roles = result
         .iter()
         .filter_map(|r| r.name.as_ref())
-        .map(|r| r.parse::<Role>())
-        .collect::<Result<Vec<Role>, _>>()
-        .map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
+        .map(|r| r.parse::<Role>().map_err(|_| AuthApiError::RoleNotFound))
+        .collect::<Result<Vec<Role>, _>>()?;
     Ok(roles)
 }
 
@@ -64,12 +61,7 @@ pub async fn address_has_roles(
                 WHERE address = ? AND name IN ({role_strings})"#
     );
     #[allow(clippy::cast_possible_truncation)]
-    let num_matching_roles = sqlx::query(&q)
-        .bind(address)
-        .fetch_one(conn)
-        .await
-        .map_err(|e| AuthApiError::DatabaseError(e.to_string()))?
-        .get::<i64, usize>(0) as usize;
+    let num_matching_roles = sqlx::query(&q).bind(address).fetch_one(conn).await?.get::<i64, usize>(0) as usize;
     if num_matching_roles == roles.len() {
         Ok(())
     } else {
@@ -104,7 +96,7 @@ pub async fn upsert_nonce_for_address(
                 }
             }
         }
-        AuthApiError::DatabaseError(e.to_string())
+        AuthApiError::from(e)
     })
     .and_then(|res| match res.rows_affected() {
         0 => Err(AuthApiError::AddressNotFound),
@@ -114,18 +106,11 @@ pub async fn upsert_nonce_for_address(
 }
 
 async fn fetch_roles(conn: &mut SqliteConnection) -> Result<HashMap<Role, i64>, AuthApiError> {
-    let result = sqlx::query!("SELECT id, name FROM roles")
-        .fetch_all(conn)
-        .await
-        .map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
+    let result = sqlx::query!("SELECT id, name FROM roles").fetch_all(conn).await?;
     let roles = result
         .iter()
-        .map(|r| {
-            let role = r.name.parse::<Role>()?;
-            Ok((role, r.id))
-        })
-        .collect::<Result<HashMap<_, _>, _>>()
-        .map_err(|e: ConversionError| AuthApiError::DatabaseError(e.to_string()))?;
+        .map(|r| r.name.parse::<Role>().map(|role| (role, r.id)).map_err(|_| AuthApiError::RoleNotFound))
+        .collect::<Result<HashMap<_, _>, _>>()?;
     debug!("Fetched current roles table: {:?}", roles);
     Ok(roles)
 }
@@ -152,13 +137,15 @@ pub async fn assign_roles(
         values.push_bind_unseparated(role_id);
         values.push_unseparated(")");
     }
-    let res = qb.build().execute(conn).await.map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
+    let res = qb.build().execute(conn).await?;
 
     if res.rows_affected() == roles.len() as u64 {
         Ok(())
     } else {
         error!("Expected to insert {} roles, but inserted {}", roles.len(), res.rows_affected());
-        Err(AuthApiError::DatabaseError("Internal error. Report this to the developers".to_string()))
+        Err(AuthApiError::DatabaseError(
+            "Inserted unexpected number of Roles. Report this to the developers".to_string(),
+        ))
     }
 }
 
@@ -184,7 +171,7 @@ pub async fn remove_roles(
         values.push_bind(*id);
     });
     qb.push(")");
-    let res = qb.build().execute(conn).await.map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
+    let res = qb.build().execute(conn).await?;
 
     Ok(res.rows_affected())
 }

@@ -7,9 +7,8 @@ use log::*;
 use sqlx::SqlitePool;
 use tari_common_types::tari_address::TariAddress;
 
-use super::{auth, db_url, new_pool, orders, transfers, user_accounts, SqliteDatabaseError};
+use super::db::{auth, db_url, new_pool, orders, transfers, user_accounts, wallet_auth};
 use crate::{
-    db::traits::{AccountManagement, InsertOrderResult, InsertPaymentResult, PaymentGatewayDatabase},
     db_types::{
         MicroTari,
         NewOrder,
@@ -24,8 +23,17 @@ use crate::{
         UserAccount,
     },
     order_objects::OrderQueryFilter,
-    AuthApiError,
-    AuthManagement,
+    traits::{
+        AccountApiError,
+        AccountManagement,
+        AuthApiError,
+        AuthManagement,
+        PaymentGatewayDatabase,
+        PaymentGatewayError,
+        WalletAuth,
+        WalletAuthApiError,
+        WalletInfo,
+    },
 };
 
 #[derive(Clone)]
@@ -41,38 +49,34 @@ impl Debug for SqliteDatabase {
 }
 
 impl PaymentGatewayDatabase for SqliteDatabase {
-    type Error = SqliteDatabaseError;
-
     fn url(&self) -> &str {
         self.url.as_str()
     }
 
-    async fn fetch_or_create_account_for_order(&self, order: &NewOrder) -> Result<i64, Self::Error> {
+    async fn fetch_or_create_account_for_order(&self, order: &NewOrder) -> Result<i64, PaymentGatewayError> {
         let mut conn = self.pool.acquire().await?;
         let cust_id = Some(order.customer_id.clone());
         let pubkey = order.address.as_ref().cloned();
-        user_accounts::fetch_or_create_account(cust_id, pubkey, &mut conn).await
+        let id = user_accounts::fetch_or_create_account(cust_id, pubkey, &mut conn).await?;
+        Ok(id)
     }
 
-    async fn fetch_or_create_account_for_payment(&self, payment: &Payment) -> Result<i64, Self::Error> {
+    async fn fetch_or_create_account_for_payment(&self, payment: &Payment) -> Result<i64, PaymentGatewayError> {
         let mut conn = self.pool.acquire().await?;
         let pubkey = Some(payment.sender.clone().to_address());
         let customer_id = match payment.order_id.as_ref() {
             Some(oid) => orders::fetch_order_by_order_id(oid, &mut conn).await?.map(|o| o.customer_id),
             None => None,
         };
-        user_accounts::fetch_or_create_account(customer_id, pubkey, &mut conn).await
+        let id = user_accounts::fetch_or_create_account(customer_id, pubkey, &mut conn).await?;
+        Ok(id)
     }
 
-    async fn process_new_order_for_customer(&self, order: NewOrder) -> Result<i64, Self::Error> {
+    async fn process_new_order_for_customer(&self, order: NewOrder) -> Result<i64, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
         let price = order.total_price;
         let _cid = order.customer_id.clone();
-        let id = match orders::idempotent_insert(order.clone(), &mut tx).await {
-            Ok(InsertOrderResult::Inserted(id)) => Ok(id),
-            Ok(InsertOrderResult::AlreadyExists(id)) => Err(SqliteDatabaseError::DuplicateOrder(id)),
-            Err(e) => Err(e),
-        }?;
+        let id = orders::idempotent_insert(order.clone(), &mut tx).await?;
         debug!("🗃️ Order #{} has been saved in the DB with id {id}", order.order_id);
         let account_id =
             user_accounts::fetch_or_create_account(Some(order.customer_id.clone()), order.address, &mut tx).await?;
@@ -88,16 +92,10 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     /// * creates a new account for the public key if one does not already exist
     /// * Adds the payment amount to the account's total received, and total pending
     /// Returns the account id for the public key.
-    async fn process_new_payment_for_pubkey(&self, payment: NewPayment) -> Result<i64, Self::Error> {
+    async fn process_new_payment_for_pubkey(&self, payment: NewPayment) -> Result<i64, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
-        let txid = match transfers::idempotent_insert(payment.clone(), &mut tx).await {
-            Ok(InsertPaymentResult::Inserted(id)) => Ok(id),
-            Ok(InsertPaymentResult::AlreadyExists(_id)) => {
-                Err(SqliteDatabaseError::DuplicatePayment(payment.txid.clone()))
-            },
-            Err(e) => Err(e),
-        }?;
-        debug!("🗃️ Transfer {txid} received from [{}]", payment.sender);
+        let txid = transfers::idempotent_insert(payment.clone(), &mut tx).await?;
+        debug!("🗃️ Transfer {txid} received from [{}]", payment.sender.as_address());
         let customer_id = match &payment.order_id {
             Some(order_id) => {
                 let existing_order = orders::fetch_order_by_order_id(order_id, &mut tx).await?;
@@ -105,7 +103,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             },
             None => None,
         };
-        let sender = Some(payment.sender);
+        let sender = Some(payment.sender.to_address());
         let acc_id = user_accounts::fetch_or_create_account(customer_id, sender, &mut tx).await?;
         user_accounts::adjust_balances(acc_id, payment.amount, payment.amount, MicroTari::from(0), &mut tx).await?;
         debug!("🗃️ Transfer {txid} processed. {} credited to pending account", payment.amount);
@@ -113,11 +111,11 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         Ok(acc_id)
     }
 
-    async fn fetch_payable_orders(&self, account_id: i64) -> Result<Vec<Order>, Self::Error> {
+    async fn fetch_payable_orders(&self, account_id: i64) -> Result<Vec<Order>, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
         let account = user_accounts::user_account_by_id(account_id, &mut tx)
             .await?
-            .ok_or_else(|| SqliteDatabaseError::AccountNotFound(account_id))?;
+            .ok_or_else(|| PaymentGatewayError::AccountNotFound(account_id))?;
         let query = OrderQueryFilter::default().with_account_id(account_id).with_status(OrderStatusType::New);
         let unpaid_orders = orders::search_orders(query, &mut tx).await?;
         let balance = account.current_balance;
@@ -134,11 +132,11 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         Ok(paid_orders)
     }
 
-    async fn try_pay_orders(&self, account_id: i64, orders: &[Order]) -> Result<Vec<Order>, Self::Error> {
+    async fn try_pay_orders(&self, account_id: i64, orders: &[Order]) -> Result<Vec<Order>, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
         let account = user_accounts::user_account_by_id(account_id, &mut tx)
             .await?
-            .ok_or_else(|| SqliteDatabaseError::AccountNotFound(account_id))?;
+            .ok_or_else(|| PaymentGatewayError::AccountNotFound(account_id))?;
         let mut new_balance = account.current_balance;
         let mut result = Vec::with_capacity(orders.len());
         for order in orders {
@@ -158,11 +156,15 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         Ok(result)
     }
 
-    async fn update_payment_status(&self, txid: &str, status: TransferStatus) -> Result<Option<i64>, Self::Error> {
+    async fn update_payment_status(
+        &self,
+        txid: &str,
+        status: TransferStatus,
+    ) -> Result<Option<i64>, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
         let payment = transfers::fetch_payment(txid, &mut tx).await?;
         if payment.is_none() {
-            return Err(SqliteDatabaseError::PaymentStatusUpdateError(format!("Payment {txid} not found")));
+            return Err(PaymentGatewayError::PaymentStatusUpdateError(format!("Payment {txid} not found")));
         }
         let payment = payment.unwrap();
         let old_status = payment.status;
@@ -176,15 +178,17 @@ impl PaymentGatewayDatabase for SqliteDatabase {
                 "🗃️ Payment {txid} cannot be transitioned from {old_status} to {status}.If there is a valid use case, \
                  perform a manual adjustment now and submit a ticket so that it can be handled properly in the future."
             );
-            return Err(SqliteDatabaseError::PaymentStatusUpdateError(format!(
+            return Err(PaymentGatewayError::PaymentStatusUpdateError(format!(
                 "Payment {txid} has status {status} instead of 'Received'"
             )));
         }
 
         let account = match user_accounts::user_account_for_tx(txid, &mut tx).await {
             Ok(Some(acc)) => Ok(acc),
-            Ok(None) => Err(SqliteDatabaseError::AccountNotLinkedWithTransaction(txid.to_string())),
-            Err(e) => Err(e),
+            Ok(None) => Err(PaymentGatewayError::AccountNotLinkedWithTransaction(format!(
+                "No account is not linked to payment {txid}"
+            ))),
+            Err(e) => Err(e.into()),
         }?;
         let acc_id = account.id;
         let unchanged = MicroTari::from(0);
@@ -201,7 +205,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         Ok(Some(acc_id))
     }
 
-    async fn update_order(&self, id: &OrderId, update: OrderUpdate) -> Result<(), Self::Error> {
+    async fn update_order(&self, id: &OrderId, update: OrderUpdate) -> Result<(), PaymentGatewayError> {
         let mut tx = self.pool.acquire().await?;
         trace!("🗃️ Order {id} updating with new values: {update:?}");
         orders::update_order(id, update, &mut tx).await?;
@@ -209,16 +213,14 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         Ok(())
     }
 
-    async fn close(&mut self) -> Result<(), Self::Error> {
+    async fn close(&mut self) -> Result<(), PaymentGatewayError> {
         self.pool.close().await;
         Ok(())
     }
 }
 
 impl AccountManagement for SqliteDatabase {
-    type Error = SqliteDatabaseError;
-
-    async fn fetch_user_account(&self, account_id: i64) -> Result<Option<UserAccount>, Self::Error> {
+    async fn fetch_user_account(&self, account_id: i64) -> Result<Option<UserAccount>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
         user_accounts::user_account_by_id(account_id, &mut conn).await
     }
@@ -228,40 +230,50 @@ impl AccountManagement for SqliteDatabase {
     ///
     /// Alternatively, you can search through the memo fields of payments to find a matching order id by calling
     /// [`search_for_user_account_by_memo`].
-    async fn fetch_user_account_for_order(&self, order_id: &OrderId) -> Result<Option<UserAccount>, Self::Error> {
+    async fn fetch_user_account_for_order(&self, order_id: &OrderId) -> Result<Option<UserAccount>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
         user_accounts::user_account_for_order(order_id, &mut conn).await
     }
 
-    async fn fetch_user_account_for_customer_id(&self, customer_id: &str) -> Result<Option<UserAccount>, Self::Error> {
+    async fn fetch_user_account_for_customer_id(
+        &self,
+        customer_id: &str,
+    ) -> Result<Option<UserAccount>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
         user_accounts::user_account_for_customer_id(customer_id, &mut conn).await
     }
 
-    async fn fetch_user_account_for_address(&self, pubkey: &TariAddress) -> Result<Option<UserAccount>, Self::Error> {
+    async fn fetch_user_account_for_address(
+        &self,
+        pubkey: &TariAddress,
+    ) -> Result<Option<UserAccount>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
         user_accounts::user_account_for_address(pubkey, &mut conn).await
     }
 
-    async fn fetch_orders_for_account(&self, account_id: i64) -> Result<Vec<Order>, Self::Error> {
+    async fn fetch_orders_for_account(&self, account_id: i64) -> Result<Vec<Order>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
         let query = OrderQueryFilter::default().with_account_id(account_id);
-        orders::search_orders(query, &mut conn).await
+        let orders = orders::search_orders(query, &mut conn).await?;
+        Ok(orders)
     }
 
-    async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, Self::Error> {
+    async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
-        orders::fetch_order_by_order_id(order_id, &mut conn).await
+        let oid = orders::fetch_order_by_order_id(order_id, &mut conn).await?;
+        Ok(oid)
     }
 
-    async fn fetch_payments_for_address(&self, address: &TariAddress) -> Result<Vec<Payment>, Self::Error> {
+    async fn fetch_payments_for_address(&self, address: &TariAddress) -> Result<Vec<Payment>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
-        transfers::fetch_payments_for_address(address, &mut conn).await
+        let payments = transfers::fetch_payments_for_address(address, &mut conn).await?;
+        Ok(payments)
     }
 
-    async fn search_orders(&self, query: OrderQueryFilter) -> Result<Vec<Order>, Self::Error> {
+    async fn search_orders(&self, query: OrderQueryFilter) -> Result<Vec<Order>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
-        orders::search_orders(query, &mut conn).await
+        let orders = orders::search_orders(query, &mut conn).await?;
+        Ok(orders)
     }
 }
 
@@ -311,42 +323,40 @@ impl AuthManagement for SqliteDatabase {
     }
 }
 
+impl WalletAuth for SqliteDatabase {
+    async fn get_wallet_info(&self, wallet_address: &TariAddress) -> Result<WalletInfo, WalletAuthApiError> {
+        let mut conn = self.pool.acquire().await?;
+        let result = wallet_auth::fetch_wallet_info_for_address(wallet_address, &mut conn).await?;
+        Ok(result)
+    }
+
+    async fn update_wallet_nonce(
+        &self,
+        wallet_address: &TariAddress,
+        new_nonce: i64,
+    ) -> Result<(), WalletAuthApiError> {
+        let mut conn = self.pool.acquire().await?;
+        let _ = wallet_auth::update_wallet_nonce(wallet_address, new_nonce, &mut conn).await?;
+        Ok(())
+    }
+}
+
 impl SqliteDatabase {
     /// Creates a new database API object
-    pub async fn new(max_connections: u32) -> Result<Self, SqliteDatabaseError> {
+    pub async fn new(max_connections: u32) -> Result<Self, sqlx::Error> {
         let url = db_url();
         SqliteDatabase::new_with_url(url.as_str(), max_connections).await
     }
 
-    pub async fn new_with_url(url: &str, max_connections: u32) -> Result<Self, SqliteDatabaseError> {
+    pub async fn new_with_url(url: &str, max_connections: u32) -> Result<Self, sqlx::Error> {
         trace!("Creating new database connection pool with url {url}");
         let pool = new_pool(url, max_connections).await?;
         let url = url.to_string();
         Ok(Self { url, pool })
     }
 
-    /// Retrieve the last entry for the corresponding `order_id` from the orders table. If no entry
-    /// exists, `None` will be returned.
-    pub async fn order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, SqliteDatabaseError> {
-        let mut conn = self.pool.acquire().await?;
-        orders::fetch_order_by_order_id(order_id, &mut conn).await
-    }
-
     /// Returns a reference to the database connection pool.
     pub fn pool(&self) -> &SqlitePool {
         &self.pool
-    }
-
-    /// Fetches all orders from the database that match the given memo field.
-    /// The match is fuzzy. As long as the memo _contains_ the given string, the order will be returned.
-    pub async fn fetch_orders_by_memo(&self, memo: &str) -> Result<Vec<Order>, SqliteDatabaseError> {
-        let where_clause = OrderQueryFilter::default()
-            .with_memo(memo.trim().to_string())
-            .with_status(OrderStatusType::Paid)
-            .with_status(OrderStatusType::New)
-            .with_currency("XTR".to_string());
-        let mut conn = self.pool.acquire().await?;
-        let orders = orders::search_orders(where_clause, &mut conn).await?;
-        Ok(orders)
     }
 }

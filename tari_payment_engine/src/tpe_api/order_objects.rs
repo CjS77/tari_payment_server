@@ -6,7 +6,7 @@ use tari_common_types::tari_address::TariAddress;
 
 use crate::{
     db_types::{MicroTari, Order, OrderId, OrderStatusType},
-    tpe_api::errors::AccountApiError,
+    traits::AccountApiError,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
