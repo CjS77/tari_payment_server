@@ -107,17 +107,23 @@ pub fn sign_message(message: &str, secret_key: &RistrettoSecretKey) -> Result<Me
     MemoSchnorr::sign(secret_key, message.as_bytes(), &mut rng)
 }
 
-pub fn ser_sig<S>(sig: &MemoSchnorr, s: S) -> Result<S::Ok, S::Error>
-where S: serde::Serializer {
+pub fn ser_sig<H, S>(sig: &RistrettoSchnorrWithDomain<H>, s: S) -> Result<S::Ok, S::Error>
+where
+    H: DomainSeparation,
+    S: serde::Serializer,
+{
     let nonce = sig.get_public_nonce().to_hex();
     let sig = sig.get_signature().to_hex();
     s.serialize_str(&format!("{nonce}{sig}"))
 }
 
-pub fn de_sig<'de, D>(d: D) -> Result<MemoSchnorr, D::Error>
-where D: serde::Deserializer<'de> {
+pub fn de_sig<'de, H, D>(d: D) -> Result<RistrettoSchnorrWithDomain<H>, D::Error>
+where
+    H: DomainSeparation,
+    D: serde::Deserializer<'de>,
+{
     let s = String::deserialize(d)?;
-    hex_to_schnorr::<_, String>(&s).map_err(|s| serde::de::Error::custom(s))
+    hex_to_schnorr::<_, String>(&s).map_err(serde::de::Error::custom)
 }
 
 pub fn hex_to_schnorr<H: DomainSeparation, E: From<String>>(s: &str) -> Result<RistrettoSchnorrWithDomain<H>, E> {

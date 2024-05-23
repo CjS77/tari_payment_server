@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, net::IpAddr};
 
 use chrono::{TimeZone, Utc};
-use cucumber::{given, then};
-use log::info;
+use cucumber::{gherkin::Step, given, then};
+use log::{debug, info, warn};
 use tari_common_types::{tari_address::TariAddress, types::PrivateKey};
 use tari_jwt::{
     jwt_compact::{AlgorithmExt, Claims, Header},
@@ -12,8 +12,7 @@ use tari_jwt::{
 };
 use tari_payment_engine::{
     db_types::{LoginToken, MicroTari, NewOrder, NewPayment, OrderId, Role},
-    AuthManagement,
-    PaymentGatewayDatabase,
+    traits::{AuthManagement, NewWalletInfo, PaymentGatewayDatabase, WalletManagement},
 };
 
 use crate::cucumber::TPGWorld;
@@ -24,8 +23,8 @@ fn seed_orders() -> [NewOrder; 5] {
             order_id: OrderId::new("1"),
             currency: "XTR".into(),
             customer_id: "alice".into(),
-            memo: Some("address: [b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d]".into()),
-            address: None,
+            memo: Some("Manually inserted by Keith".into()),
+            address: "b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d".parse().ok(),
             total_price: MicroTari::from_tari(100),
             created_at: Utc.with_ymd_and_hms(2024, 3, 10, 15, 0, 0).unwrap(),
         },
@@ -33,8 +32,8 @@ fn seed_orders() -> [NewOrder; 5] {
             order_id: OrderId::new("2"),
             currency: "XTR".into(),
             customer_id: "bob".into(),
-            memo: Some("address: [680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b]".into()),
-            address: None,
+            memo: Some("Manually inserted by Charlie".into()),
+            address: "680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b".parse().ok(),
             total_price: MicroTari::from_tari(200),
             created_at: Utc.with_ymd_and_hms(2024, 3, 10, 15, 30, 0).unwrap(),
         },
@@ -42,8 +41,8 @@ fn seed_orders() -> [NewOrder; 5] {
             order_id: OrderId::new("3"),
             currency: "XTR".into(),
             customer_id: "alice".into(),
-            memo: Some("address: [b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d]".into()),
-            address: None,
+            memo: Some("Manually inserted by Sam".into()),
+            address: "b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d".parse().ok(),
             total_price: MicroTari::from_tari(65),
             created_at: Utc.with_ymd_and_hms(2024, 3, 11, 16, 0, 0).unwrap(),
         },
@@ -51,8 +50,8 @@ fn seed_orders() -> [NewOrder; 5] {
             order_id: OrderId::new("4"),
             currency: "XTR".into(),
             customer_id: "bob".into(),
-            memo: Some("address: [680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b]".into()),
-            address: None,
+            memo: Some("Manually inserted by Ray".into()),
+            address: "680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b".parse().ok(),
             total_price: MicroTari::from_tari(350),
             created_at: Utc.with_ymd_and_hms(2024, 3, 11, 17, 0, 0).unwrap(),
         },
@@ -60,8 +59,8 @@ fn seed_orders() -> [NewOrder; 5] {
             order_id: OrderId::new("5"),
             currency: "XMR".into(),
             customer_id: "admin".into(),
-            address: None,
-            memo: Some("address: [aa3c076152c1ae44ae86585eeba1d348badb845d1cab5ef12db98fafb4fea55d6c]".into()),
+            memo: Some("Manually inserted by Charlie".into()),
+            address: "aa3c076152c1ae44ae86585eeba1d348badb845d1cab5ef12db98fafb4fea55d6c".parse().ok(),
             total_price: MicroTari::from_tari(25),
             created_at: Utc.with_ymd_and_hms(2024, 3, 12, 18, 0, 0).unwrap(),
         },
@@ -188,8 +187,7 @@ impl SeedUsers {
 async fn fresh_database(world: &mut TPGWorld) {
     world.start_database().await;
     let db = world.database();
-    for mut order in seed_orders() {
-        order.try_extract_address().expect("Error extracting address");
+    for order in seed_orders() {
         db.process_new_order_for_customer(order).await.unwrap();
     }
     world.start_server().await;
@@ -231,6 +229,42 @@ async fn super_admin_user(world: &mut TPGWorld) {
     let db = world.db.clone().unwrap();
     db.assign_roles(&admin.address, &admin.roles).await.unwrap();
     world.super_admin = Some(admin);
+}
+
+#[given(expr = "an authorized wallet with secret {word}")]
+async fn authorize_wallet(world: &mut TPGWorld, step: &Step, secret: String) {
+    let json = step.docstring().expect("JSON wallet specifier is missing");
+    let info = serde_json::from_str::<NewWalletInfo>(&json).expect("Failed to parse wallet info");
+    let secret = PrivateKey::from_hex(&secret).unwrap();
+    world.wallets.insert(info.address.clone(), secret);
+    let db = world.db.clone().unwrap();
+    db.register_wallet(info).await.unwrap();
+}
+
+#[given("a server configuration")]
+async fn server_configuration(world: &mut TPGWorld, step: &Step) {
+    let Some(table) = step.table() else {
+        warn!("Why specify a configuration step and then not supply a configuration?");
+        return;
+    };
+    table.rows.iter().for_each(|row| {
+        let key = row[0].as_str();
+        let value = row[1].as_str();
+        match key {
+            "host" => world.config.host = value.into(),
+            "port" => world.config.port = value.parse().expect("Invalid port number"),
+            "shopify_api_key" => world.config.shopify_api_key = value.into(),
+            "database_url" => world.config.database_url = value.into(),
+            "shopify_whitelist" => {
+                let ip = value.parse::<IpAddr>().expect("Invalid IP address");
+                world.config.shopify_whitelist = Some(vec![ip])
+            },
+            "use_x_forwarded_for" => world.config.use_x_forwarded_for = value == "true",
+            "use_forwarded" => world.config.use_forwarded = value == "true",
+            _ => warn!("Unknown configuration key: {key}"),
+        }
+    });
+    debug!("🌍️ Server configuration set. {:?}", world.config);
 }
 
 async fn setup_roles_assignments(world: &mut TPGWorld) {

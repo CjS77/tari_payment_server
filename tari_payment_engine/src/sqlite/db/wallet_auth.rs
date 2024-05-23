@@ -1,9 +1,9 @@
-use std::net::SocketAddr;
+use std::net::IpAddr;
 
 use sqlx::{query, Row, SqliteConnection};
 use tari_common_types::tari_address::TariAddress;
 
-use crate::traits::{WalletAuthApiError, WalletInfo};
+use crate::traits::{NewWalletInfo, WalletAuthApiError, WalletInfo, WalletManagementError};
 
 pub async fn fetch_wallet_info_for_address(
     address: &TariAddress,
@@ -15,7 +15,7 @@ pub async fn fetch_wallet_info_for_address(
         .fetch_optional(conn)
         .await?
         .and_then(|row| {
-            let ip_address = row.get::<&str, _>("ip_address").parse::<SocketAddr>().ok()?;
+            let ip_address = row.get::<&str, _>("ip_address").parse::<IpAddr>().ok()?;
             let address = row.get("address");
             let last_nonce = row.get("last_nonce");
             Some(WalletInfo { address, ip_address, last_nonce })
@@ -45,6 +45,27 @@ pub async fn update_wallet_nonce(
         })?;
     if result.rows_affected() == 0 {
         return Err(WalletAuthApiError::WalletNotFound);
+    }
+    Ok(())
+}
+
+pub(crate) async fn register_wallet(
+    info: NewWalletInfo,
+    conn: &mut SqliteConnection,
+) -> Result<(), WalletManagementError> {
+    let address = info.address.as_hex();
+    let ip_address = info.ip_address.to_string();
+    let nonce = info.initial_nonce.unwrap_or(0);
+    let result = query!(
+        r#"INSERT INTO wallet_auth (address, ip_address, last_nonce) VALUES (?, ?, ?)"#,
+        address,
+        ip_address,
+        nonce
+    )
+    .execute(conn)
+    .await?;
+    if result.rows_affected() == 0 {
+        panic!("Find out what caused this... Wallet already registered?");
     }
     Ok(())
 }

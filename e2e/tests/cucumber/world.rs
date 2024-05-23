@@ -1,12 +1,14 @@
-use std::sync::mpsc::channel;
+use std::{collections::HashMap, sync::mpsc::channel};
 
 use actix_web::dev::ServerHandle;
 use cucumber::World;
 use log::*;
 use reqwest::{Client, Method, RequestBuilder, StatusCode};
+use tari_jwt::tari_crypto::ristretto::RistrettoSecretKey;
 use tari_payment_engine::{
+    db_types::SerializedTariAddress,
     test_utils::prepare_env::{create_database, random_db_path, run_migrations},
-    PaymentGatewayDatabase,
+    traits::PaymentGatewayDatabase,
     SqliteDatabase,
 };
 use tari_payment_server::{
@@ -27,6 +29,7 @@ pub struct TPGWorld {
     pub access_token: Option<String>,
     pub logged_in: bool,
     pub response: Option<(StatusCode, String)>,
+    pub wallets: HashMap<SerializedTariAddress, RistrettoSecretKey>,
 }
 
 impl Default for TPGWorld {
@@ -52,6 +55,7 @@ impl Default for TPGWorld {
             response: None,
             access_token: None,
             logged_in: false,
+            wallets: HashMap::new(),
         }
     }
 }

@@ -16,9 +16,10 @@ Feature: Accounts endpoint
     {
       "id": 1,
       "total_received":0,
-      "total_pending":0,
+      "current_pending":0,
       "current_balance":0,
-      "total_orders":165000000
+      "total_orders":165000000,
+      "current_orders":165000000
     }
     """
 
@@ -39,9 +40,10 @@ Feature: Accounts endpoint
     {
       "id": 2,
       "total_received":0,
-      "total_pending":0,
+      "current_pending":0,
       "current_balance":0,
-      "total_orders":550000000
+      "total_orders":550000000,
+      "current_orders":550000000
     }
     """
 
@@ -56,8 +58,9 @@ Feature: Accounts endpoint
     {
       "id": 2,
       "total_received":0,
-      "total_pending":0,
+      "current_pending":0,
       "current_balance":0,
+      "current_orders":550000000,
       "total_orders":550000000
     }
     """

@@ -48,7 +48,7 @@ async fn fetch_my_account_valid_token() {
     let (status, body) = get_request(&token, "/account", configure).await.expect("Failed to make request");
     assert_eq!(status, StatusCode::OK);
     let json = r#"
-    {"id":1,"created_at":"2024-03-01T10:30:00Z","updated_at":"2024-03-01T10:30:00Z","total_received":1000000,"current_pending":0,"current_balance":1000000,"total_orders":0}
+    {"id":1,"created_at":"2024-03-01T10:30:00Z","updated_at":"2024-03-01T10:30:00Z","total_received":1000000,"current_pending":0,"current_balance":1000000,"total_orders":0,"current_orders":0}
     "#;
     assert_eq!(body, json.trim());
 }
@@ -66,7 +66,7 @@ async fn fetch_account_from_admin() {
             .expect("Failed to make request");
     assert_eq!(status, StatusCode::OK);
     let json = r#"
-    {"id":1,"created_at":"2024-03-01T10:30:00Z","updated_at":"2024-03-01T10:30:00Z","total_received":1000000,"current_pending":0,"current_balance":1000000,"total_orders":0}
+    {"id":1,"created_at":"2024-03-01T10:30:00Z","updated_at":"2024-03-01T10:30:00Z","total_received":1000000,"current_pending":0,"current_balance":1000000,"total_orders":0,"current_orders":0}
     "#;
     assert_eq!(body, json.trim());
 }
@@ -95,7 +95,7 @@ async fn fetch_account_from_users_own_address() {
     let (status, body) = get_request(&token, "/account", configure).await.expect("Request should have succeeded");
     assert_eq!(status, StatusCode::OK);
     let json = r#"
-    {"id":1,"created_at":"2024-03-01T10:30:00Z","updated_at":"2024-03-01T10:30:00Z","total_received":1000000,"current_pending":0,"current_balance":1000000,"total_orders":0}
+    {"id":1,"created_at":"2024-03-01T10:30:00Z","updated_at":"2024-03-01T10:30:00Z","total_received":1000000,"current_pending":0,"current_balance":1000000,"total_orders":0,"current_orders":0}
     "#;
     assert_eq!(body, json.trim());
 }

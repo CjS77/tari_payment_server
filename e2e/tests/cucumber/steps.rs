@@ -10,11 +10,12 @@ use tari_jwt::{
     Ristretto256SigningKey,
 };
 use tari_payment_engine::{
-    db_types::{MicroTari, OrderId, OrderStatusType, Role},
-    AccountManagement,
+    db_types::{MicroTari, OrderId, Role},
+    traits::AccountManagement,
 };
 use tari_payment_server::{
     auth::{build_jwt_signer, JwtClaims},
+    data_objects::PaymentNotification,
     shopify_order::ShopifyOrder,
 };
 use tokio::time::sleep;
@@ -88,6 +89,27 @@ async fn user_auth(world: &mut TPGWorld, user: String, nonce: u64, roles: String
     if world.logged_in {
         world.access_token = Some(token);
     }
+}
+
+#[when(regex = r"^a payment arrives from (x-forwarded-for|forwarded|ip) (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$")]
+async fn payment_notification(world: &mut TPGWorld, step: &Step, ip_source: String, ip: String) {
+    let json = step.docstring().expect("No payment notification");
+    let notification = serde_json::from_str::<PaymentNotification>(&json)
+        .map_err(|e| error!("{e}"))
+        .expect("Failed to parse payment notification");
+    trace!("Payment Notification: {notification:?}");
+    let (code, body) = world
+        .request(Method::POST, "/wallet/incoming_payment", |req| {
+            let req = req.json(&notification);
+            match ip_source.as_str() {
+                "x-forwarded-for" => req.header("x-forwarded-for", ip),
+                "forwarded" => req.header("forwarded", format!("for={}", ip)),
+                _ => req,
+            }
+        })
+        .await;
+    debug!("Got Response: {code} {body}");
+    world.response = Some((code, body));
 }
 
 #[then(expr = "I am logged in")]

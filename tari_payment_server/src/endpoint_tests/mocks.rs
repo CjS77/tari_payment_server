@@ -5,24 +5,6 @@ use tari_payment_engine::{
     order_objects::OrderQueryFilter,
     traits::{AccountApiError, AccountManagement, AuthApiError, AuthManagement},
 };
-use thiserror::Error;
-
-#[derive(Debug, Clone, Error)]
-pub struct MockErr {
-    pub message: String,
-}
-
-impl MockErr {
-    pub fn new(message: &str) -> Self {
-        Self { message: message.to_string() }
-    }
-}
-
-impl std::fmt::Display for MockErr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.message)
-    }
-}
 
 mock! {
     pub AccountManager {}

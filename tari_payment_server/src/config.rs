@@ -1,5 +1,6 @@
-use std::{env, io::Write, net::SocketAddr};
+use std::{env, io::Write, net::IpAddr};
 
+use actix_jwt_auth_middleware::FromRequest;
 use log::*;
 use rand::thread_rng;
 use serde_json::json;
@@ -27,7 +28,7 @@ pub struct ServerConfig {
     pub database_url: String,
     pub auth: AuthConfig,
     /// If supplied, requests against /shopify endpoints will be checked against a whitelist of Shopify IP addresses.
-    pub shopify_whitelist: Option<Vec<SocketAddr>>,
+    pub shopify_whitelist: Option<Vec<IpAddr>>,
     /// If true, the X-Forwarded-For header will be used to determine the client's IP address, rather than the
     /// connection's remote address.
     pub use_x_forwarded_for: bool,
@@ -83,7 +84,7 @@ impl ServerConfig {
                         s.parse()
                             .map_err(|e| {
                                 warn!("Ignoring invalid IP address ({s}) in TPG_SHOPIFY_IP_WHITELIST: {e}");
-                                None::<SocketAddr>
+                                None::<IpAddr>
                             })
                             .ok()
                     })
@@ -160,5 +161,18 @@ impl AuthConfig {
                 "The verification key does not match the signing key. Check your configuration.".to_string(),
             ))
         }
+    }
+}
+
+//-------------------------------------------------  ProxyConfig  -----------------------------------------------------
+#[derive(Clone, Copy, Debug, FromRequest)]
+pub struct ProxyConfig {
+    pub use_x_forwarded_for: bool,
+    pub use_forwarded: bool,
+}
+
+impl ProxyConfig {
+    pub fn from_config(config: &ServerConfig) -> Self {
+        Self { use_x_forwarded_for: config.use_x_forwarded_for, use_forwarded: config.use_forwarded }
     }
 }

@@ -37,6 +37,8 @@ pub enum ServerError {
     NoRecordFound(String),
     #[error("Insufficient Permissions. {0}")]
     InsufficientPermissions(String),
+    #[error("A request was made from an unauthorized wallet.")]
+    UnauthorizedWalletRequest,
 }
 
 impl ResponseError for ServerError {
@@ -62,7 +64,8 @@ impl ResponseError for ServerError {
             Self::CouldNotSerializeAccessToken(_) => StatusCode::BAD_REQUEST,
             Self::InvalidRequestPath(_) => StatusCode::BAD_REQUEST,
             Self::NoRecordFound(_) => StatusCode::NOT_FOUND,
-            ServerError::InsufficientPermissions(_) => StatusCode::FORBIDDEN,
+            Self::InsufficientPermissions(_) => StatusCode::FORBIDDEN,
+            Self::UnauthorizedWalletRequest => StatusCode::UNAUTHORIZED,
         }
     }
 

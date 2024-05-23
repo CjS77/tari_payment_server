@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, str::FromStr, time::Duration};
+use std::{net::IpAddr, time::Duration};
 
 use actix_jwt_auth_middleware::use_jwt::UseJWTOnApp;
 use actix_web::{
@@ -10,18 +10,20 @@ use actix_web::{
     HttpServer,
 };
 use futures::{future::ok, FutureExt};
-use log::{info, warn};
-use tari_payment_engine::{AccountApi, AuthApi, OrderFlowApi, SqliteDatabase};
+use log::*;
+use tari_payment_engine::{AccountApi, AuthApi, OrderFlowApi, SqliteDatabase, WalletAuthApi};
 
 use crate::{
     auth::{build_tps_authority, TokenIssuer},
-    config::ServerConfig,
+    config::{ProxyConfig, ServerConfig},
     errors::{AuthError, ServerError, ServerError::AuthenticationError},
+    helpers::get_remote_ip,
     routes::{
         health,
         AccountRoute,
         AuthRoute,
         CheckTokenRoute,
+        IncomingPaymentNotificationRoute,
         MyAccountRoute,
         MyOrdersRoute,
         MyPaymentsRoute,
@@ -43,18 +45,22 @@ pub async fn run_server(config: ServerConfig) -> Result<(), ServerError> {
 }
 
 pub fn create_server_instance(config: ServerConfig, db: SqliteDatabase) -> Result<Server, ServerError> {
+    let proxy_config = ProxyConfig::from_config(&config);
     let srv = HttpServer::new(move || {
         let orders_api = OrderFlowApi::new(db.clone());
         let auth_api = AuthApi::new(db.clone());
         let jwt_signer = TokenIssuer::new(&config.auth);
         let authority = build_tps_authority(config.auth.clone());
         let accounts_api = AccountApi::new(db.clone());
-        let app = App::new()
+        let wallet_auth = WalletAuthApi::new(db.clone());
+        let mut app = App::new()
             .wrap(Logger::new("%t (%D ms) %s %a %{Host}i %U").log_target("tps::access_log"))
             .app_data(web::Data::new(orders_api))
             .app_data(web::Data::new(accounts_api))
             .app_data(web::Data::new(auth_api))
-            .app_data(web::Data::new(jwt_signer));
+            .app_data(web::Data::new(jwt_signer))
+            .app_data(web::Data::new(wallet_auth))
+            .app_data(web::Data::new(proxy_config));
         // Routes that require authentication
         let auth_scope = web::scope("/api")
             .service(UpdateRolesRoute::<SqliteDatabase>::new())
@@ -80,9 +86,9 @@ pub fn create_server_instance(config: ServerConfig, db: SqliteDatabase) -> Resul
                 }
             })
             .service(ShopifyWebhookRoute::<SqliteDatabase>::new());
-        let wallet_scope = web::scope("/wallet").wrap_fn(move |req, srv| {
-            // let wallet_info = get_wallet_info(&req);
-        });
+        let wallet_scope =
+            web::scope("/wallet").service(IncomingPaymentNotificationRoute::<SqliteDatabase, SqliteDatabase>::new());
+        app = app.service(wallet_scope);
         app.use_jwt(authority.clone(), auth_scope)
             .service(health)
             .service(AuthRoute::<SqliteDatabase>::new())
@@ -97,19 +103,10 @@ pub fn create_server_instance(config: ServerConfig, db: SqliteDatabase) -> Resul
 fn is_whitelisted(
     use_x_forwarded_for: bool,
     use_forwarded: bool,
-    shopify_whitelist: &Option<Vec<SocketAddr>>,
+    shopify_whitelist: &Option<Vec<IpAddr>>,
     req: &ServiceRequest,
 ) -> bool {
-    // Collect peer IP from x-forwarded-for, or forwarded headers _if_ `use_nnn` has been set to true
-    // in the configuration. Otherwise, use the peer address from the connection info.
-    let peer_addr = req.connection_info().peer_addr().map(|a| a.to_string());
-    let peer_ip = req
-        .headers()
-        .get("X-Forwarded-For")
-        .and_then(|v| use_x_forwarded_for.then(|| v.to_str().ok()).flatten())
-        .or_else(|| req.headers().get("Forwarded").and_then(|v| use_forwarded.then(|| v.to_str().ok()).flatten()))
-        .or_else(|| peer_addr.as_ref().map(|s| s.as_str()))
-        .and_then(|s| SocketAddr::from_str(s).ok());
+    let peer_ip = get_remote_ip(req.request(), use_x_forwarded_for, use_forwarded);
     match (peer_ip, &shopify_whitelist) {
         (Some(ip), Some(whitelist)) => {
             info!("Shopify webhook from {ip}");

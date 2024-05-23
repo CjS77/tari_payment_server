@@ -34,4 +34,10 @@ pub mod test_utils;
 
 #[cfg(feature = "sqlite")]
 pub use sqlite::SqliteDatabase;
-pub use tpe_api::{accounts_api::AccountApi, auth_api::AuthApi, order_flow_api::OrderFlowApi, order_objects};
+pub use tpe_api::{
+    accounts_api::AccountApi,
+    auth_api::AuthApi,
+    order_flow_api::OrderFlowApi,
+    order_objects,
+    wallet_api::WalletAuthApi,
+};

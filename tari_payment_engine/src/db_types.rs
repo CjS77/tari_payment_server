@@ -1,5 +1,6 @@
 use std::{
     fmt::Display,
+    hash::{Hash, Hasher},
     iter::Sum,
     ops::{Add, Neg, Sub, SubAssign},
     str::FromStr,
@@ -117,6 +118,10 @@ impl SerializedTariAddress {
     pub fn as_address(&self) -> &TariAddress {
         &self.0
     }
+
+    pub fn as_hex(&self) -> String {
+        self.0.to_hex()
+    }
 }
 
 impl AsRef<TariAddress> for SerializedTariAddress {
@@ -165,6 +170,20 @@ where &'r str: Decode<'r, DB>
 impl Type<Sqlite> for SerializedTariAddress {
     fn type_info() -> <Sqlite as Database>::TypeInfo {
         <String as Type<Sqlite>>::type_info()
+    }
+}
+
+impl PartialEq for SerializedTariAddress {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for SerializedTariAddress {}
+
+impl Hash for SerializedTariAddress {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_hex().hash(state);
     }
 }
 
@@ -344,7 +363,7 @@ impl NewOrder {
 
     /// Tries to extract the address from the memo
     pub fn try_extract_address(&mut self) -> Result<(), MemoSignatureError> {
-        let sig = extract_and_verify_memo_signature(&self)?;
+        let sig = extract_and_verify_memo_signature(self)?;
         trace!("Extracted address from memo and confirmed signature was correct");
         self.address = Some(sig.address.to_address());
         Ok(())

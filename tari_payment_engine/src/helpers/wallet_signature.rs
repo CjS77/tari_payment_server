@@ -5,7 +5,10 @@ use tari_crypto::{
 };
 use thiserror::Error;
 
-use crate::{db_types::SerializedTariAddress, helpers::memo_signature::hex_to_schnorr};
+use crate::{
+    db_types::SerializedTariAddress,
+    helpers::memo_signature::{de_sig, hex_to_schnorr, ser_sig},
+};
 
 hash_domain!(WalletSignatureDomain, "WalletSignature");
 
@@ -25,20 +28,32 @@ impl From<String> for WalletSignatureError {
 pub struct WalletSignature {
     pub address: SerializedTariAddress,
     pub nonce: i64,
+    #[serde(serialize_with = "ser_sig", deserialize_with = "de_sig")]
     pub signature: WalletSchnorr,
 }
 
 impl WalletSignature {
-    pub fn create(
+    pub fn create<T: Serialize>(
         address: SerializedTariAddress,
         nonce: i64,
         secret_key: &RistrettoSecretKey,
+        payload: &T,
     ) -> Result<Self, WalletSignatureError> {
         let mut rng = rand::thread_rng();
-        let message = signature_message(&address, nonce);
+        let message = Self::signature_message(&address, nonce, &payload)?;
         let signature =
             WalletSchnorr::sign(secret_key, &message, &mut rng).map_err(|e| WalletSignatureError(e.to_string()))?;
         Ok(Self { address, nonce, signature })
+    }
+
+    pub fn signature_message<T: Serialize>(
+        address: &SerializedTariAddress,
+        nonce: i64,
+        payload: &T,
+    ) -> Result<String, WalletSignatureError> {
+        let msg_payload = serde_json::to_string(payload)
+            .map_err(|e| WalletSignatureError(format!("Could not serialize wallet signature payload. {e}")))?;
+        Ok(format!("{}:{}:{}", address.as_address(), nonce, msg_payload))
     }
 
     pub fn new(address: &str, nonce: i64, signature: &str) -> Result<Self, WalletSignatureError> {
@@ -47,8 +62,15 @@ impl WalletSignature {
         Ok(Self { address, nonce, signature })
     }
 
-    pub fn is_valid(&self) -> bool {
-        let message = signature_message(&self.address, self.nonce);
+    /// Verify the signature against the address and nonce. This does *not* verify that the wallet is the wallet we
+    /// think it is, only that the signature is valid for the given address and nonce.
+    ///
+    /// You will still need to fetch the nonce and IP address from the database for the given address
+    /// and check that they match the expected values.
+    pub fn is_valid<T: Serialize>(&self, payload: &T) -> bool {
+        let Ok(message) = Self::signature_message(&self.address, self.nonce, payload) else {
+            return false;
+        };
         let pubkey = self.address.as_address().public_key();
         self.signature.verify(pubkey, message)
     }
@@ -56,8 +78,4 @@ impl WalletSignature {
     pub fn as_json(&self) -> String {
         serde_json::to_string(self).expect("Failed to serialize WalletSignature")
     }
-}
-
-pub fn signature_message(address: &SerializedTariAddress, nonce: i64) -> String {
-    format!("{}:{}", address.as_address(), nonce)
 }

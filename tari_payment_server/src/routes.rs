@@ -28,18 +28,21 @@ use log::*;
 use paste::paste;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
-    db_types::{NewOrder, NewPayment, OrderId, Role, SerializedTariAddress},
+    db_types::{NewOrder, OrderId, Role, SerializedTariAddress},
     order_objects::OrderQueryFilter,
-    traits::{AccountManagement, AuthManagement, PaymentGatewayDatabase, PaymentGatewayError},
+    traits::{AccountManagement, AuthManagement, PaymentGatewayDatabase, PaymentGatewayError, WalletAuth},
     AccountApi,
     AuthApi,
     OrderFlowApi,
+    WalletAuthApi,
 };
 
 use crate::{
     auth::{check_login_token_signature, JwtClaims, TokenIssuer},
-    data_objects::{JsonResponse, RoleUpdateRequest},
+    config::ProxyConfig,
+    data_objects::{JsonResponse, PaymentNotification, RoleUpdateRequest},
     errors::{OrderConversionError, ServerError},
+    helpers::get_remote_ip,
     shopify_order::ShopifyOrder,
 };
 
@@ -68,22 +71,22 @@ macro_rules! route {
     };
 
     ($name:ident => $method:ident $path:literal impl $($bounds:ty),+) => {
-        paste! { pub struct [<$name:camel Route>]<A>(PhantomData<fn() -> A>);}
-        paste! { impl<A> [<$name:camel Route>]<A> {
+        paste! { pub struct [<$name:camel Route>]< $( [< T $bounds:camel> ],)+ >( $( PhantomData<fn() -> [< T $bounds:camel> ] >,)+ );}
+        paste! { impl< $( [< T $bounds:camel> ],)+ > [<$name:camel Route>]< $( [< T $bounds:camel> ],)+ > {
             #[allow(clippy::new_without_default)]
             pub fn new() -> Self {
-                Self(PhantomData::<fn() -> A>)
+                Self($( PhantomData::<fn() -> [< T $bounds:camel> ] >,)+)
             }
         }}
-        paste! { impl<A> actix_web::dev::HttpServiceFactory for [<$name:camel Route>]<A>
+        paste! { impl<$( [< T $bounds:camel >] , )+> actix_web::dev::HttpServiceFactory for [<$name:camel Route>]<$([<T $bounds:camel>],)+>
         where
-            A: $($bounds)++ 'static,
+            $([<T $bounds:camel>]: $bounds + 'static,)+
         {
             fn register(self, config: &mut actix_web::dev::AppService) {
                 let res = actix_web::Resource::new($path)
                     .name(stringify!($name))
                     .guard(actix_web::guard::$method())
-                    .to($name::<A>);
+                    .to($name::< $( [< T $bounds:camel >], )+>);
                 actix_web::dev::HttpServiceFactory::register(res, config);
             }
         }}
@@ -401,15 +404,43 @@ pub async fn shopify_webhook<B: PaymentGatewayDatabase>(
 }
 
 //------------------------------------------   Incoming payments  ---------------------------------------------
-route!(incoming_payment_notification => Post "/incoming_payment" impl PaymentGatewayDatabase);
-pub async fn incoming_payment_notification<B: PaymentGatewayDatabase>(
-    api: web::Data<OrderFlowApi<B>>,
-    body: web::Json<NewPayment>,
-) -> HttpResponse {
+route!(incoming_payment_notification => Post "/incoming_payment" impl PaymentGatewayDatabase, WalletAuth );
+pub async fn incoming_payment_notification<BOrder, BAuth>(
+    req: HttpRequest,
+    config: web::Data<ProxyConfig>,
+    auth_api: web::Data<WalletAuthApi<BAuth>>,
+    order_api: web::Data<OrderFlowApi<BOrder>>,
+    body: web::Json<PaymentNotification>,
+) -> HttpResponse
+where
+    BAuth: WalletAuth,
+    BOrder: PaymentGatewayDatabase,
+{
     trace!("💻️ Received incoming payment notification");
-    let payment = body.into_inner();
-    info!("💻️ New payment received from {} for {}.", payment.sender.as_address(), payment.amount);
-    let result = match api.process_new_payment(payment).await {
+    let PaymentNotification { payment, auth } = body.into_inner();
+    let use_x_forwarded_for = config.use_x_forwarded_for;
+    let use_forwarded = config.use_forwarded;
+    trace!("💻️ Extracting remote IP address. {req:?}. {:?}", req.connection_info());
+    let Some(peer_addr) = get_remote_ip(&req, use_x_forwarded_for, use_forwarded) else {
+        warn!("💻️ Could not determine remote IP address for a wallet payment notification. The request is rejected");
+        return HttpResponse::Unauthorized().finish();
+    };
+    // Log the payment
+    info!("💻️ New payment notification received from IP {peer_addr}.");
+    info!("💻️ Payment: {}", serde_json::to_string(&payment).unwrap_or_else(|e| format!("{e}")));
+    info!("💻️ Auth: {}", serde_json::to_string(&auth).unwrap_or_else(|e| format!("{e}")));
+    trace!("💻️ Verifying wallet signature");
+    if !auth.is_valid(&payment) {
+        warn!("💻️ Invalid wallet signature received from {peer_addr}. The request is rejected.");
+        return HttpResponse::Unauthorized().finish();
+    }
+    let auth_api = auth_api.as_ref();
+    if let Err(e) = auth_api.authenticate_wallet(auth, &peer_addr, &payment).await {
+        warn!("💻️ Unauthorized wallet signature received from {peer_addr}. Reason: {e}. The request is rejected.");
+        return HttpResponse::Unauthorized().finish();
+    }
+    // -- from here on, we trust that the notification is legitimate.
+    let result = match order_api.process_new_payment(payment).await {
         Ok(orders) => {
             let ids = orders.iter().map(|o| o.order_id.as_str()).collect::<Vec<_>>().join(", ");
             let msg = format!("{} orders were paid. {}", orders.len(), ids);

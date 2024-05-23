@@ -1,4 +1,4 @@
-use log::debug;
+use log::*;
 use serde_json::Value;
 
 pub fn json_is_subset_of(part: &str, complete: &str) -> bool {
@@ -17,12 +17,12 @@ pub fn value_is_subset_of(part: &Value, complete: &Value) -> bool {
             match complete.get(key) {
                 Some(complete_value) => {
                     if !value_is_subset_of(value, complete_value) {
-                        debug!("Value mismatch: {} != {}", value, complete_value);
+                        error!("Value mismatch: {} != {}", value, complete_value);
                         return false;
                     }
                 },
                 None => {
-                    debug!("Key not found: {}", key);
+                    error!("Key not found: {}", key);
                     return false;
                 },
             }
@@ -30,13 +30,13 @@ pub fn value_is_subset_of(part: &Value, complete: &Value) -> bool {
         true
     } else if part.is_array() {
         if !complete.is_array() {
-            debug!("Given object is an array, but we do not expect an array");
+            error!("Given object is an array, but we do not expect an array");
             return false;
         }
         let arr_p = part.as_array().expect("Not an array");
         let arr_c = complete.as_array().expect("Not an array");
         if arr_p.len() != arr_c.len() {
-            debug!("Array length mismatch: {} != {}", arr_p.len(), arr_c.len());
+            error!("Array length mismatch: {} != {}", arr_p.len(), arr_c.len());
             return false;
         }
         arr_p.iter().zip(arr_c.iter()).all(|(p, c)| value_is_subset_of(p, c))
@@ -47,8 +47,6 @@ pub fn value_is_subset_of(part: &Value, complete: &Value) -> bool {
 
 #[cfg(test)]
 mod test {
-    use serde_json::Value;
-
     use super::*;
 
     #[test]

@@ -124,7 +124,7 @@ pub async fn assign_roles(
 
     let role_ids = roles
         .iter()
-        .map(|r| all_roles.get(r).ok_or(AuthApiError::RoleNotFound).map(|id| *id))
+        .map(|r| all_roles.get(r).ok_or(AuthApiError::RoleNotFound).copied())
         .collect::<Result<Vec<i64>, _>>()?;
     let address = address.to_hex();
 
@@ -158,7 +158,7 @@ pub async fn remove_roles(
 
     let role_ids = roles
         .iter()
-        .map(|r| all_roles.get(r).ok_or(AuthApiError::RoleNotFound).map(|id| *id))
+        .map(|r| all_roles.get(r).ok_or(AuthApiError::RoleNotFound).copied())
         .collect::<Result<Vec<i64>, _>>()?;
 
     let address = address.to_hex();

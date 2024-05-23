@@ -42,11 +42,11 @@ Feature: Admins can search orders by various criteria
 #    When todo
 
   Scenario: Admin can search for orders with a matching memo field
-    When Admin GETs to "/api/search/orders?memo=680ac255" with body
+    When Admin GETs to "/api/search/orders?memo=Charlie" with body
     Then I receive a 200 Ok response
     And I receive a partial JSON response:
     """
-    [ { "order_id": "2"}, { "order_id": "4"} ]
+    [ { "order_id": "2"}, { "order_id": "5"} ]
     """
 
   Scenario: Admin can search for orders with a matching customer id

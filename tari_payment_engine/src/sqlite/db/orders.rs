@@ -71,7 +71,7 @@ pub async fn fetch_order_by_order_id(
     .await;
     match order {
         Err(sqlx::Error::RowNotFound) => Ok(None),
-        Err(e) => Err(e.into()),
+        Err(e) => Err(e),
         Ok(o) => Ok(Some(o)),
     }
 }

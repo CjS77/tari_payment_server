@@ -3832,6 +3832,7 @@ dependencies = [
  "mockall",
  "paste",
  "rand",
+ "regex",
  "serde",
  "serde_json",
  "tari-jwt",
@@ -3859,6 +3860,23 @@ dependencies = [
  "snafu",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "taritools"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "clap 4.5.4",
+ "rand",
+ "serde",
+ "serde_json",
+ "tari-jwt",
+ "tari_common",
+ "tari_common_types",
+ "tari_crypto",
+ "tari_payment_engine",
+ "tari_payment_server",
 ]
 
 [[package]]

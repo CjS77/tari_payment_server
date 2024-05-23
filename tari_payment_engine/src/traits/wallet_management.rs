@@ -13,16 +13,14 @@ pub trait WalletAuth {
 
 #[allow(async_fn_in_trait)]
 pub trait WalletManagement {
-    type Error: std::error::Error;
-
     /// Adds the given wallet info to the wallet auth table in the database.
-    async fn register_wallet(&self, wallet: NewWalletInfo) -> Result<(), Self::Error>;
+    async fn register_wallet(&self, wallet: NewWalletInfo) -> Result<(), WalletManagementError>;
 
     /// Removes the wallet with the given address from the wallet auth table in the database.
-    async fn deregister_wallet(&self, wallet_address: &TariAddress) -> Result<WalletInfo, Self::Error>;
+    async fn deregister_wallet(&self, wallet_address: &TariAddress) -> Result<WalletInfo, WalletManagementError>;
 
     /// Updates the wallet with the given address in the wallet auth table in the database.
-    async fn update_wallet_info(&self, wallet: UpdateWalletInfo) -> Result<(), Self::Error>;
+    async fn update_wallet_info(&self, wallet: UpdateWalletInfo) -> Result<(), WalletManagementError>;
 }
 
 #[derive(Debug, Clone, Error)]
@@ -42,5 +40,17 @@ pub enum WalletAuthApiError {
 impl From<sqlx::Error> for WalletAuthApiError {
     fn from(e: sqlx::Error) -> Self {
         WalletAuthApiError::DatabaseError(e.to_string())
+    }
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum WalletManagementError {
+    #[error("Database error: {0}")]
+    DatabaseError(String),
+}
+
+impl From<sqlx::Error> for WalletManagementError {
+    fn from(e: sqlx::Error) -> Self {
+        WalletManagementError::DatabaseError(e.to_string())
     }
 }

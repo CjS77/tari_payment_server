@@ -28,11 +28,15 @@ use crate::{
         AccountManagement,
         AuthApiError,
         AuthManagement,
+        NewWalletInfo,
         PaymentGatewayDatabase,
         PaymentGatewayError,
+        UpdateWalletInfo,
         WalletAuth,
         WalletAuthApiError,
         WalletInfo,
+        WalletManagement,
+        WalletManagementError,
     },
 };
 
@@ -115,7 +119,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         let mut tx = self.pool.begin().await?;
         let account = user_accounts::user_account_by_id(account_id, &mut tx)
             .await?
-            .ok_or_else(|| PaymentGatewayError::AccountNotFound(account_id))?;
+            .ok_or(PaymentGatewayError::AccountNotFound(account_id))?;
         let query = OrderQueryFilter::default().with_account_id(account_id).with_status(OrderStatusType::New);
         let unpaid_orders = orders::search_orders(query, &mut tx).await?;
         let balance = account.current_balance;
@@ -136,7 +140,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         let mut tx = self.pool.begin().await?;
         let account = user_accounts::user_account_by_id(account_id, &mut tx)
             .await?
-            .ok_or_else(|| PaymentGatewayError::AccountNotFound(account_id))?;
+            .ok_or(PaymentGatewayError::AccountNotFound(account_id))?;
         let mut new_balance = account.current_balance;
         let mut result = Vec::with_capacity(orders.len());
         for order in orders {
@@ -336,8 +340,23 @@ impl WalletAuth for SqliteDatabase {
         new_nonce: i64,
     ) -> Result<(), WalletAuthApiError> {
         let mut conn = self.pool.acquire().await?;
-        let _ = wallet_auth::update_wallet_nonce(wallet_address, new_nonce, &mut conn).await?;
+        wallet_auth::update_wallet_nonce(wallet_address, new_nonce, &mut conn).await?;
         Ok(())
+    }
+}
+
+impl WalletManagement for SqliteDatabase {
+    async fn register_wallet(&self, wallet: NewWalletInfo) -> Result<(), WalletManagementError> {
+        let mut conn = self.pool.acquire().await?;
+        wallet_auth::register_wallet(wallet, &mut conn).await
+    }
+
+    async fn deregister_wallet(&self, wallet_address: &TariAddress) -> Result<WalletInfo, WalletManagementError> {
+        todo!()
+    }
+
+    async fn update_wallet_info(&self, wallet: UpdateWalletInfo) -> Result<(), WalletManagementError> {
+        todo!()
     }
 }
 

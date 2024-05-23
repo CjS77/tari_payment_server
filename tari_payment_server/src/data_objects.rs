@@ -1,7 +1,10 @@
 use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
-use tari_payment_engine::db_types::Role;
+use tari_payment_engine::{
+    db_types::{NewPayment, Role},
+    helpers::WalletSignature,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoleUpdateRequest {
@@ -26,4 +29,10 @@ impl JsonResponse {
     pub fn failure<S: Display>(message: S) -> Self {
         Self { success: false, message: message.to_string() }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaymentNotification {
+    pub payment: NewPayment,
+    pub auth: WalletSignature,
 }
