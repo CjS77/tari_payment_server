@@ -32,6 +32,7 @@ use crate::{
         OrdersSearchRoute,
         PaymentsRoute,
         ShopifyWebhookRoute,
+        TxConfirmationNotificationRoute,
         UpdateRolesRoute,
     },
 };
@@ -86,8 +87,9 @@ pub fn create_server_instance(config: ServerConfig, db: SqliteDatabase) -> Resul
                 }
             })
             .service(ShopifyWebhookRoute::<SqliteDatabase>::new());
-        let wallet_scope =
-            web::scope("/wallet").service(IncomingPaymentNotificationRoute::<SqliteDatabase, SqliteDatabase>::new());
+        let wallet_scope = web::scope("/wallet")
+            .service(IncomingPaymentNotificationRoute::<SqliteDatabase, SqliteDatabase>::new())
+            .service(TxConfirmationNotificationRoute::<SqliteDatabase, SqliteDatabase>::new());
         app = app.service(wallet_scope);
         app.use_jwt(authority.clone(), auth_scope)
             .service(health)

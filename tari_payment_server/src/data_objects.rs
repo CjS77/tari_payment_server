@@ -36,3 +36,14 @@ pub struct PaymentNotification {
     pub payment: NewPayment,
     pub auth: WalletSignature,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionConfirmationNotification {
+    pub confirmation: TransactionConfirmation,
+    pub auth: WalletSignature,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionConfirmation {
+    pub txid: String,
+}

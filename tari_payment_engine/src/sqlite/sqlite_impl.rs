@@ -172,6 +172,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         }
         let payment = payment.unwrap();
         let old_status = payment.status;
+        trace!("🗃️ Updating payment: Payment {txid} is currently {old_status}");
         use TransferStatus::*;
         if old_status == status {
             debug!("🗃️ Payment {txid} already has status {status}. No action to take");
@@ -186,7 +187,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
                 "Payment {txid} has status {status} instead of 'Received'"
             )));
         }
-
+        trace!("🗃️ Looking for account linked to payment {txid}");
         let account = match user_accounts::user_account_for_tx(txid, &mut tx).await {
             Ok(Some(acc)) => Ok(acc),
             Ok(None) => Err(PaymentGatewayError::AccountNotLinkedWithTransaction(format!(

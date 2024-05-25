@@ -8,7 +8,7 @@ mod payments;
 use jwt_token::print_jwt_token;
 use tari_payment_engine::db_types::OrderId;
 
-use crate::payments::print_payment_auth;
+use crate::payments::{print_payment_auth, print_tx_confirm};
 
 #[derive(Parser, Debug)]
 #[command(version = "1.0.0", author = "CjS77")]
@@ -37,6 +37,8 @@ pub enum Command {
     },
     #[clap(name = "payment")]
     PaymentAuth(PaymentAuthParams),
+    #[clap(name = "confirm")]
+    TxConfirm(TxConfirmParams),
 }
 
 #[derive(Debug, Args)]
@@ -67,12 +69,29 @@ pub struct PaymentAuthParams {
     sender: String,
 }
 
+#[derive(Debug, Args)]
+pub struct TxConfirmParams {
+    /// The payment wallet's secret key
+    #[arg(short = 's', long = "seckey")]
+    secret: String,
+    #[arg(short = 'n', long = "network", default_value = "mainnet")]
+    /// The network to use (testnet, stagenet, mainnet)
+    network: Network,
+    /// A monotonically increasing nonce
+    #[arg(short = 'c', long = "nonce", default_value = "1")]
+    nonce: i64,
+    /// The transaction identifier. Typically, the kernel signature in Tari
+    #[arg(short = 't', long = "txid", default_value = "payment001")]
+    txid: String,
+}
+
 fn main() {
     let cli = Arguments::parse();
     match cli.command {
         Command::NewAddress => print_new_address(cli.network),
         Command::AccessToken { secret, network, roles } => print_jwt_token(secret, network, roles),
         Command::PaymentAuth(params) => print_payment_auth(params),
+        Command::TxConfirm(params) => print_tx_confirm(params),
     }
 }
 

@@ -15,7 +15,8 @@ use tari_payment_engine::{
 };
 use tari_payment_server::{
     auth::{build_jwt_signer, JwtClaims},
-    data_objects::PaymentNotification,
+    data_objects::{PaymentNotification, TransactionConfirmation, TransactionConfirmationNotification},
+    routes::account,
     shopify_order::ShopifyOrder,
 };
 use tokio::time::sleep;
@@ -101,6 +102,27 @@ async fn payment_notification(world: &mut TPGWorld, step: &Step, ip_source: Stri
     let (code, body) = world
         .request(Method::POST, "/wallet/incoming_payment", |req| {
             let req = req.json(&notification);
+            match ip_source.as_str() {
+                "x-forwarded-for" => req.header("x-forwarded-for", ip),
+                "forwarded" => req.header("forwarded", format!("for={}", ip)),
+                _ => req,
+            }
+        })
+        .await;
+    debug!("Got Response: {code} {body}");
+    world.response = Some((code, body));
+}
+
+#[when(regex = r"^a confirmation arrives from (x-forwarded-for|forwarded|ip) (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$")]
+async fn confirmation_notification(world: &mut TPGWorld, step: &Step, ip_source: String, ip: String) {
+    let json = step.docstring().expect("No confirmation notification");
+    let confirmation = serde_json::from_str::<TransactionConfirmationNotification>(&json)
+        .map_err(|e| error!("{e}"))
+        .expect("Failed to parse transaction confirmation");
+    trace!("Confirmation: {confirmation:?}");
+    let (code, body) = world
+        .request(Method::POST, "/wallet/tx_confirmation", |req| {
+            let req = req.json(&confirmation);
             match ip_source.as_str() {
                 "x-forwarded-for" => req.header("x-forwarded-for", ip),
                 "forwarded" => req.header("forwarded", format!("for={}", ip)),
@@ -240,8 +262,8 @@ async fn check_order_state(world: &mut TPGWorld, order_id: String, state: String
     assert_eq!(order.status, status);
 }
 
-#[then(expr = "{word} has a balance of {int} Tari")]
-async fn check_balance(world: &mut TPGWorld, user: String, balance: i64) {
+#[then(regex = r#"^(\w+) has a (current|pending) balance of (\d+) Tari$"#)]
+async fn check_balance(world: &mut TPGWorld, user: String, bal_type: String, balance: i64) {
     let db = world.db.as_ref().expect("No database connection");
     let users = SeedUsers::new();
     let user = users.user(&user);
@@ -251,7 +273,12 @@ async fn check_balance(world: &mut TPGWorld, user: String, balance: i64) {
         .expect("Failed to fetch account")
         .expect("No account found");
     let expected_balance = MicroTari::from_tari(balance);
-    assert_eq!(account.current_balance, expected_balance);
+    let actual_balance = match bal_type.as_str() {
+        "current" => account.current_balance,
+        "pending" => account.current_pending,
+        _ => panic!("Invalid balance type: {bal_type}"),
+    };
+    assert_eq!(actual_balance, expected_balance);
 }
 
 fn modify_signature(token: String, value: &str) -> String {

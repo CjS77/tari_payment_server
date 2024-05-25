@@ -14,9 +14,6 @@ Feature: Order flow
     Then Customer #1 has current orders worth 2500 XTR
     And Alice has a balance of 0 Tari
     Then order "alice001" is in state New
-    When Alice sends a payment of 2525 Tari
-    Then order "alice001" is fulfilled
-    And Alice has a balance of 25 Tari
 
   Scenario: Replaying signature for different order fails
     When Customer #1 ["alice"] places order "alice002" for 2500 XTR, with memo

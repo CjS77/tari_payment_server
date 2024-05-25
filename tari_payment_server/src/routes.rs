@@ -40,7 +40,7 @@ use tari_payment_engine::{
 use crate::{
     auth::{check_login_token_signature, JwtClaims, TokenIssuer},
     config::ProxyConfig,
-    data_objects::{JsonResponse, PaymentNotification, RoleUpdateRequest},
+    data_objects::{JsonResponse, PaymentNotification, RoleUpdateRequest, TransactionConfirmationNotification},
     errors::{OrderConversionError, ServerError},
     helpers::get_remote_ip,
     shopify_order::ShopifyOrder,
@@ -458,6 +458,56 @@ where
         Err(e) => {
             warn!("💻️ Unexpected error handling incoming payment notification. {e}");
             JsonResponse::failure("Unexpected error handling payment.")
+        },
+    };
+    HttpResponse::Ok().json(result)
+}
+
+route!(tx_confirmation_notification => Post "/tx_confirmation" impl PaymentGatewayDatabase, WalletAuth );
+pub async fn tx_confirmation_notification<BOrder, BAuth>(
+    req: HttpRequest,
+    config: web::Data<ProxyConfig>,
+    auth_api: web::Data<WalletAuthApi<BAuth>>,
+    order_api: web::Data<OrderFlowApi<BOrder>>,
+    body: web::Json<TransactionConfirmationNotification>,
+) -> HttpResponse
+where
+    BAuth: WalletAuth,
+    BOrder: PaymentGatewayDatabase,
+{
+    trace!("💻️ Received transaction confirmation notification");
+    let TransactionConfirmationNotification { confirmation, auth } = body.into_inner();
+    let use_x_forwarded_for = config.use_x_forwarded_for;
+    let use_forwarded = config.use_forwarded;
+    trace!("💻️ Extracting remote IP address. {req:?}. {:?}", req.connection_info());
+    let Some(peer_addr) = get_remote_ip(&req, use_x_forwarded_for, use_forwarded) else {
+        warn!("💻️ Could not determine remote IP address for a wallet payment notification. The request is rejected");
+        return HttpResponse::Unauthorized().finish();
+    };
+    // Log the payment
+    info!("💻️ New transaction confirmation received from IP {peer_addr}.");
+    info!("💻️ Confirmation: {}", serde_json::to_string(&confirmation).unwrap_or_else(|e| format!("{e}")));
+    info!("💻️ Auth: {}", serde_json::to_string(&auth).unwrap_or_else(|e| format!("{e}")));
+    trace!("💻️ Verifying wallet signature");
+    if !auth.is_valid(&confirmation) {
+        warn!("💻️ Invalid wallet signature received from {peer_addr}. The request is rejected.");
+        return HttpResponse::Unauthorized().finish();
+    }
+    let auth_api = auth_api.as_ref();
+    if let Err(e) = auth_api.authenticate_wallet(auth, &peer_addr, &confirmation).await {
+        warn!("💻️ Unauthorized wallet signature received from {peer_addr}. Reason: {e}. The request is rejected.");
+        return HttpResponse::Unauthorized().finish();
+    }
+    // -- from here on, we trust that the notification is legitimate.
+    let tx_id = confirmation.txid.clone();
+    let result = match order_api.confirm_payment(confirmation.txid).await {
+        Err(e) => {
+            error!("💻️ Could not confirm payment. {e}");
+            JsonResponse::failure(String::from("Could not confirm payment."))
+        },
+        Ok(orders) => {
+            info!("💻️ Payment {tx_id} confirmed successfully. {} orders have been paid as a result.", orders.len());
+            JsonResponse::success(format!("Payment {tx_id} confirmed successfully."))
         },
     };
     HttpResponse::Ok().json(result)
