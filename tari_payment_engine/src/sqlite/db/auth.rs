@@ -3,7 +3,7 @@
 //! Generally clients should never call these methods directly, and prefer to use the [`AuthManagement`] trait methods.
 //! that is implemented on the [`SqliteDatabase`] struct instead.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use log::{debug, error};
 use sqlx::{QueryBuilder, Row, SqliteConnection};
@@ -29,7 +29,10 @@ pub async fn auth_account_exists(address: &TariAddress, conn: &mut SqliteConnect
     }
 }
 
-pub async fn roles_for_address(address: &TariAddress, conn: &mut SqliteConnection) -> Result<Vec<Role>, AuthApiError> {
+pub async fn roles_for_address(
+    address: &TariAddress,
+    conn: &mut SqliteConnection,
+) -> Result<HashSet<Role>, AuthApiError> {
     let address = address.to_hex();
     let result = sqlx::query!(
         r#"SELECT name FROM
@@ -40,11 +43,13 @@ pub async fn roles_for_address(address: &TariAddress, conn: &mut SqliteConnectio
     .fetch_all(conn)
     .await
     .map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
-    let roles = result
+    let mut roles = result
         .iter()
         .filter_map(|r| r.name.as_ref())
         .map(|r| r.parse::<Role>().map_err(|_| AuthApiError::RoleNotFound))
-        .collect::<Result<Vec<Role>, _>>()?;
+        .collect::<Result<HashSet<Role>, _>>()?;
+    // Add in default roles
+    roles.insert(Role::User);
     Ok(roles)
 }
 
@@ -53,6 +58,14 @@ pub async fn address_has_roles(
     roles: &[Role],
     conn: &mut SqliteConnection,
 ) -> Result<(), AuthApiError> {
+    // Empty roles are always true
+    if roles.is_empty() {
+        return Ok(());
+    }
+    // User role is always true
+    if roles.len() == 1 && roles[0] == Role::User {
+        return Ok(());
+    }
     let address = address.to_hex();
     let role_strings = roles.iter().map(|r| format!("'{r}'")).collect::<Vec<String>>().join(",");
     let q = format!(

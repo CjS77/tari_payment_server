@@ -28,7 +28,7 @@ use log::*;
 use paste::paste;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
-    db_types::{NewOrder, OrderId, Role, SerializedTariAddress},
+    db_types::{NewOrder, OrderId, OrderStatusType, Role, SerializedTariAddress},
     order_objects::OrderQueryFilter,
     traits::{AccountManagement, AuthManagement, PaymentGatewayDatabase, PaymentGatewayError, WalletAuth},
     AccountApi,
@@ -232,6 +232,27 @@ pub async fn my_orders<B: AccountManagement>(
 ) -> Result<HttpResponse, ServerError> {
     debug!("💻️ GET my_orders for {}", claims.address);
     get_orders(&claims.address, api.as_ref()).await
+}
+
+route!(my_unfulfilled_orders => Get "/unfulfilled_orders" impl AccountManagement);
+/// Route handler for the unfulfilled_orders endpoint
+///
+/// Authenticated users can fetch their own orders using this endpoint. The Tari address for the account is extracted
+/// from the JWT token supplied in the `tpg_access_token` header.
+///
+/// Admin users (ReadAll and SuperAdmin roles) can use the `/unfulfilled_orders/{address}` endpoint to fetch orders for
+/// any account.
+pub async fn my_unfulfilled_orders<B: AccountManagement>(
+    claims: JwtClaims,
+    api: web::Data<AccountApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    debug!("💻️ GET my_unfulfilled_orders for {}", claims.address);
+    let query = OrderQueryFilter::default().with_status(OrderStatusType::New);
+    let orders = api.search_orders(query).await.map_err(|e| {
+        debug!("💻️ Could not fetch orders. {e}");
+        ServerError::BackendError(e.to_string())
+    })?;
+    Ok(HttpResponse::Ok().json(orders))
 }
 
 route!(orders_search => Get "/search/orders" impl AccountManagement where requires [Role::ReadAll]);

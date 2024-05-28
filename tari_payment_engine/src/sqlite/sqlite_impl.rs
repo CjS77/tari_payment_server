@@ -295,7 +295,8 @@ impl AuthManagement for SqliteDatabase {
 
     async fn fetch_roles_for_address(&self, address: &TariAddress) -> Result<Vec<Role>, AuthApiError> {
         let mut conn = self.pool.acquire().await.map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
-        auth::roles_for_address(address, &mut conn).await
+        let roles = auth::roles_for_address(address, &mut conn).await?;
+        Ok(roles.into_iter().collect())
     }
 
     async fn create_auth_log(&self, _address: &TariAddress, _nonce: u64) -> Result<(), AuthApiError> {

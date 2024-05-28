@@ -34,6 +34,7 @@ use crate::{
         MyAccountRoute,
         MyOrdersRoute,
         MyPaymentsRoute,
+        MyUnfulfilledOrdersRoute,
         OrderByIdRoute,
         OrdersRoute,
         OrdersSearchRoute,
@@ -84,6 +85,7 @@ pub fn create_server_instance(
             .service(MyAccountRoute::<SqliteDatabase>::new())
             .service(AccountRoute::<SqliteDatabase>::new())
             .service(MyOrdersRoute::<SqliteDatabase>::new())
+            .service(MyUnfulfilledOrdersRoute::<SqliteDatabase>::new())
             .service(OrdersRoute::<SqliteDatabase>::new())
             .service(OrderByIdRoute::<SqliteDatabase>::new())
             .service(MyPaymentsRoute::<SqliteDatabase>::new())

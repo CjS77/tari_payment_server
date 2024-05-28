@@ -3,12 +3,17 @@ use tari_common::configuration::Network;
 
 mod jwt_token;
 mod keys;
+
+mod memo;
 mod payments;
 
 use jwt_token::print_jwt_token;
 use tari_payment_engine::db_types::OrderId;
 
-use crate::payments::{print_payment_auth, print_tx_confirm};
+use crate::{
+    memo::print_memo_signature,
+    payments::{print_payment_auth, print_tx_confirm},
+};
 
 #[derive(Parser, Debug)]
 #[command(version = "1.0.0", author = "CjS77")]
@@ -35,6 +40,8 @@ pub enum Command {
         #[arg(short = 'r', long = "roles", default_value = "user")]
         roles: Vec<String>,
     },
+    #[clap(name = "memo", about = "Generate a memo signature in order to authenticate orders in storefronts")]
+    MemoSignature(MemoSignatureParams),
     #[clap(name = "payment")]
     PaymentAuth(PaymentAuthParams),
     #[clap(name = "confirm")]
@@ -70,6 +77,19 @@ pub struct PaymentAuthParams {
 }
 
 #[derive(Debug, Args)]
+pub struct MemoSignatureParams {
+    /// The user's wallet secret key
+    #[arg(short = 's', long = "seckey")]
+    secret: String,
+    #[arg(short = 'n', long = "network", default_value = "mainnet")]
+    /// The network to use (testnet, stagenet, mainnet)
+    network: Network,
+    /// The order number associated with this payment. Generally extracted from the memo.
+    #[arg(short = 'o', long = "order")]
+    order_id: String,
+}
+
+#[derive(Debug, Args)]
 pub struct TxConfirmParams {
     /// The payment wallet's secret key
     #[arg(short = 's', long = "seckey")]
@@ -90,6 +110,7 @@ fn main() {
     match cli.command {
         Command::NewAddress => print_new_address(cli.network),
         Command::AccessToken { secret, network, roles } => print_jwt_token(secret, network, roles),
+        Command::MemoSignature(params) => print_memo_signature(params),
         Command::PaymentAuth(params) => print_payment_auth(params),
         Command::TxConfirm(params) => print_tx_confirm(params),
     }

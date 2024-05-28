@@ -89,7 +89,7 @@ impl OrderQueryFilter {
 
     pub fn with_status(mut self, status: OrderStatusType) -> Self {
         if self.status.is_none() {
-            self.status = Some(Vec::new());
+            self.status = Some(vec![status]);
         } else {
             self.status.as_mut().unwrap().push(status);
         }
