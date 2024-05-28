@@ -352,11 +352,11 @@ impl WalletManagement for SqliteDatabase {
         wallet_auth::register_wallet(wallet, &mut conn).await
     }
 
-    async fn deregister_wallet(&self, wallet_address: &TariAddress) -> Result<WalletInfo, WalletManagementError> {
+    async fn deregister_wallet(&self, _wallet_address: &TariAddress) -> Result<WalletInfo, WalletManagementError> {
         todo!()
     }
 
-    async fn update_wallet_info(&self, wallet: UpdateWalletInfo) -> Result<(), WalletManagementError> {
+    async fn update_wallet_info(&self, _wallet: UpdateWalletInfo) -> Result<(), WalletManagementError> {
         todo!()
     }
 }

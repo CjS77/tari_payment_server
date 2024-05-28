@@ -12,6 +12,7 @@ use crate::{
     traits::{AccountApiError, AccountManagement},
 };
 
+/// The `AccountApi` provides a unified API for accessing accounts.
 pub struct AccountApi<B> {
     db: B,
 }

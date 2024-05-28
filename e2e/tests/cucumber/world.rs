@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::mpsc::channel};
+use std::{
+    collections::HashMap,
+    sync::{mpsc::channel, Arc, Mutex},
+};
 
 use actix_web::dev::ServerHandle;
 use cucumber::World;
@@ -7,6 +10,7 @@ use reqwest::{Client, Method, RequestBuilder, StatusCode};
 use tari_jwt::tari_crypto::ristretto::RistrettoSecretKey;
 use tari_payment_engine::{
     db_types::SerializedTariAddress,
+    events::{EventHooks, EventType},
     test_utils::prepare_env::{create_database, random_db_path, run_migrations},
     traits::PaymentGatewayDatabase,
     SqliteDatabase,
@@ -30,6 +34,9 @@ pub struct TPGWorld {
     pub logged_in: bool,
     pub response: Option<(StatusCode, String)>,
     pub wallets: HashMap<SerializedTariAddress, RistrettoSecretKey>,
+    // Hashmap of order_id and whether the hook has been called.
+    pub on_paid_hook_results: HashMap<String, bool>,
+    pub last_event_type: Arc<Mutex<Option<EventType>>>,
 }
 
 impl Default for TPGWorld {
@@ -56,6 +63,8 @@ impl Default for TPGWorld {
             access_token: None,
             logged_in: false,
             wallets: HashMap::new(),
+            on_paid_hook_results: HashMap::new(),
+            last_event_type: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -79,9 +88,18 @@ impl TPGWorld {
         }
         let db = self.db.as_ref().unwrap().clone();
         info!("🌍️ Starting server on {}:{} using DB {}", config.host, config.port, db.url());
+        let last_event = Arc::clone(&self.last_event_type);
         let (tx, rx) = channel();
         tokio::spawn(async move {
-            let srv = create_server_instance(config, db).expect("Error creating server instance");
+            let mut hooks = EventHooks::default();
+            hooks.on_order_paid(move |ev| {
+                info!("🌍️ Received order paid event: {ev:?}");
+                if let Ok(mut le) = last_event.lock() {
+                    *le = Some(EventType::OrderPaid(ev));
+                }
+                Box::pin(async {})
+            });
+            let srv = create_server_instance(config, db, hooks).expect("Error creating server instance");
             let _res = tx.send(srv.handle());
             match srv.await {
                 Ok(_) => info!("🌍️ Server shut down"),
@@ -112,6 +130,10 @@ impl TPGWorld {
         let code = res.status();
         let body = res.text().await.expect("Error parsing response body");
         (code, body)
+    }
+
+    pub fn last_event(&self) -> Option<EventType> {
+        self.last_event_type.lock().unwrap().clone()
     }
 }
 

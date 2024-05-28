@@ -329,6 +329,17 @@ pub struct Order {
     pub status: OrderStatusType,
 }
 
+impl PartialEq for Order {
+    fn eq(&self, other: &Self) -> bool {
+        self.order_id == other.order_id &&
+            self.customer_id == other.customer_id &&
+            self.total_price == other.total_price &&
+            self.currency == other.currency
+    }
+}
+
+impl Eq for Order {}
+
 //--------------------------------------        NewOrder       ---------------------------------------------------------
 #[derive(Debug, Clone)]
 pub struct NewOrder {

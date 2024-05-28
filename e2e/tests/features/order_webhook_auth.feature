@@ -12,7 +12,7 @@ Feature: Order flow
     }
     """
     Then Customer #1 has current orders worth 2500 XTR
-    And Alice has a balance of 0 Tari
+    And Alice has a current balance of 0 Tari
     Then order "alice001" is in state New
 
   Scenario: Replaying signature for different order fails

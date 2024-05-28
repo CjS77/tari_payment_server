@@ -55,6 +55,7 @@ pub trait PaymentGatewayDatabase: Clone {
     /// Any order that has enough credit in the account
     /// * Will be marked as Paid
     /// * Returned in the result vector.
+    /// * Will fire an OnOrderPaid hook if one is set.
     async fn try_pay_orders(&self, account_id: i64, orders: &[Order]) -> Result<Vec<Order>, PaymentGatewayError>;
 
     /// Updates the payment status for the given transaction id. This is typically called to transition a payment from

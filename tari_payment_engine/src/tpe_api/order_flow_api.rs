@@ -1,22 +1,18 @@
 use std::fmt::Debug;
 
-use futures_util::future::LocalBoxFuture;
 use log::*;
 
 use crate::{
     db_types::{NewOrder, NewPayment, Order, TransferStatus},
+    events::{EventProducers, OrderPaidEvent},
     traits::{PaymentGatewayDatabase, PaymentGatewayError},
 };
-
-pub type OrderCreatedHookFn = Box<dyn Fn(NewOrder) -> LocalBoxFuture<'static, ()> + Sync>;
-pub type PaymentCreatedHookFn = Box<dyn Fn(NewPayment) -> LocalBoxFuture<'static, ()> + Sync>;
 
 /// `OrderFlowApi` is the primary API for handling order and payment flows in response to merchant order events and
 /// wallet payment events.
 pub struct OrderFlowApi<B> {
     db: B,
-    on_order_created: Option<OrderCreatedHookFn>,
-    on_payment_created: Option<PaymentCreatedHookFn>,
+    producers: EventProducers,
 }
 
 impl<B> Debug for OrderFlowApi<B> {
@@ -26,28 +22,8 @@ impl<B> Debug for OrderFlowApi<B> {
 }
 
 impl<B> OrderFlowApi<B> {
-    pub fn new(db: B) -> Self {
-        Self { db, on_order_created: None, on_payment_created: None }
-    }
-
-    /// Add a hook that is called when a new order is created.
-    ///
-    /// The hook is called with the new order as an argument.
-    /// Example:
-    /// ```rust,ignore
-    ///    let mut api = OrderManagerApi::new(db);
-    ///    api.add_order_created_hook(Box::new(move |order| {
-    ///      let fut = Box::pin( async { /* async code codes here */ });
-    ///      fut.boxed_local()
-    /// }));
-    pub fn add_order_created_hook(&mut self, hook: OrderCreatedHookFn) {
-        self.on_order_created = Some(hook);
-    }
-
-    /// Add a hook that is called when a new payment is created.
-    /// See [`add_order_created_hook`] for an example.
-    pub fn add_payment_created_hook(&mut self, hook: PaymentCreatedHookFn) {
-        self.on_payment_created = Some(hook);
+    pub fn new(db: B, producers: EventProducers) -> Self {
+        Self { db, producers }
     }
 }
 
@@ -63,18 +39,26 @@ where B: PaymentGatewayDatabase
     /// If any orders are marked as paid, they are returned.
     pub async fn process_new_order(&self, order: NewOrder) -> Result<Vec<Order>, PaymentGatewayError> {
         let account_id = self.db.process_new_order_for_customer(order.clone()).await?;
-        if let Some(hook) = &self.on_order_created {
-            trace!("🔄️📦️ Executing OnOrderCreated hook for [{}].", order.order_id);
-            hook(order.clone()).await;
-        }
+        // TODO NewOrderEvent hook handler
         let payable = self.db.fetch_payable_orders(account_id).await?;
         let paid_orders = self.db.try_pay_orders(account_id, &payable).await?;
+        self.call_order_paid_hook(&paid_orders).await;
         debug!(
             "🔄️📦️ Order [{}] processing complete. {} orders are paid for account #{account_id}",
             order.order_id,
             payable.len()
         );
         Ok(paid_orders)
+    }
+
+    async fn call_order_paid_hook(&self, paid_orders: &[Order]) {
+        for emitter in &self.producers.order_paid_producer {
+            debug!("🔄️📦️ Notifying order paid hook subscribers");
+            for order in paid_orders {
+                let event = OrderPaidEvent { order: order.clone() };
+                emitter.publish_event(event).await;
+            }
+        }
     }
 
     /// Submit a new payment to the order manager.
@@ -88,13 +72,11 @@ where B: PaymentGatewayDatabase
         let txid = payment.txid.clone();
         let account_id = self.db.process_new_payment_for_pubkey(payment.clone()).await?;
         trace!("🔄️💰️ Payment [{txid}] for account #{account_id} processed.");
-        if let Some(hook) = &self.on_payment_created {
-            trace!("🔄️💰️ Executing OnPayment hook for [{txid}].");
-            hook(payment.clone()).await;
-        }
+        // todo insert hook
         let payable = self.db.fetch_payable_orders(account_id).await?;
         trace!("🔄️💰️ {} fulfillable orders fetched for account #{account_id}", payable.len());
         let paid_orders = self.db.try_pay_orders(account_id, &payable).await?;
+        self.call_order_paid_hook(&paid_orders).await;
         debug!(
             "🔄️💰️ Payment [{txid}] processing complete. {} orders are paid for account #{account_id}",
             payable.len()
@@ -113,6 +95,7 @@ where B: PaymentGatewayDatabase
                 trace!("🔄️✅️ {} fulfillable orders fetched for account #{acc_id}", payable.len());
                 let paid_orders = self.db.try_pay_orders(acc_id, &payable).await?;
                 debug!("🔄️✅️ [{txid}] confirmed. {} orders are paid for account #{acc_id}", payable.len());
+                self.call_order_paid_hook(&paid_orders).await;
                 paid_orders
             },
             None => {

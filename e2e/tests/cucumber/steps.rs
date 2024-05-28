@@ -10,13 +10,13 @@ use tari_jwt::{
     Ristretto256SigningKey,
 };
 use tari_payment_engine::{
-    db_types::{MicroTari, OrderId, Role},
+    db_types::{MicroTari, Order, OrderId, Role},
+    events::{EventType, OrderPaidEvent},
     traits::AccountManagement,
 };
 use tari_payment_server::{
     auth::{build_jwt_signer, JwtClaims},
-    data_objects::{PaymentNotification, TransactionConfirmation, TransactionConfirmationNotification},
-    routes::account,
+    data_objects::{PaymentNotification, TransactionConfirmationNotification},
     shopify_order::ShopifyOrder,
 };
 use tokio::time::sleep;
@@ -279,6 +279,17 @@ async fn check_balance(world: &mut TPGWorld, user: String, bal_type: String, bal
         _ => panic!("Invalid balance type: {bal_type}"),
     };
     assert_eq!(actual_balance, expected_balance);
+}
+
+#[then("the OnOrderPaid trigger fires with")]
+async fn check_order_paid_trigger(world: &mut TPGWorld, step: &Step) {
+    let json = step.docstring().expect("No expected order");
+    let order = serde_json::from_str::<Order>(&json)
+        .map_err(|e| error!("{e}"))
+        .expect("Failed to parse transaction confirmation");
+    let last_event = world.last_event();
+    let ev = OrderPaidEvent::new(order);
+    assert_eq!(last_event, Some(EventType::OrderPaid(ev)));
 }
 
 fn modify_signature(token: String, value: &str) -> String {

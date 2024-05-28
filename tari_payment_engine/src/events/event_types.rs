@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 
-use crate::db_types::{MicroTari, OrderStatus, PublicKey};
+use crate::db_types::{MicroTari, Order, OrderStatus, PublicKey};
 
 #[derive(Debug, Clone)]
 pub struct OrderStatusMessage(pub OrderStatus);
@@ -14,4 +14,20 @@ pub struct PaymentReceived {
     pub amount: MicroTari,
     /// The memo attached to the transfer
     pub memo: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrderPaidEvent {
+    pub order: Order,
+}
+
+impl OrderPaidEvent {
+    pub fn new(order: Order) -> Self {
+        Self { order }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EventType {
+    OrderPaid(OrderPaidEvent),
 }
