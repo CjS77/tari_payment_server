@@ -45,6 +45,20 @@ use crate::{
     },
 };
 
+/// Defines the log format for the access log middleware.
+const LOG_FORMAT: &str = concat!(
+    "%t ",                                   // Time when the request was started to process
+    "%a ",                                   // Remote IP-address (IP-address of proxy if using reverse proxy)
+    "x-forwarded-for: %{X-Forwarded-For}i ", // X-Forwarded-For header
+    "forwarded: %{Forwarded}i ",             // Forwarded header
+    "\"%r\" ",                               // First line of request
+    "%s ",                                   // Response status code
+    "ua:\"%{User-Agent}i\" ",                // User agent
+    "auth:\"%{tpg_auth_token}i\" ",          // Authentication token
+    "access:\"%{tpg_access_token}i\" ",      // Access token
+    "%D ms",                                 // Time taken to serve the request in milliseconds
+);
+
 pub async fn run_server(config: ServerConfig) -> Result<(), ServerError> {
     let db = SqliteDatabase::new_with_url(&config.database_url, 25)
         .await
@@ -72,7 +86,7 @@ pub fn create_server_instance(
         let wallet_auth = WalletAuthApi::new(db.clone());
 
         let mut app = App::new()
-            .wrap(Logger::new("%t (%D ms) %s %a %{Host}i %U").log_target("tps::access_log"))
+            .wrap(Logger::new(LOG_FORMAT).log_target("access_log"))
             .app_data(web::Data::new(orders_api))
             .app_data(web::Data::new(accounts_api))
             .app_data(web::Data::new(auth_api))

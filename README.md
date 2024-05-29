@@ -72,7 +72,39 @@ The server is configured via the following environment variables:
 - `TPG_SHOPIFY_API_KEY`: This variable is used to set the API key for your Shopify app. If not set, an error message will be logged, and the value will be set to an empty string.
 - `TPG_DATABASE_URL`: This variable is used to set the URL for the TPG database. If not set, an error message will be logged, and the value will be set to an empty string.
                It's of the form `sqlite://<path to database file>` or `postgres://<username>:<password>@<host>/<database>`.
+- `RUST_LOG`: This variable is used to set the log level for the server. If not set, the default value is `info`.
+              For production, I recommend setting this to:
+              `RUST_LOG="warn,tari_payment_server=info,tari_payment_engine=info,access_log=info"`
+              At the minimum, set `access_log=INFO` to use the access log middleware to log all incoming requests.
 
+## Access logs
+Access logs are printed to the terminal, as long as the `RUST_LOG` environment variable is set to `info` or has the `access_log=INFO` term
+included. It is straightforward to redirect these logs to a file or a log aggregator, to be ingested by your favourite log management system.
+
+The log format is
+ * Time when the request was started to process (`2024-05-29T08:42:20.029845041Z`)
+ * Remote IP-address (IP-address of proxy if using reverse proxy) (`127.0.0.1`)
+ * X-Forwarded-For header (`x-forwarded-for: 192.168.1.100`)
+ * Forwarded header (`forwarded-for: 1.2.3.4`)
+ * First line of request (`"POST /shopify/webhook/checkout_create HTTP/1.1"`)
+ * Response status code (`200`)
+ * User agent (`ua:"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"`)
+ * Authentication token (`auth:"eyJ..."`)
+ * Access token (`access:"eyJ..."`)
+ * Time taken to serve the request in milliseconds (`5.353228 ms`)
+
+An example log output is
+```text
+[2024-05-29T08:42:20Z INFO  access_log] 2024-05-29T08:42:20.029845041Z 127.0.0.1 x-forwarded-for: - forwarded: - "POST /shopify/webhook/checkout_create HTTP/1.1" 200 ua:"-" auth:"-" access:"-" 5.353228 ms
+[2024-05-29T08:42:20Z INFO  access_log] 2024-05-29T08:42:20.183878425Z 127.0.0.1 x-forwarded-for: - forwarded: - "POST /auth HTTP/1.1" 400 ua:"-" auth:"some made up nonsense" access:"-" 0.142130 ms
+[2024-05-29T08:42:20Z INFO  access_log] 2024-05-29T08:42:20.184103124Z 127.0.0.1 x-forwarded-for: - forwarded: for=192.168.1.100 POST /wallet/incoming_payment HTTP/1.1" 401 ua:"-" auth:"-" access:"-" 5.718148 ms
+[2024-05-29T08:42:20Z INFO  access_log] 2024-05-29T08:42:20.215215236Z 127.0.0.1 x-forwarded-for: 192.168.1.100 forwarded: - POST /wallet/incoming_payment HTTP/1.1" 401 ua:"-" auth:"-" access:"-" 4.793100 ms
+[2024-05-29T08:42:20Z INFO  access_log] 2024-05-29T08:42:20.215669395Z 127.0.0.1 x-forwarded-for: 1.2.3.4 forwarded: - "POST /wallet/incoming_payment HTTP/1.1" 401 ua:"-" auth:"-" access:"-" 9.104270 ms
+[2024-05-29T08:42:20Z INFO  access_log] 2024-05-29T08:42:20.267856222Z 127.0.0.1 x-forwarded-for: - forwarded: - "POST /auth HTTP/1.1" 200 ua:"-" auth:"eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ.eyJhZGRyZXNzIjp7Im5ldHdvcmsiOiJtYWlubmV0IiwicHVibGljX2tleSI6ImI4OTcxNTk4YTg2NWIyNWI2NTA4ZDRiYTE1NGRiMjI4ZTA0NGYzNjdiZDlhMWVmNTBkZDQwNTFkYjQyYjYzMTQifSwibm9uY2UiOjEsImRlc2lyZWRfcm9sZXMiOlsidXNlciJdfQ.Uit7DJ2VtFdrDGiiDo4vQVKEc6TZ789hTbndrZXDR2QuAeQwlTzvnVPUBibJVwWRJTUFmy7n06amVC6HWhTcCw" access:"-" 7.055605 ms
+[2024-05-29T08:42:20Z INFO  access_log] 2024-05-29T08:42:20.343505667Z 127.0.0.1 x-forwarded-for: - forwarded: - "POST /auth HTTP/1.1" 401 ua:"-" auth:"eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ.eyJhZGRyZXNzIjp7Im5ldHdvcmsiOiJtYWlubmV0IiwicHVibGljX2tleSI6ImI4OTcxNTk4YTg2NWIyNWI2NTA4ZDRiYTE1NGRiMjI4ZTA0NGYzNjdiZDlhMWVmNTBkZDQwNTFkYjQyYjYzMTQifSwibm9uY2UiOjEsImRlc2lyZWRfcm9sZXMiOlsidXNlciJdfQ.nMLtM8Cm-uNXdeo_XLXSX0Iqos_TV1F_uhty6I8X8GNthJMBhE2scU_V8HR2ZMYM4kFXdQTiXBplUe-TNLGTDg" access:"eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjE3MTcwNTg1NDAsImlhdCI6MTcxNjk3MjE0MCwiYWRkcmVzcyI6eyJuZXR3b3JrIjoibWFpbm5ldCIsInB1YmxpY19rZXkiOiJiODk3MTU5OGE4NjViMjViNjUwOGQ0YmExNTRkYjIyOGUwNDRmMzY3YmQ5YTFlZjUwZGQ0MDUxZGI0MmI2MzE0In0sInJvbGVzIjpbInVzZXIiXX0.oB8FdVJ6KS377SNnuYqX0E2AWRgTINyjST6tJuRfpkrOYe0mbLDZ927oRTlkkIUDyw4PY85Jlepamn6WF5_CDQ" 5.544898 ms
+[2024-05-29T08:42:20Z INFO  access_log] 2024-05-29T08:42:20.388926978Z 127.0.0.1 x-forwarded-for: - forwarded: - "GET /api/unfulfilled_orders HTTP/1.1" 200 ua:"-" auth:"-" access:"eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjE3MTcwNTg1NDAsImlhdCI6MTcxNjk3MjE0MCwiYWRkcmVzcyI6eyJuZXR3b3JrIjoibWFpbm5ldCIsInB1YmxpY19rZXkiOiJiODk3MTU5OGE4NjViMjViNjUwOGQ0YmExNTRkYjIyOGUwNDRmMzY3YmQ5YTFlZjUwZGQ0MDUxZGI0MmI2MzE0In0sInJvbGVzIjpbInVzZXIiXX0.zrRjS_AeysZswQ3a5FhggXz8jAEZ2XGSwdu-Qfb9KVx9NvKfVZCVXOW8AyyJA4idcBr_N_wt1LYPchS0HghMBQ" 5.185608 ms
+[2024-05-29T08:42:21Z INFO  access_log] 2024-05-29T08:42:21.253659261Z 127.0.0.1 x-forwarded-for: - forwarded: - "GET /api/search/orders?customer_id=bob&since=2024-03-11T0:0:0Z HTTP/1.1" 200 ua:"-" auth:"-" access:"eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjE3MTcwNTg1NDAsImlhdCI6MTcxNjk3MjE0MCwiYWRkcmVzcyI6eyJuZXR3b3JrIjoibWFpbm5ldCIsInB1YmxpY19rZXkiOiJhYTNjMDc2MTUyYzFhZTQ0YWU4NjU4NWVlYmExZDM0OGJhZGI4NDVkMWNhYjVlZjEyZGI5OGZhZmI0ZmVhNTVkIn0sInJvbGVzIjpbInJlYWRfYWxsIl19.kmWQe-PCmwi-_lNjw4sS132YQ8ly_Xx5hgkKooysc3M79lXbTfv-q4hViSBi9lEEiLuKeLc4hLHS223X_QT5CQ" 9.396370 ms
+```
 
 # Building from source
 
