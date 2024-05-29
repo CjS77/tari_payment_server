@@ -12,7 +12,7 @@ use tari_jwt::{
 use tari_payment_engine::{
     db_types::{MicroTari, Order, OrderId, Role},
     events::{EventType, OrderPaidEvent},
-    traits::AccountManagement,
+    traits::{AccountManagement, AuthManagement},
 };
 use tari_payment_server::{
     auth::{build_jwt_signer, JwtClaims},
@@ -290,6 +290,16 @@ async fn check_order_paid_trigger(world: &mut TPGWorld, step: &Step) {
     let last_event = world.last_event();
     let ev = OrderPaidEvent::new(order);
     assert_eq!(last_event, Some(EventType::OrderPaid(ev)));
+}
+
+#[then(expr = "address {word} has roles {string}")]
+async fn check_roles(world: &mut TPGWorld, address: String, roles: String) {
+    let db = world.db.as_ref().expect("No database connection");
+    let roles = extract_roles(&roles);
+    let address = address.parse().expect("Invalid address");
+    let account =
+        db.check_address_has_roles(&address, &roles).await.map_err(|e| error!("Failed to fetch account. {e}"));
+    assert!(account.is_ok())
 }
 
 fn modify_signature(token: String, value: &str) -> String {

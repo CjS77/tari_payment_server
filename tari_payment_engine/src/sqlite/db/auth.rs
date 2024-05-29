@@ -11,6 +11,8 @@ use tari_common_types::tari_address::TariAddress;
 
 use crate::{db_types::Role, traits::AuthApiError};
 
+pub static DEFAULT_ROLES: &[Role] = &[Role::User];
+
 pub async fn auth_account_exists(address: &TariAddress, conn: &mut SqliteConnection) -> Result<bool, AuthApiError> {
     let address = address.to_hex();
     let row = sqlx::query!(r#"SELECT count(address) as "count" FROM auth_log WHERE address = ?"#, address)
@@ -49,7 +51,7 @@ pub async fn roles_for_address(
         .map(|r| r.parse::<Role>().map_err(|_| AuthApiError::RoleNotFound))
         .collect::<Result<HashSet<Role>, _>>()?;
     // Add in default roles
-    roles.insert(Role::User);
+    roles.extend(DEFAULT_ROLES.iter().cloned());
     Ok(roles)
 }
 
@@ -62,12 +64,13 @@ pub async fn address_has_roles(
     if roles.is_empty() {
         return Ok(());
     }
-    // User role is always true
-    if roles.len() == 1 && roles[0] == Role::User {
+    // Check default roles
+    if roles.iter().all(|r| DEFAULT_ROLES.contains(r)) {
         return Ok(());
     }
+    let additional_roles = roles.iter().filter(|r| !DEFAULT_ROLES.contains(r)).collect::<Vec<_>>();
     let address = address.to_hex();
-    let role_strings = roles.iter().map(|r| format!("'{r}'")).collect::<Vec<String>>().join(",");
+    let role_strings = additional_roles.iter().map(|r| format!("'{r}'")).collect::<Vec<String>>().join(",");
     let q = format!(
         r#"SELECT count(name) as "num_roles"
                 FROM role_assignments LEFT JOIN roles ON role_assignments.role_id = roles.id
@@ -75,10 +78,10 @@ pub async fn address_has_roles(
     );
     #[allow(clippy::cast_possible_truncation)]
     let num_matching_roles = sqlx::query(&q).bind(address).fetch_one(conn).await?.get::<i64, usize>(0) as usize;
-    if num_matching_roles == roles.len() {
+    if num_matching_roles == additional_roles.len() {
         Ok(())
     } else {
-        let n = roles.len().saturating_sub(num_matching_roles);
+        let n = additional_roles.len().saturating_sub(num_matching_roles);
         Err(AuthApiError::RoleNotAllowed(n))
     }
 }
