@@ -100,3 +100,38 @@ Feature: The /api/unfulfilled_orders endpoint
       "orders": [ { "order_id": "alice001", "total_price": 250000000, "status": "New" }, { "order_id": "alice002", "total_price": 150000000, "status": "New" } ]
     }
     """
+    # Now one of the orders gets fulfilled
+    When a payment arrives from x-forwarded-for 192.168.1.100
+    """
+    {"payment": {
+      "sender":"b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d",
+      "amount":250000000,
+      "txid":"payment001"
+    },
+    "auth": {
+      "address":"c009584dac6ad9ca0964e3dc93892c607ca37e049b4c30637fa477d0d601174495","nonce":1,
+      "signature":"22cab0a461b2dcd0fd4f7ac688775b51e365bdde4f8b0f3d977a877e28151c43f3ee321ebcd8ec51b2fd41c022862ae507f4f93d37e77dadbfc3122718a4a10a"}
+    }
+    """
+    Then I receive a 200 Ok response with the message '"success":true'
+    # Transaction is not confirmed yet
+    When a confirmation arrives from x-forwarded-for 192.168.1.100
+    """
+    { "confirmation": {"txid": "payment001"},
+      "auth": {
+        "address":"c009584dac6ad9ca0964e3dc93892c607ca37e049b4c30637fa477d0d601174495",
+        "nonce":2,
+        "signature":"c2f727328c7387282b6e65c8fd0ffcd7a03355cb9046e3602991be9991a7860496ec9ecfa85c0463d37b6a3a2261e50964dfcd5127d41fa907c14448b2a4ce0b"
+      }
+    }
+    """
+    When Admin GETs to "/api/unfulfilled_orders/b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d" with body
+    Then I receive a 200 Ok response
+    Then I receive a partial JSON response:
+    """
+    {
+      "address": "b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d",
+      "total_orders": 150000000,
+      "orders": [ { "order_id": "alice002", "total_price": 150000000, "status": "New" } ]
+    }
+    """
