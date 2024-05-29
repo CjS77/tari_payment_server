@@ -10,4 +10,4 @@ if [[ -z "$DATABASE_TYPE" ]]; then
   exit 1
 fi
 
-sqlx migrate add -r -s --source ./tari_payment_engine/src/db/$DATABASE_TYPE/migrations $@
+sqlx migrate add -r -s --source ./tari_payment_engine/src/$DATABASE_TYPE/migrations $@

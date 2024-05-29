@@ -24,5 +24,5 @@ fi
 CMD=${1:-run}
 shift;
 
-sqlx migrate $CMD --source ./tari_payment_engine/src/db/$DATABASE_TYPE/migrations $@
+sqlx migrate $CMD --source ./tari_payment_engine/src/$DATABASE_TYPE/migrations $@
 echo "Ok"
