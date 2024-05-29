@@ -41,6 +41,7 @@ use crate::{
         PaymentsRoute,
         ShopifyWebhookRoute,
         TxConfirmationNotificationRoute,
+        UnfulfilledOrdersRoute,
         UpdateRolesRoute,
     },
 };
@@ -100,6 +101,7 @@ pub fn create_server_instance(
             .service(AccountRoute::<SqliteDatabase>::new())
             .service(MyOrdersRoute::<SqliteDatabase>::new())
             .service(MyUnfulfilledOrdersRoute::<SqliteDatabase>::new())
+            .service(UnfulfilledOrdersRoute::<SqliteDatabase>::new())
             .service(OrdersRoute::<SqliteDatabase>::new())
             .service(OrderByIdRoute::<SqliteDatabase>::new())
             .service(MyPaymentsRoute::<SqliteDatabase>::new())

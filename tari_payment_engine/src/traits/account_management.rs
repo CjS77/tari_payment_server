@@ -24,8 +24,8 @@ impl From<sqlx::Error> for AccountApiError {
 /// An account is a record that associates one or more Tari wallets (via their address) and their associated
 /// payments with a set of orders from the merchant.
 ///
-/// The [`crate::traits::PaymentGatewayDatabase`] trait handles the actual machinery of matching Tari addresses with merchant accounts
-/// and orders. `AccountManagement` provides methods for querying information about these accounts.
+/// The [`crate::traits::PaymentGatewayDatabase`] trait handles the actual machinery of matching Tari addresses with
+/// merchant accounts and orders. `AccountManagement` provides methods for querying information about these accounts.
 #[allow(async_fn_in_trait)]
 pub trait AccountManagement {
     /// Fetches the user account associated with the given account id. If no account exists, `None` is returned.
@@ -50,5 +50,9 @@ pub trait AccountManagement {
 
     async fn fetch_payments_for_address(&self, address: &TariAddress) -> Result<Vec<Payment>, AccountApiError>;
 
-    async fn search_orders(&self, query: OrderQueryFilter) -> Result<Vec<Order>, AccountApiError>;
+    async fn search_orders(
+        &self,
+        query: OrderQueryFilter,
+        only_for: Option<TariAddress>,
+    ) -> Result<Vec<Order>, AccountApiError>;
 }

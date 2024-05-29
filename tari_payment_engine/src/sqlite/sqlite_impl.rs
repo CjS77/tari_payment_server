@@ -272,8 +272,19 @@ impl AccountManagement for SqliteDatabase {
         Ok(payments)
     }
 
-    async fn search_orders(&self, query: OrderQueryFilter) -> Result<Vec<Order>, AccountApiError> {
+    async fn search_orders(
+        &self,
+        mut query: OrderQueryFilter,
+        only_for: Option<TariAddress>,
+    ) -> Result<Vec<Order>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
+        if let Some(address) = only_for {
+            let id = match user_accounts::user_account_for_address(&address, &mut conn).await? {
+                Some(acc) => acc.id,
+                None => return Ok(vec![]),
+            };
+            query = query.with_account_id(id);
+        }
         let orders = orders::search_orders(query, &mut conn).await?;
         Ok(orders)
     }

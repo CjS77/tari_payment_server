@@ -9,9 +9,9 @@ use crate::db_types::Role;
 /// For users to interact with the payment engine, they must be authenticated. This is done at the server level, but the
 /// `AuthManagement` trait does provide some helper methods to help with the process.
 ///
-/// Specifically, the [`AuthManagement::create_auth_log`] and [`AuthManagement::upsert_nonce_for_address`] methods are used to create and update login
-/// records for users. See the Authentication documentation for `tari_payment_server` , which is stateless on the
-/// user side. However, the server must keep track
+/// Specifically, the [`AuthManagement::create_auth_log`] and [`AuthManagement::upsert_nonce_for_address`] methods are
+/// used to create and update login records for users. See the Authentication documentation for `tari_payment_server` ,
+/// which is stateless on the user side. However, the server must keep track
 /// of a nonce for each user to ensure that authentication tokens cannot be replayed.
 #[allow(async_fn_in_trait)]
 pub trait AuthManagement {
@@ -33,7 +33,8 @@ pub trait AuthManagement {
     /// Checks the nonce for the given address, creating a new login record if necessary. If the nonce is not strictly
     /// increasing, the error [`AuthApiError::InvalidNonce`] is returned.
     ///
-    /// The default implementation of this function is to call [`Self::check_auth_account_exists`] and [`Self::create_auth_log`]
+    /// The default implementation of this function is to call [`Self::check_auth_account_exists`] and
+    /// [`Self::create_auth_log`]
     async fn upsert_nonce_for_address(&self, address: &TariAddress, nonce: u64) -> Result<(), AuthApiError> {
         if self.check_auth_account_exists(address).await? {
             self.update_nonce_for_address(address, nonce).await

@@ -29,7 +29,7 @@ use paste::paste;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
     db_types::{NewOrder, OrderId, OrderStatusType, Role, SerializedTariAddress},
-    order_objects::OrderQueryFilter,
+    order_objects::{OrderQueryFilter, OrderResult},
     traits::{AccountManagement, AuthManagement, PaymentGatewayDatabase, PaymentGatewayError, WalletAuth},
     AccountApi,
     AuthApi,
@@ -236,7 +236,7 @@ pub async fn my_orders<B: AccountManagement>(
 }
 
 route!(my_unfulfilled_orders => Get "/unfulfilled_orders" impl AccountManagement);
-/// Route handler for the unfulfilled_orders endpoint
+/// Route handler for my unfulfilled_orders endpoint
 ///
 /// Authenticated users can fetch their own orders using this endpoint. The Tari address for the account is extracted
 /// from the JWT token supplied in the `tpg_access_token` header.
@@ -249,11 +249,31 @@ pub async fn my_unfulfilled_orders<B: AccountManagement>(
 ) -> Result<HttpResponse, ServerError> {
     debug!("💻️ GET my_unfulfilled_orders for {}", claims.address);
     let query = OrderQueryFilter::default().with_status(OrderStatusType::New);
-    let orders = api.search_orders(query).await.map_err(|e| {
-        debug!("💻️ Could not fetch orders. {e}");
+    let address = claims.address;
+    let orders = api.search_orders(query, Some(address)).await.map_err(|e| {
+        debug!("💻️ Could not fetch my unfulfilled orders. {e}");
         ServerError::BackendError(e.to_string())
     })?;
     Ok(HttpResponse::Ok().json(orders))
+}
+
+route!(unfulfilled_orders => Get "/unfulfilled_orders/{address}" impl AccountManagement where requires [Role::ReadAll]);
+/// Route handler for the unfulfilled_orders endpoint
+///
+/// Admins with ReadAll role can use this endpoint to fetch unfulfilled orders for any account.
+pub async fn unfulfilled_orders<B: AccountManagement>(
+    path: web::Path<SerializedTariAddress>,
+    api: web::Data<AccountApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let address = path.into_inner().to_address();
+    debug!("💻️ GET unfulfilled_orders for {address}");
+    let query = OrderQueryFilter::default().with_status(OrderStatusType::New);
+    let orders = api.search_orders(query, Some(address.clone())).await.map_err(|e| {
+        debug!("💻️ Could not fetch unfulfilled orders. {e}");
+        ServerError::BackendError(e.to_string())
+    })?;
+    let result = OrderResult { address, total_orders: orders.iter().map(|o| o.total_price).sum(), orders };
+    Ok(HttpResponse::Ok().json(result))
 }
 
 route!(orders_search => Get "/search/orders" impl AccountManagement where requires [Role::ReadAll]);
@@ -263,7 +283,7 @@ pub async fn orders_search<B: AccountManagement>(
 ) -> Result<HttpResponse, ServerError> {
     debug!("💻️ GET orders search for [{query}]");
     let query = query.into_inner();
-    let orders = api.search_orders(query).await.map_err(|e| {
+    let orders = api.search_orders(query, None).await.map_err(|e| {
         debug!("💻️ Could not fetch orders. {e}");
         ServerError::BackendError(e.to_string())
     })?;

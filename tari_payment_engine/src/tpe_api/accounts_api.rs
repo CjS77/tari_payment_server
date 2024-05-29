@@ -70,7 +70,11 @@ where B: AccountManagement
         Ok(PaymentsResult { address: address.clone().into(), total_payments, payments })
     }
 
-    pub async fn search_orders(&self, query: OrderQueryFilter) -> Result<Vec<Order>, AccountApiError> {
-        self.db.search_orders(query).await.map_err(|e| AccountApiError::DatabaseError(e.to_string()))
+    pub async fn search_orders(
+        &self,
+        query: OrderQueryFilter,
+        only_for: Option<TariAddress>,
+    ) -> Result<Vec<Order>, AccountApiError> {
+        self.db.search_orders(query, only_for).await.map_err(|e| AccountApiError::DatabaseError(e.to_string()))
     }
 }

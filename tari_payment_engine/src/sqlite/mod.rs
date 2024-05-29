@@ -6,13 +6,13 @@
 //! the database schema and triggers first.
 //!
 //! In particular, triggers are used to:
-//! * Prevent DELETE queries on the `orders` table and `payments` tables. Orders and payments are never deleted,
-//!   only cancelled.
+//! * Prevent DELETE queries on the `orders` table and `payments` tables. Orders and payments are never deleted, only
+//!   cancelled.
 //! * The `current_orders` and `total_orders` columns in the `user_accounts` table are maintained and updated
 //!   automatically when orders are created or modified.
 //! * Enforce that nonces are monotonically increasing every time that a user authenticates. Note that this check is
-//!   partially replicated in the code, in case another backend implementation does _not_ do this. It's better to do this
-//!   twice than accidentally never at all.
+//!   partially replicated in the code, in case another backend implementation does _not_ do this. It's better to do
+//!   this twice than accidentally never at all.
 //!
 //! ## Audit logs
 //! The database maintains an audit log of all changes to the `orders` and `payments` tables. Any INSERT, or UPDATE

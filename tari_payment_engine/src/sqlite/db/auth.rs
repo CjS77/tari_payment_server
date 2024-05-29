@@ -1,7 +1,7 @@
 //! Sqlite database operations for the tari payment authentication
 //!
-//! Generally clients should never call these methods directly, and prefer to use the [`crate::traits::AuthManagement`] trait methods.
-//! that is implemented on the [`crate::SqliteDatabase`] struct instead.
+//! Generally clients should never call these methods directly, and prefer to use the [`crate::traits::AuthManagement`]
+//! trait methods. that is implemented on the [`crate::SqliteDatabase`] struct instead.
 
 use std::collections::{HashMap, HashSet};
 
