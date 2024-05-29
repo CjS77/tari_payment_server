@@ -30,8 +30,11 @@ use crate::{
         AccountRoute,
         AuthRoute,
         CheckTokenRoute,
+        HistoryForAddressRoute,
+        HistoryForIdRoute,
         IncomingPaymentNotificationRoute,
         MyAccountRoute,
+        MyHistoryRoute,
         MyOrdersRoute,
         MyPaymentsRoute,
         MyUnfulfilledOrdersRoute,
@@ -99,6 +102,9 @@ pub fn create_server_instance(
             .service(UpdateRolesRoute::<SqliteDatabase>::new())
             .service(MyAccountRoute::<SqliteDatabase>::new())
             .service(AccountRoute::<SqliteDatabase>::new())
+            .service(MyHistoryRoute::<SqliteDatabase>::new())
+            .service(HistoryForAddressRoute::<SqliteDatabase>::new())
+            .service(HistoryForIdRoute::<SqliteDatabase>::new())
             .service(MyOrdersRoute::<SqliteDatabase>::new())
             .service(MyUnfulfilledOrdersRoute::<SqliteDatabase>::new())
             .service(UnfulfilledOrdersRoute::<SqliteDatabase>::new())

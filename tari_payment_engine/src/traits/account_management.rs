@@ -4,6 +4,7 @@ use thiserror::Error;
 use crate::{
     db_types::{Order, OrderId, Payment, UserAccount},
     order_objects::OrderQueryFilter,
+    tpe_api::account_objects::FullAccount,
 };
 
 #[derive(Debug, Clone, Error)]
@@ -49,6 +50,12 @@ pub trait AccountManagement {
     async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, AccountApiError>;
 
     async fn fetch_payments_for_address(&self, address: &TariAddress) -> Result<Vec<Payment>, AccountApiError>;
+
+    /// Returns the consolidated account history for the given address, if it exists.
+    async fn history_for_address(&self, address: &TariAddress) -> Result<Option<FullAccount>, AccountApiError>;
+
+    /// Returns the consolidated account history for the given account id, if it exists.
+    async fn history_for_id(&self, account_id: i64) -> Result<Option<FullAccount>, AccountApiError>;
 
     async fn search_orders(
         &self,

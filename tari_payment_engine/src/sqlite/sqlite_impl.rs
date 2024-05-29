@@ -23,6 +23,7 @@ use crate::{
         UserAccount,
     },
     order_objects::OrderQueryFilter,
+    tpe_api::account_objects::FullAccount,
     traits::{
         AccountApiError,
         AccountManagement,
@@ -270,6 +271,20 @@ impl AccountManagement for SqliteDatabase {
         let mut conn = self.pool.acquire().await?;
         let payments = transfers::fetch_payments_for_address(address, &mut conn).await?;
         Ok(payments)
+    }
+
+    async fn history_for_address(&self, address: &TariAddress) -> Result<Option<FullAccount>, AccountApiError> {
+        let mut conn = self.pool.acquire().await?;
+        let id = match user_accounts::user_account_for_address(address, &mut conn).await? {
+            Some(acc) => acc.id,
+            None => return Ok(None),
+        };
+        user_accounts::history_for_id(id, &mut conn).await
+    }
+
+    async fn history_for_id(&self, id: i64) -> Result<Option<FullAccount>, AccountApiError> {
+        let mut conn = self.pool.acquire().await?;
+        user_accounts::history_for_id(id, &mut conn).await
     }
 
     async fn search_orders(

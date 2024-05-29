@@ -8,7 +8,7 @@ use tari_common_types::tari_address::TariAddress;
 use crate::{
     db_types::{Order, OrderId, UserAccount},
     order_objects::{OrderQueryFilter, OrderResult},
-    tpe_api::payment_objects::PaymentsResult,
+    tpe_api::{account_objects::FullAccount, payment_objects::PaymentsResult},
     traits::{AccountApiError, AccountManagement},
 };
 
@@ -68,6 +68,20 @@ where B: AccountManagement
         let total_payments = payments.iter().map(|p| p.amount).sum();
         trace!("Total payments for address: {:?}", total_payments);
         Ok(PaymentsResult { address: address.clone().into(), total_payments, payments })
+    }
+
+    /// Returns the consolidated account history for the given address, if it exists.
+    /// This includes all orders and payments associated with the address.
+    /// If the address does not exist, `None` is returned.
+    pub async fn history_for_address(&self, address: &TariAddress) -> Result<Option<FullAccount>, AccountApiError> {
+        self.db.history_for_address(address).await
+    }
+
+    /// Returns the consolidated account history for the given account id, if it exists.
+    /// This includes all orders and payments associated with the account.
+    /// If the account does not exist, `None` is returned.
+    pub async fn history_for_id(&self, account_id: i64) -> Result<Option<FullAccount>, AccountApiError> {
+        self.db.history_for_id(account_id).await
     }
 
     pub async fn search_orders(

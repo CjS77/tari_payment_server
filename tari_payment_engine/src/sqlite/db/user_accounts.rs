@@ -1,9 +1,12 @@
 use log::{debug, error, trace};
-use sqlx::SqliteConnection;
+use sqlx::{pool::PoolConnection, Sqlite, SqliteConnection};
 use tari_common_types::tari_address::TariAddress;
 
 use crate::{
     db_types::{MicroTari, OrderId, UserAccount},
+    order_objects::OrderQueryFilter,
+    sqlite::db::{orders, transfers},
+    tpe_api::account_objects::{AccountAddress, CustomerId, FullAccount},
     traits::AccountApiError,
 };
 
@@ -88,7 +91,7 @@ pub async fn user_account_for_tx(txid: &str, conn: &mut SqliteConnection) -> Res
         FROM user_accounts
         WHERE user_accounts.id = (
             SELECT user_account_id
-            FROM user_account_public_keys INNER JOIN payments ON user_account_public_keys.public_key = payments.sender
+            FROM user_account_address INNER JOIN payments ON user_account_address.address = payments.sender
             WHERE txid = $1
             LIMIT 1
         )"#,
@@ -140,10 +143,10 @@ pub async fn user_account_for_customer_id(
 /// Internally, the public key is first matched with internal account ids to see if a link exists. If so, the user
 /// account is fetched.
 pub async fn user_account_for_address(
-    public_key: &TariAddress,
+    address: &TariAddress,
     conn: &mut SqliteConnection,
 ) -> Result<Option<UserAccount>, AccountApiError> {
-    let pk = public_key.to_hex();
+    let pk = address.to_hex();
     let result = sqlx::query_as!(
         UserAccount,
         r#"
@@ -159,8 +162,8 @@ pub async fn user_account_for_address(
         FROM user_accounts
         WHERE user_accounts.id = (
             SELECT user_account_id
-            FROM user_account_public_keys
-            WHERE public_key = $1
+            FROM user_account_address
+            WHERE address = $1
             LIMIT 1)
         "#,
         pk
@@ -171,9 +174,9 @@ pub async fn user_account_for_address(
 }
 
 /// Returns the internal account id for the given public key, if it exists, or None if it does not exist.
-async fn acc_id_for_pubkey(pk: &TariAddress, conn: &mut SqliteConnection) -> Result<Option<i64>, AccountApiError> {
+async fn acc_id_for_address(pk: &TariAddress, conn: &mut SqliteConnection) -> Result<Option<i64>, AccountApiError> {
     let pk = pk.to_hex();
-    let id = sqlx::query!("SELECT user_account_id FROM user_account_public_keys WHERE public_key = $1 LIMIT 1", pk)
+    let id = sqlx::query!("SELECT user_account_id FROM user_account_address WHERE address = $1 LIMIT 1", pk)
         .fetch_optional(conn)
         .await?
         .map(|r| r.user_account_id);
@@ -229,13 +232,10 @@ async fn link_accounts(
     };
     if let Some(pk) = pk {
         let addr = pk.to_hex();
-        let result = sqlx::query!(
-            "INSERT INTO user_account_public_keys (user_account_id, public_key) VALUES ($1, $2)",
-            acc_id,
-            addr,
-        )
-        .execute(tx)
-        .await;
+        let result =
+            sqlx::query!("INSERT INTO user_account_address (user_account_id, address) VALUES ($1, $2)", acc_id, addr,)
+                .execute(tx)
+                .await;
         if let Err(e) = result {
             error!("Could not link tari address and user account. {e}");
         }
@@ -244,7 +244,7 @@ async fn link_accounts(
     Ok(acc_id)
 }
 
-/// Fetches the user account for the given customer_id and/or public key. If both customer_id and public_key are
+/// Fetches the user account for the given customer_id and/or public key. If both customer_id and address are
 /// provided, the resulting account id must match, otherwise an error is returned.
 ///
 /// If the account does not exist, one is created and the given customer id and/or public key is linked to the
@@ -253,16 +253,16 @@ async fn link_accounts(
 /// Return value: The existing or newly created account id.
 pub async fn fetch_or_create_account(
     cust_id: Option<String>,
-    pubkey: Option<TariAddress>,
+    address: Option<TariAddress>,
     conn: &mut SqliteConnection,
 ) -> Result<i64, AccountApiError> {
-    if cust_id.is_none() && pubkey.is_none() {
+    if cust_id.is_none() && address.is_none() {
         return Err(AccountApiError::QueryError(
-            "🧑️ Nothing to do. Both cid and pubkey are None. I don't want to create an orphan account".to_string(),
+            "🧑️ Nothing to do. Both cid and address are None. I don't want to create an orphan account".to_string(),
         ));
     }
 
-    trace!("🧑️ Fetching or creating user account for customer_id {cust_id:?} and public_key {pubkey:?}");
+    trace!("🧑️ Fetching or creating user account for customer_id {cust_id:?} and address {address:?}");
     let cid_is_linked = match &cust_id {
         Some(cid) => acc_id_for_cust_id(cid, &mut *conn).await?,
         None => None,
@@ -273,8 +273,8 @@ pub async fn fetch_or_create_account(
         cid_is_linked.map_or(-1, |id| id),
     );
 
-    let pk_is_linked = match &pubkey {
-        Some(pk) => acc_id_for_pubkey(pk, &mut *conn).await?,
+    let pk_is_linked = match &address {
+        Some(pk) => acc_id_for_address(pk, &mut *conn).await?,
         None => None,
     };
 
@@ -290,13 +290,13 @@ pub async fn fetch_or_create_account(
                 Ok(acc_cid)
             } else {
                 Err(AccountApiError::QueryError(
-                    "🧑️ Customer_id and public_key are linked to different accounts".to_string(),
+                    "🧑️ Customer_id and address are linked to different accounts".to_string(),
                 ))
             }
         },
-        (Some(account_id), None) => link_accounts(account_id, None, pubkey, &mut *conn).await,
+        (Some(account_id), None) => link_accounts(account_id, None, address, &mut *conn).await,
         (None, Some(account_id)) => link_accounts(account_id, cust_id, None, &mut *conn).await,
-        (None, None) => create_account_with_links(cust_id, pubkey, &mut *conn).await,
+        (None, None) => create_account_with_links(cust_id, address, &mut *conn).await,
     }?;
     Ok(id)
 }
@@ -373,4 +373,61 @@ pub async fn incr_order_totals(
     .await?;
     let new_total = MicroTari::from(result.total_orders);
     Ok(new_total)
+}
+
+pub async fn fetch_addresses_for_account(
+    account_id: i64,
+    conn: &mut SqliteConnection,
+) -> Result<Vec<AccountAddress>, AccountApiError> {
+    let addresses: Vec<AccountAddress> =
+        sqlx::query_as(r#"SELECT address, created_at, updated_at FROM user_account_address WHERE user_account_id = ?"#)
+            .bind(account_id)
+            .fetch_all(conn)
+            .await?;
+    Ok(addresses)
+}
+
+pub async fn fetch_customer_ids_for_account(
+    account_id: i64,
+    conn: &mut SqliteConnection,
+) -> Result<Vec<CustomerId>, AccountApiError> {
+    let cust_ids = sqlx::query_as!(
+        CustomerId,
+        r#"SELECT customer_id,
+    created_at as "created_at: chrono::DateTime<chrono::Utc>",
+    updated_at as "updated_at: chrono::DateTime<chrono::Utc>"
+    FROM user_account_customer_ids WHERE user_account_id = ?"#,
+        account_id
+    )
+    .fetch_all(conn)
+    .await?;
+    Ok(cust_ids)
+}
+
+pub(crate) async fn history_for_id(
+    id: i64,
+    conn: &mut PoolConnection<Sqlite>,
+) -> Result<Option<FullAccount>, AccountApiError> {
+    let Some(account) = user_account_by_id(id, conn).await? else {
+        return Ok(None);
+    };
+    let addresses = fetch_addresses_for_account(id, conn).await?;
+    let customer_ids = fetch_customer_ids_for_account(id, conn).await?;
+    let mut all_payments = vec![];
+    for address in &addresses {
+        let mut payments = transfers::fetch_payments_for_address(address.address.as_address(), conn).await?;
+        all_payments.append(&mut payments);
+    }
+    let mut all_orders = vec![];
+    for cust_id in &customer_ids {
+        let query = OrderQueryFilter::default().with_customer_id(cust_id.customer_id.clone());
+        let mut orders = orders::search_orders(query, conn).await?;
+        all_orders.append(&mut orders);
+    }
+    let result = FullAccount::new(account)
+        .with_addresses(addresses)
+        .with_customer_ids(customer_ids)
+        .with_orders(all_orders)
+        .with_payments(all_payments);
+    Ok(Some(result))
 }

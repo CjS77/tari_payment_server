@@ -24,11 +24,11 @@ CREATE TABLE IF NOT EXISTS user_accounts
     current_orders  INTEGER NOT NULL    DEFAULT 0
 );
 
-CREATE TABLE IF NOT EXISTS user_account_public_keys
+CREATE TABLE IF NOT EXISTS user_account_address
 (
     id              INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     user_account_id INTEGER REFERENCES user_accounts (id) NOT NULL,
-    public_key      TEXT UNIQUE NOT NULL,
+    address         TEXT UNIQUE NOT NULL,
     created_at      TIMESTAMP NOT NULL  DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP NOT NULL  DEFAULT CURRENT_TIMESTAMP
 );
@@ -43,8 +43,8 @@ CREATE TABLE IF NOT EXISTS user_account_customer_ids
 );
 
 CREATE INDEX IF NOT EXISTS user_accounts_id ON user_accounts (id);
-CREATE INDEX IF NOT EXISTS user_account_public_keys_user_account_id ON user_account_public_keys (user_account_id);
-CREATE INDEX IF NOT EXISTS user_account_public_keys_public_key ON user_account_public_keys (public_key);
+CREATE INDEX IF NOT EXISTS user_account_address_user_account_id ON user_account_address (user_account_id);
+CREATE INDEX IF NOT EXISTS user_account_address_address ON user_account_address (address);
 
 CREATE INDEX IF NOT EXISTS user_account_customer_ids_customer_id ON user_account_customer_ids (customer_id);
 CREATE INDEX IF NOT EXISTS user_account_customer_ids_user_account_id ON user_account_customer_ids (user_account_id);

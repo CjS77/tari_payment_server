@@ -9,7 +9,7 @@ use crate::{
     traits::AccountApiError,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct OrderResult {
     #[serde(serialize_with = "address_to_hex")]
     pub address: TariAddress,

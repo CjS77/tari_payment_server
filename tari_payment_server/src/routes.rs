@@ -30,6 +30,7 @@ use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
     db_types::{NewOrder, OrderId, OrderStatusType, Role, SerializedTariAddress},
     order_objects::{OrderQueryFilter, OrderResult},
+    tpe_api::account_objects::FullAccount,
     traits::{AccountManagement, AuthManagement, PaymentGatewayDatabase, PaymentGatewayError, WalletAuth},
     AccountApi,
     AuthApi,
@@ -166,6 +167,61 @@ where
     let access_token = signer.issue_token(token, None)?;
     trace!("💻️ Issued access token");
     Ok(HttpResponse::Ok().content_type("application/json").body(access_token))
+}
+
+//----------------------------------------------   History  ----------------------------------------------------
+route!(my_history => Get "/history" impl AccountManagement);
+pub async fn my_history<B: AccountManagement>(
+    claims: JwtClaims,
+    api: web::Data<AccountApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    debug!("💻️ GET my_history for {}", claims.address);
+    let history = get_history_for_address(&claims.address, api.as_ref()).await?;
+    Ok(HttpResponse::Ok().json(history))
+}
+
+route!(history_for_address => Get "/history/address/{address}" impl AccountManagement where requires [Role::ReadAll]);
+pub async fn history_for_address<B: AccountManagement>(
+    path: web::Path<SerializedTariAddress>,
+    api: web::Data<AccountApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let address = path.into_inner().to_address();
+    debug!("💻️ GET history for {address}");
+    let history = get_history_for_address(&address, api.as_ref()).await?;
+    Ok(HttpResponse::Ok().json(history))
+}
+
+route!(history_for_id => Get "/history/id/{id}" impl AccountManagement where requires [Role::ReadAll]);
+pub async fn history_for_id<B: AccountManagement>(
+    path: web::Path<i64>,
+    api: web::Data<AccountApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let id = path.into_inner();
+    debug!("💻️ GET history for id {id}");
+    let history = get_history_for_account_id(id, api.as_ref()).await?;
+    Ok(HttpResponse::Ok().json(history))
+}
+
+pub async fn get_history_for_address<B: AccountManagement>(
+    address: &TariAddress,
+    api: &AccountApi<B>,
+) -> Result<FullAccount, ServerError> {
+    let history = api.history_for_address(address).await.map_err(|e| {
+        debug!("💻️ Could not fetch account history for {address}. {e}");
+        ServerError::BackendError(e.to_string())
+    })?;
+    history.ok_or_else(|| ServerError::NoRecordFound(format!("No account found for {address}")))
+}
+
+pub async fn get_history_for_account_id<B: AccountManagement>(
+    id: i64,
+    api: &AccountApi<B>,
+) -> Result<FullAccount, ServerError> {
+    let history = api.history_for_id(id).await.map_err(|e| {
+        debug!("💻️ Could not fetch account history for account id {id}. {e}");
+        ServerError::BackendError(e.to_string())
+    })?;
+    history.ok_or_else(|| ServerError::NoRecordFound(format!("No account found for id {id}")))
 }
 
 //----------------------------------------------   Account  ----------------------------------------------------

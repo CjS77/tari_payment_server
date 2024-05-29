@@ -104,7 +104,7 @@ impl<S: Into<String>> From<S> for PublicKey {
 }
 
 //--------------------------------------     TariAddress       ---------------------------------------------------------
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct SerializedTariAddress(
     #[serde(serialize_with = "address_to_hex", deserialize_with = "str_to_address")] TariAddress,
@@ -198,27 +198,6 @@ pub struct UserAccount {
     pub current_balance: MicroTari,
     pub total_orders: MicroTari,
     pub current_orders: MicroTari,
-}
-
-//-------------------------------------- UserAccountPublicKey --------------------------------------------------------
-#[derive(Debug, Clone)]
-pub struct UserAccountPublicKey {
-    pub id: i64,
-    pub user_account_id: String,
-    pub public_key: PublicKey,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-//-------------------------------------- UserAccountCustomerId --------------------------------------------------------
-
-#[derive(Debug, Clone)]
-pub struct UserAccountCustomerId {
-    pub id: i64,
-    pub user_account_id: String,
-    pub customer_id: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
 }
 
 //--------------------------------------   OrderStatusType     ---------------------------------------------------------
@@ -446,7 +425,7 @@ impl OrderUpdate {
 }
 
 //--------------------------------------        Payment       ---------------------------------------------------------
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, FromRow)]
 pub struct Payment {
     pub txid: String,
     /// The time the payment was received
@@ -470,6 +449,12 @@ pub struct Payment {
 pub enum PaymentType {
     OnChain,
     Manual,
+}
+
+impl Default for PaymentType {
+    fn default() -> Self {
+        Self::OnChain
+    }
 }
 
 impl From<String> for PaymentType {
@@ -535,6 +520,12 @@ pub enum TransferStatus {
     Received,
     Confirmed,
     Cancelled,
+}
+
+impl Default for TransferStatus {
+    fn default() -> Self {
+        Self::Received
+    }
 }
 
 impl Display for TransferStatus {
