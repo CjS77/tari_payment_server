@@ -1,0 +1,38 @@
+name: Tests
+on: [pull_request]
+env:
+  toolchain: nightly-2024-02-20
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      RUST_LOG: info
+      TPG_HOST: 127.0.0.1
+      TPG_PORT: 4444
+      TPG_DATABASE_URL: sqlite://${{ github.workspace  }}/data/tari_store.db
+      DATABASE_URL: sqlite://${{ github.workspace }}/data/tari_store.db
+      DATABASE_TYPE: sqlite
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.toolchain }}
+          components: rustfmt, clippy
+      - name: Install sqlx
+        run: |
+          cargo install sqlx-cli --no-default-features --features sqlite
+          sqlx --version
+      - name: Run migrations
+        run: |
+          mkdir -p ${{ github.workspace  }}/data
+          touch ${{ github.workspace  }}/data/tari_store.db
+          sqlx migrate run --source tari_payment_engine/src/sqlite/migrations -D sqlite://${{ github.workspace }}/data/tari_store.db
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Run tests
+        env:
+          RUST_LOG: info
+        run: cargo test --features sqlite

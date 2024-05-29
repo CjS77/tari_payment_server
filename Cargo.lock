@@ -3670,6 +3670,7 @@ checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 [[package]]
 name = "tari-jwt"
 version = "0.1.0"
+source = "git+https://github.com/tari-project/tari-jwt.git?branch=main#208285b25ca075249112e67701213a7c1d91281b"
 dependencies = [
  "anyhow",
  "jwt-compact",

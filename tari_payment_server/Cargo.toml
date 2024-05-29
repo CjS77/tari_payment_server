@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 tpg_common = { version = "0.1.0", path = "../tpg_common" }
 paste = "1.0.14"
-tari-jwt = {  version = "0.1.0", path = "../../tari-jwt" }
+tari-jwt = {  version = "0.1.0", git = "https://github.com/tari-project/tari-jwt.git", branch = "main" }
 tari_payment_engine = { version = "0.1.0", path = "../tari_payment_engine" }
 
 actix-jwt-auth-middleware = { version = "0.5.0", git = "https://github.com/cjs77/actix-jwt-auth-middleware.git", branch = "master" }
