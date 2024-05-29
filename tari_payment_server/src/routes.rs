@@ -130,7 +130,8 @@ route!(auth => Post "/auth" impl AuthManagement);
 /// This route is used to authenticate a user and issue a JWT token.
 ///
 /// Users must supply a login token in the `tpg_auth_token` header.
-/// This token is signed by the user('s wallet, typically) and is a JWT with the following fields (See [`LoginToken`]):
+/// This token is signed by the user('s wallet, typically) and is a JWT with the following fields
+/// (See [`tari_payment_engine::db_types::LoginToken`]):
 /// * `address` - The address of the user's wallet. This is the same as the pubkey with an additional checksum/network
 ///   byte.
 /// * `nonce` - A unique number that must increase on every call (not necessarily by 1 - a unix time epoch can be used,
