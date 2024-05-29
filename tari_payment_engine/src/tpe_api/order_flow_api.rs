@@ -33,7 +33,7 @@ where B: PaymentGatewayDatabase
     /// Submit a new order to the order manager.
     ///
     /// This should be a brand-new order. If the order already exists, the order manager will return an error.
-    /// To change details about an order, you should use the [`update_order`] method.
+    /// To change details about an order, you should use the [`Self::update_order`] method.
     ///
     /// After the order is added, all the orders for the account are checked to see if any can be marked as paid.
     /// If any orders are marked as paid, they are returned.
@@ -64,7 +64,8 @@ where B: PaymentGatewayDatabase
     /// Submit a new payment to the order manager.
     ///
     /// This should be a brand-new payment. If the payment already exists, the order manager will return an error.
-    /// To change the status of a payment, you should use the [`update_payment_status`] method.
+    /// To change the status of a payment, you should use the [`Self::confirm_payment`] or [`Self::cancel_payment`]
+    /// methods.
     ///
     /// After the payment is added, all the orders for the account are checked to see if any can be marked as paid.
     /// If any orders are marked as paid, they are returned.

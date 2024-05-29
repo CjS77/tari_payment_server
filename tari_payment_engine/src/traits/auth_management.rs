@@ -9,8 +9,8 @@ use crate::db_types::Role;
 /// For users to interact with the payment engine, they must be authenticated. This is done at the server level, but the
 /// `AuthManagement` trait does provide some helper methods to help with the process.
 ///
-/// Specifically, the [`create_auth_log`] and [`upsert_nonce_for_address`] methods are used to create and update login
-/// records for users. See the Authentication documentation for [`tari_payment_server`] , which is stateless on the
+/// Specifically, the [`AuthManagement::create_auth_log`] and [`AuthManagement::upsert_nonce_for_address`] methods are used to create and update login
+/// records for users. See the Authentication documentation for `tari_payment_server` , which is stateless on the
 /// user side. However, the server must keep track
 /// of a nonce for each user to ensure that authentication tokens cannot be replayed.
 #[allow(async_fn_in_trait)]
@@ -21,7 +21,7 @@ pub trait AuthManagement {
     /// Checks whether an address is authorised for **all** of the given roles. The function only succeeds if this is
     /// the case. If any of the roles are missing, the error [`AuthApiError::RoleNotAllowed(usize)`] is returned,
     /// with the number of missing roles given as the parameter.
-    /// You can use [`fetch_roles_for_address`] to get valid roles for the address.
+    /// You can use [`Self::fetch_roles_for_address`] to get valid roles for the address.
     async fn check_address_has_roles(&self, address: &TariAddress, roles: &[Role]) -> Result<(), AuthApiError>;
     /// Fetches the roles for the given address. If the address is not found, the request still succeeds and returns
     /// an empty vector.
@@ -33,7 +33,7 @@ pub trait AuthManagement {
     /// Checks the nonce for the given address, creating a new login record if necessary. If the nonce is not strictly
     /// increasing, the error [`AuthApiError::InvalidNonce`] is returned.
     ///
-    /// The default implementation of this function is to call [`check_auth_account_exists`] and [`create_auth_log`]
+    /// The default implementation of this function is to call [`Self::check_auth_account_exists`] and [`Self::create_auth_log`]
     async fn upsert_nonce_for_address(&self, address: &TariAddress, nonce: u64) -> Result<(), AuthApiError> {
         if self.check_auth_account_exists(address).await? {
             self.update_nonce_for_address(address, nonce).await

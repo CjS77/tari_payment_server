@@ -232,9 +232,6 @@ impl AccountManagement for SqliteDatabase {
 
     /// Fetches the user account for the given order id. A user account must have already been created for this account.
     /// If no account is found, `None` will be returned.
-    ///
-    /// Alternatively, you can search through the memo fields of payments to find a matching order id by calling
-    /// [`search_for_user_account_by_memo`].
     async fn fetch_user_account_for_order(&self, order_id: &OrderId) -> Result<Option<UserAccount>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
         user_accounts::user_account_for_order(order_id, &mut conn).await

@@ -24,7 +24,7 @@ impl From<sqlx::Error> for AccountApiError {
 /// An account is a record that associates one or more Tari wallets (via their address) and their associated
 /// payments with a set of orders from the merchant.
 ///
-/// The [`PaymentGatewayDatabase`] trait handles the actual machinery of matching Tari addresses with merchant accounts
+/// The [`crate::traits::PaymentGatewayDatabase`] trait handles the actual machinery of matching Tari addresses with merchant accounts
 /// and orders. `AccountManagement` provides methods for querying information about these accounts.
 #[allow(async_fn_in_trait)]
 pub trait AccountManagement {
@@ -33,9 +33,6 @@ pub trait AccountManagement {
 
     /// Fetches the user account for the given order id. A user account must have already been created for this account.
     /// If no account is found, `None` will be returned.
-    ///
-    /// Alternatively, you can search through the memo fields of payments to find a matching order id by calling
-    /// [`search_for_user_account_by_memo`].
     async fn fetch_user_account_for_order(&self, order_id: &OrderId) -> Result<Option<UserAccount>, AccountApiError>;
 
     async fn fetch_user_account_for_customer_id(

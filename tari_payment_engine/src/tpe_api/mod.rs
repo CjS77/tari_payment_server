@@ -7,7 +7,7 @@
 //!
 //! * [`accounts_api`] provides methods for interacting with user accounts, including fetching order and payment
 //!   histories, status, and metadata.
-//! * [`auth_api`] manages nonce state for authentication tokens, and managing user [`Role`]s
+//! * [`auth_api`] manages nonce state for authentication tokens, and managing user [`crate::db_types::Role`]s
 //! * [`order_flow_api`] is the primary API for handling order and payment flows in response to merchant order events
 //!   and wallet payment events.
 //! * [`wallet_api`] provides methods for interacting with the hot wallet authorization and authentication.

@@ -13,13 +13,13 @@
 //! queries for orders, payments and other account-related information.
 //!
 //! ## Traits
-//! The [`r#mod`] module defines behavior that database backend need to expose in order to be supported by the
+//! The module defines behavior that database backend need to expose in order to be supported by the
 //! Tari Payment Engine.
 //!
 //! * [`PaymentGatewayDatabase`] defines the highest level of behavior for backends supporting the Tari Payment Engine.
-//! * [`OrderManagement`] defines the behaviour for querying information about orders in the database backend.
 //! * [`AuthManagement`] defines behavior for managing authentication.
 //! * [`AccountManagement`] provides methods for querying information about user accounts, orders and payments.
+//! * [`WalletManagement`] defines behavior for managing the set of authorized hot wallets associated with the server.
 mod account_management;
 mod auth_management;
 mod payment_gateway_database;
