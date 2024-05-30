@@ -11,8 +11,9 @@ use tari_jwt::{
 };
 use tari_payment_engine::{
     db_types::{MicroTari, Order, OrderId, Role},
-    events::{EventType, OrderPaidEvent},
+    events::{EventProducers, EventType, OrderPaidEvent},
     traits::{AccountManagement, AuthManagement},
+    OrderFlowApi,
 };
 use tari_payment_server::{
     auth::{build_jwt_signer, JwtClaims},
@@ -111,6 +112,14 @@ async fn payment_notification(world: &mut TPGWorld, step: &Step, ip_source: Stri
         .await;
     debug!("Got Response: {code} {body}");
     world.response = Some((code, body));
+}
+
+#[when(expr = "payment {word} is confirmed")]
+async fn confirm_payment(world: &mut TPGWorld, txid: String) {
+    let db = world.db.as_ref().expect("No database connection").clone();
+    let api = OrderFlowApi::new(db, EventProducers::default());
+    let orders = api.confirm_payment(txid).await.expect("Failed to confirm transaction");
+    debug!("Paid orders: {}", serde_json::to_string(&orders).expect("Failed to serialize orders"));
 }
 
 #[when(regex = r"^a confirmation arrives from (x-forwarded-for|forwarded|ip) (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$")]

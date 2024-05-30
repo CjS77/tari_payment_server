@@ -260,6 +260,32 @@ pub async fn account<B: AccountManagement>(
     get_account(&address, api.as_ref()).await
 }
 
+route!(creditors => Get "/creditors" impl AccountManagement where requires [Role::ReadAll]);
+/// Route handler for the creditors endpoint
+/// Admin users (ReadAll and SuperAdmin roles) can use this endpoint to fetch all accounts that have a positive balance.
+/// This is useful for reconciling accounts and ensuring that all payments have been processed.
+///
+/// The `/api/creditors` endpoint allows admins (with the ReadAll role) to query all accounts that have a positive
+/// balance (either pending or current) on the system.
+///
+/// This is useful for troubleshooting issues when customers have sent a payment but their orders were not matched.
+///
+/// * Funds might still be in pending and need to be confirmed on the blockchain before the order will be matched. Also
+///   check that the hot wallet is sending notifications.
+/// * The current balance is not enough the complete the order. In this case there will be both a current balance and a
+///   positive value in current orders (did users take fees into account?)
+/// * In other cases, the order_id and payment were not matched because of an error in the memos. Here you should see a
+///   naked current balance, and some additional sleuthing is required to find the order it corresponds to. Once
+///   identified, an admin will need to complete a manual order-payment match.
+pub async fn creditors<B: AccountManagement>(api: web::Data<AccountApi<B>>) -> Result<HttpResponse, ServerError> {
+    debug!("💻️ GET creditors");
+    let accounts = api.creditors().await.map_err(|e| {
+        debug!("💻️ Could not fetch creditors. {e}");
+        ServerError::BackendError(e.to_string())
+    })?;
+    Ok(HttpResponse::Ok().json(accounts))
+}
+
 pub async fn get_account<B: AccountManagement>(
     address: &TariAddress,
     api: &AccountApi<B>,

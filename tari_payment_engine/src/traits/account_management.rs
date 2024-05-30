@@ -62,4 +62,6 @@ pub trait AccountManagement {
         query: OrderQueryFilter,
         only_for: Option<TariAddress>,
     ) -> Result<Vec<Order>, AccountApiError>;
+
+    async fn creditors(&self) -> Result<Vec<UserAccount>, AccountApiError>;
 }

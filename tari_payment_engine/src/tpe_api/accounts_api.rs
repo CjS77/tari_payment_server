@@ -91,4 +91,8 @@ where B: AccountManagement
     ) -> Result<Vec<Order>, AccountApiError> {
         self.db.search_orders(query, only_for).await.map_err(|e| AccountApiError::DatabaseError(e.to_string()))
     }
+
+    pub async fn creditors(&self) -> Result<Vec<UserAccount>, AccountApiError> {
+        self.db.creditors().await
+    }
 }

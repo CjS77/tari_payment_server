@@ -431,3 +431,24 @@ pub(crate) async fn history_for_id(
         .with_payments(all_payments);
     Ok(Some(result))
 }
+
+pub(crate) async fn creditors(conn: &mut SqliteConnection) -> Result<Vec<UserAccount>, AccountApiError> {
+    let accounts = sqlx::query_as!(
+        UserAccount,
+        r#"
+        SELECT
+            id,
+            created_at as "created_at: chrono::DateTime<chrono::Utc>",
+            updated_at as "updated_at: chrono::DateTime<chrono::Utc>",
+            total_received,
+            current_pending,
+            current_balance,
+            total_orders,
+            current_orders
+        FROM user_accounts
+        WHERE current_balance > 0 OR current_pending > 0"#
+    )
+    .fetch_all(conn)
+    .await?;
+    Ok(accounts)
+}
