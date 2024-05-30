@@ -20,6 +20,7 @@ mock! {
         async fn history_for_address(&self, address: &TariAddress) -> Result<Option<FullAccount>, AccountApiError>;
         async fn history_for_id(&self, account_id: i64) -> Result<Option<FullAccount>, AccountApiError>;
         async fn search_orders(&self, query: OrderQueryFilter, only_address: Option<TariAddress>) -> Result<Vec<Order>, AccountApiError>;
+        async fn creditors(&self) -> Result<Vec<UserAccount>, AccountApiError>;
     }
 }
 

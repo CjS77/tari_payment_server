@@ -303,6 +303,12 @@ impl AccountManagement for SqliteDatabase {
         let orders = orders::search_orders(query, &mut conn).await?;
         Ok(orders)
     }
+
+    async fn creditors(&self) -> Result<Vec<UserAccount>, AccountApiError> {
+        let mut conn = self.pool.acquire().await?;
+        let accounts = user_accounts::creditors(&mut conn).await?;
+        Ok(accounts)
+    }
 }
 
 impl AuthManagement for SqliteDatabase {

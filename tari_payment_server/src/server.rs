@@ -30,6 +30,7 @@ use crate::{
         AccountRoute,
         AuthRoute,
         CheckTokenRoute,
+        CreditorsRoute,
         HistoryForAddressRoute,
         HistoryForIdRoute,
         IncomingPaymentNotificationRoute,
@@ -113,6 +114,7 @@ pub fn create_server_instance(
             .service(MyPaymentsRoute::<SqliteDatabase>::new())
             .service(PaymentsRoute::<SqliteDatabase>::new())
             .service(OrdersSearchRoute::<SqliteDatabase>::new())
+            .service(CreditorsRoute::<SqliteDatabase>::new())
             .service(CheckTokenRoute::new());
         let use_x_forwarded_for = config.use_x_forwarded_for;
         let use_forwarded = config.use_forwarded;
