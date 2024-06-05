@@ -128,7 +128,8 @@ pub fn create_server_instance(
                     ok(req.error_response(AuthenticationError(AuthError::ForbiddenPeer))).boxed_local()
                 }
             })
-            .service(ShopifyWebhookRoute::<SqliteDatabase>::new());
+            .service(ShopifyWebhookRoute::<SqliteDatabase>::new())
+            .service(health);
         let wallet_scope = web::scope("/wallet")
             .service(IncomingPaymentNotificationRoute::<SqliteDatabase, SqliteDatabase>::new())
             .service(TxConfirmationNotificationRoute::<SqliteDatabase, SqliteDatabase>::new());
