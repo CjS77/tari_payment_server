@@ -1,6 +1,6 @@
 CREATE TABLE orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    order_id TEXT NOT NULL,
+    order_id TEXT UNIQUE NOT NULL,
     customer_id TEXT NOT NULL,
     memo TEXT,
     total_price INTEGER NOT NULL,

@@ -1,10 +1,11 @@
 use log::{debug, trace};
-use sqlx::{QueryBuilder, SqliteConnection};
+use sqlx::{sqlite::SqliteRow, FromRow, QueryBuilder, SqliteConnection};
 
 use crate::{
-    db_types::{NewOrder, Order, OrderId, OrderStatusType, OrderUpdate},
-    order_objects::OrderQueryFilter,
-    traits::PaymentGatewayError,
+    db_types::{MicroTari, NewOrder, Order, OrderId, OrderStatusType, UserAccount},
+    order_objects::{ModifyOrderRequest, OrderQueryFilter},
+    sqlite::db::user_accounts,
+    traits::{AccountApiError, PaymentGatewayError},
 };
 
 pub async fn idempotent_insert(order: NewOrder, conn: &mut SqliteConnection) -> Result<i64, PaymentGatewayError> {
@@ -156,35 +157,58 @@ pub(crate) async fn update_order_status(
 
 pub(crate) async fn update_order(
     id: &OrderId,
-    update: OrderUpdate,
+    update: ModifyOrderRequest,
     conn: &mut SqliteConnection,
-) -> Result<(), PaymentGatewayError> {
+) -> Result<Option<Order>, PaymentGatewayError> {
     if update.is_empty() {
         debug!("📝️ No fields to update for order {id}. Update request skipped.");
-        return Ok(());
+        return Err(PaymentGatewayError::OrderModificationNoOp);
     }
     let mut builder = QueryBuilder::new("UPDATE orders SET updated_at = CURRENT_TIMESTAMP,");
     let mut set_clause = builder.separated(", ");
-    if let Some(status) = update.status {
+    if let Some(status) = update.new_status {
         set_clause.push("status = ");
         set_clause.push_bind_unseparated(status.to_string());
     }
-    if let Some(memo) = update.memo {
+    if let Some(memo) = update.new_memo {
         set_clause.push("memo = ");
         set_clause.push_bind_unseparated(memo);
     }
-    if let Some(total_price) = update.total_price {
+    if let Some(total_price) = update.new_total_price {
         set_clause.push("total_price = ");
         set_clause.push_bind_unseparated(total_price);
     }
-    if let Some(currency) = update.currency {
+    if let Some(currency) = update.new_currency {
         set_clause.push("currency = ");
         set_clause.push_bind_unseparated(currency);
     }
     builder.push(" WHERE order_id = ");
     builder.push_bind(id.as_str());
+    builder.push("RETURNING *");
     trace!("📝️ Executing query: {}", builder.sql());
-    let res = builder.build().execute(conn).await?;
+    let res = builder.build().fetch_optional(conn).await?.map(|row: SqliteRow| Order::from_row(&row)).transpose()?;
     trace!("📝️ Result of update_order: {res:?}");
+    Ok(res)
+}
+
+pub(crate) async fn pay_order(
+    account: &UserAccount,
+    order: &Order,
+    conn: &mut SqliteConnection,
+) -> Result<(), AccountApiError> {
+    let mut current_balance = account.current_balance;
+    if current_balance >= order.total_price {
+        let acc_id = account.id;
+        current_balance -= order.total_price;
+        update_order_status(order.id, OrderStatusType::Paid, conn).await.map_err(|e| match e {
+            PaymentGatewayError::DatabaseError(s) => AccountApiError::DatabaseError(s),
+            _ => unreachable!("Unexpected error type: {e}"),
+        })?;
+        trace!("📝️ Order #{} of {} marked as paid", order.id, order.total_price);
+        user_accounts::update_user_balance(account.id, current_balance, conn).await?;
+        trace!("Account {acc_id} balance updated from {} to {current_balance}", account.current_balance);
+        user_accounts::incr_order_totals(account.id, MicroTari::from(0), -order.total_price, conn).await?;
+        trace!("📝️ Adjusted account #{acc_id} orders outstanding by {}.", order.total_price);
+    }
     Ok(())
 }

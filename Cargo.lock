@@ -3800,6 +3800,7 @@ checksum = "e2013efce6b8e00f0671534b9d444d12085f2e3778b7ebba3b1be297b7f9b86a"
 name = "tari_payment_engine"
 version = "0.1.0"
 dependencies = [
+ "blake2",
  "chrono",
  "cucumber",
  "dotenvy",

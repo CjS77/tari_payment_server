@@ -13,6 +13,14 @@ pub enum AccountApiError {
     DatabaseError(String),
     #[error("User error constructing query: {0}")]
     QueryError(String),
+    #[error("The requested order does not exist: {0}")]
+    OrderDoesNotExist(OrderId),
+}
+
+impl AccountApiError {
+    pub fn dne(oid: OrderId) -> Self {
+        AccountApiError::OrderDoesNotExist(oid)
+    }
 }
 
 impl From<sqlx::Error> for AccountApiError {

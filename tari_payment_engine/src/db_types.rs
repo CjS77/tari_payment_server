@@ -201,7 +201,7 @@ pub struct UserAccount {
 }
 
 //--------------------------------------   OrderStatusType     ---------------------------------------------------------
-#[derive(Debug, Clone, PartialEq, Eq, Type, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize)]
 pub enum OrderStatusType {
     /// The order has been created and the payment has been received in full
     Paid,
@@ -380,47 +380,6 @@ impl Display for NewOrder {
             currency = self.currency,
             created_at = self.created_at
         )
-    }
-}
-
-//--------------------------------------        OrderUpdate       ------------------------------------------------------
-
-/// A struct representing the fields that are allowed to be updated on an order
-#[derive(Debug, Clone, Default)]
-pub struct OrderUpdate {
-    /// An optional description supplied by the user for the order. Useful for matching orders with payments
-    pub memo: Option<String>,
-    /// The total price of the order
-    pub total_price: Option<MicroTari>,
-    /// The currency of the order
-    pub currency: Option<String>,
-    /// The new order status
-    pub status: Option<OrderStatusType>,
-}
-
-impl OrderUpdate {
-    pub fn is_empty(&self) -> bool {
-        self.memo.is_none() && self.total_price.is_none() && self.currency.is_none() && self.status.is_none()
-    }
-
-    pub fn with_memo(mut self, memo: String) -> Self {
-        self.memo = Some(memo);
-        self
-    }
-
-    pub fn with_total_price(mut self, total_price: MicroTari) -> Self {
-        self.total_price = Some(total_price);
-        self
-    }
-
-    pub fn with_currency(mut self, currency: String) -> Self {
-        self.currency = Some(currency);
-        self
-    }
-
-    pub fn with_status(mut self, status: OrderStatusType) -> Self {
-        self.status = Some(status);
-        self
     }
 }
 
