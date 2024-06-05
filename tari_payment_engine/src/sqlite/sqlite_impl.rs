@@ -16,13 +16,12 @@ use crate::{
         Order,
         OrderId,
         OrderStatusType,
-        OrderUpdate,
         Payment,
         Role,
         TransferStatus,
         UserAccount,
     },
-    order_objects::OrderQueryFilter,
+    order_objects::{ModifyOrderRequest, OrderQueryFilter},
     tpe_api::account_objects::FullAccount,
     traits::{
         AccountApiError,
@@ -80,7 +79,6 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     async fn process_new_order_for_customer(&self, order: NewOrder) -> Result<i64, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
         let price = order.total_price;
-        let _cid = order.customer_id.clone();
         let id = orders::idempotent_insert(order.clone(), &mut tx).await?;
         debug!("🗃️ Order #{} has been saved in the DB with id {id}", order.order_id);
         let account_id =
@@ -211,12 +209,197 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         Ok(Some(acc_id))
     }
 
-    async fn update_order(&self, id: &OrderId, update: OrderUpdate) -> Result<(), PaymentGatewayError> {
-        let mut tx = self.pool.acquire().await?;
-        trace!("🗃️ Order {id} updating with new values: {update:?}");
-        orders::update_order(id, update, &mut tx).await?;
-        trace!("🗃️ Order {id} has been updated.");
-        Ok(())
+    /// A manual order status transition from `New` to `Paid` status.
+    /// This method is called by the default implementation of [`modify_status_for_order`] when the new status is
+    /// `Paid`. When this happens, the following side effects occur:
+    /// * A credit note for the `total_price` is created,
+    async fn new_to_paid(&self, order: Order) -> Result<Order, PaymentGatewayError> {
+        if order.status != OrderStatusType::New {
+            error!("🗃️ Order {} is not in 'New' status. Cannot call **new**_to_paid", order.id);
+            return Err(PaymentGatewayError::OrderModificationForbidden);
+        }
+        let mut conn = self.pool.acquire().await?;
+        let update = ModifyOrderRequest::default().with_new_status(OrderStatusType::Paid);
+        let order = orders::update_order(&order.order_id, update, &mut conn)
+            .await?
+            .ok_or_else(|| AccountApiError::OrderDoesNotExist(order.order_id.clone()))?;
+        Ok(order)
+    }
+
+    /// A manual order status transition from `New` to `Expired` or `Cancelled` status.
+    ///
+    /// This method is called by the default implementation of [`modify_status_for_order`] when the new status
+    /// is `Expired`, or `Cancelled`.
+    ///
+    /// The side effects for expiring or cancelling an order are the same. The only difference is that Expired orders
+    /// are triggered automatically based on time, whereas cancelling an order is triggered by the user or an admin.
+    ///
+    /// * The order status is updated in the database.
+    /// * The total orders for the account are updated.
+    async fn cancel_or_expire_order(
+        &self,
+        order: Order,
+        new_status: OrderStatusType,
+    ) -> Result<Order, PaymentGatewayError> {
+        if order.status != OrderStatusType::New {
+            error!("🗃️ Order {} is not in 'New' status. Cannot call cancel_or_expire_order", order.id);
+            return Err(PaymentGatewayError::OrderModificationForbidden);
+        }
+        let update = ModifyOrderRequest::default().with_new_status(new_status);
+        let mut conn = self.pool.begin().await?;
+        let account = user_accounts::user_account_for_order(&order.order_id, &mut conn)
+            .await?
+            .ok_or_else(|| PaymentGatewayError::AccountShouldExistForOrder(order.order_id.clone()))?;
+        let order = orders::update_order(&order.order_id, update, &mut conn)
+            .await?
+            .ok_or_else(|| AccountApiError::OrderDoesNotExist(order.order_id.clone()))?;
+        user_accounts::incr_order_totals(account.id, -order.total_price, -order.total_price, &mut conn).await?;
+        conn.commit().await?;
+        Ok(order)
+    }
+
+    /// Manually reset an order from `Expired` or `Cancelled` status to `New` status.
+    ///
+    /// This method is called by the default implementation of [`modify_status_for_order`] when the new status
+    /// is `New`. This is often done as a follow-up step to changing the customer id for an order.
+    ///
+    /// The side effects for resetting an order are the same for both Expired and Cancelled orders.
+    /// The effect is as if a new order comes in with the given details.
+    ///
+    /// * The order status is updated in the database.
+    /// * The [`process_order`] flow is triggered.
+    async fn reset_order(&self, order: Order) -> Result<Order, PaymentGatewayError> {
+        if !matches!(order.status, OrderStatusType::Expired | OrderStatusType::Cancelled) {
+            error!("🗃️ Order {} is not in 'Expired' or 'Cancelled' status. Cannot call reset_order", order.id);
+            return Err(PaymentGatewayError::OrderModificationForbidden);
+        }
+        let update = ModifyOrderRequest::default().with_new_status(OrderStatusType::New);
+        let mut tx = self.pool.begin().await?;
+        let order = orders::update_order(&order.order_id, update, &mut tx)
+            .await?
+            .ok_or_else(|| AccountApiError::OrderDoesNotExist(order.order_id.clone()))?;
+
+        let price = order.total_price;
+        let account = user_accounts::user_account_for_customer_id(&order.customer_id, &mut tx)
+            .await?
+            .ok_or_else(|| PaymentGatewayError::AccountShouldExistForOrder(order.order_id.clone()))?;
+        user_accounts::incr_order_totals(account.id, price, price, &mut tx).await?;
+        tx.commit().await?;
+        Ok(order)
+    }
+
+    /// Change the customer id for the given `order_id`. This function has several side effects:
+    /// - The `customer_id` field of the order is updated in the database.
+    /// - The total orders for the old and new customer are updated.
+    /// - If the order is fulfillable with existing payments in the new account, the fulfillment flow is triggered.
+    ///   (TODO at API level)
+    /// - If the new customer does not exist, a new one is created.
+    /// - If the order status was `Expired`, or `Cancelled`, it is **not** automatically reset to `New`. The admin must
+    ///   follow up with a "change status" call to reset the order.
+    ///
+    /// ## Returns:
+    /// - The old and new account ids.
+    ///
+    ///
+    /// ## Failure modes:
+    /// - If the order does not exist, an error is returned.
+    /// - If the order status is already `Paid`, an error is returned.
+    async fn modify_customer_id_for_order(
+        &self,
+        order_id: &OrderId,
+        new_cid: &str,
+    ) -> Result<(i64, i64), PaymentGatewayError> {
+        let update = ModifyOrderRequest::default().with_new_customer_id(new_cid);
+        let mut conn = self.pool.begin().await?;
+        let order = orders::fetch_order_by_order_id(order_id, &mut conn)
+            .await?
+            .ok_or_else(|| AccountApiError::OrderDoesNotExist(order_id.clone()))?;
+        // Cannot change customer id on orders that have already been paid
+        if matches!(order.status, OrderStatusType::Paid) {
+            return Err(PaymentGatewayError::OrderModificationForbidden);
+        }
+        let old_acc = user_accounts::user_account_for_order(order_id, &mut conn).await?;
+        if old_acc.is_none() {
+            warn!("Order {order_id} does not have an associated account. This should not happen.");
+            conn.rollback().await?;
+            return Err(PaymentGatewayError::AccountShouldExistForOrder(order_id.clone()));
+        }
+        let old_account = old_acc.unwrap();
+        let order = orders::update_order(order_id, update, &mut conn).await?.ok_or_else(|| {
+            warn!(
+                "Order {order_id} does not exist, but we fetched in within this same transaction. This should not \
+                 happen. There's a data race of sorts happening here and should be sorted out."
+            );
+            AccountApiError::OrderDoesNotExist(order_id.clone())
+        })?;
+        // Order is either expired, cancelled or new by now. If expired or cancelled, we don't need to make any
+        // adjustments but new orders need to be accounted for.
+        if let OrderStatusType::New = order.status {
+            user_accounts::incr_order_totals(old_account.id, -order.total_price, -order.total_price, &mut conn).await?;
+        }
+        let cust_id = Some(new_cid.into());
+        let new_account_id = user_accounts::fetch_or_create_account(cust_id, None, &mut conn).await?;
+        if let OrderStatusType::New = order.status {
+            let new_account = user_accounts::user_account_by_id(new_account_id, &mut conn).await?.ok_or_else(|| {
+                warn!("Account {new_account_id} does not exist, but we just created it. This should not happen.");
+                PaymentGatewayError::AccountShouldExistForOrder(order_id.clone())
+            })?;
+            let _ = user_accounts::incr_order_totals(new_account_id, order.total_price, order.total_price, &mut conn)
+                .await?;
+            orders::pay_order(&new_account, &order, &mut conn).await?;
+        }
+        conn.commit().await?;
+        Ok((old_account.id, new_account_id))
+    }
+
+    /// Changes the memo field for an order.
+    /// Changing the memo does not trigger any other flows, does not affect
+    /// the order status, and does not affect order fulfillment.
+    ///
+    /// ## Returns:
+    /// The modified order
+    async fn modify_memo_for_order(&self, order_id: &OrderId, new_memo: &str) -> Result<Order, PaymentGatewayError> {
+        let update = ModifyOrderRequest::default().with_new_memo(new_memo);
+        let mut conn = self.pool.acquire().await?;
+        let order = orders::update_order(&order_id, update, &mut conn)
+            .await?
+            .ok_or_else(|| AccountApiError::OrderDoesNotExist(order_id.clone()))?;
+        Ok(order)
+    }
+
+    /// Changes the total price for an order.
+    ///
+    /// To return successfully, the order must exist, and have `New` status.
+    /// This function has several side effects:
+    /// - The `total_price` field of the order is updated in the database.
+    /// - The total orders for the account are updated.
+    ///
+    /// ## Failure modes:
+    /// - If the order does not exist.
+    /// - If the order status was `Expired`, or `Cancelled` or `Paid`.
+    async fn modify_total_price_for_order(
+        &self,
+        order_id: &OrderId,
+        new_total_price: MicroTari,
+    ) -> Result<Order, PaymentGatewayError> {
+        let mut tx = self.pool.begin().await?;
+        let order = orders::fetch_order_by_order_id(order_id, &mut tx)
+            .await?
+            .ok_or_else(|| AccountApiError::OrderDoesNotExist(order_id.clone()))?;
+        if !matches!(order.status, OrderStatusType::New) {
+            info!("🗃️ Order {order_id}'s price cannot be changed since it is already {}", order.status);
+            return Err(PaymentGatewayError::OrderModificationForbidden);
+        }
+        let update = ModifyOrderRequest::default().with_new_total_price(new_total_price);
+        let order = orders::update_order(order_id, update, &mut tx).await?.ok_or_else(|| {
+            let msg = format!(
+                "Order {order_id} does not exist, but we fetched in within this same transaction. This represents a \
+                 bug and the transaction will be rolled back"
+            );
+            error!("{msg}");
+            PaymentGatewayError::DatabaseError(msg)
+        })?;
+        Ok(order)
     }
 
     async fn close(&mut self) -> Result<(), PaymentGatewayError> {

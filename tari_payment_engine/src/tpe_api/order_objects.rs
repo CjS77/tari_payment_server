@@ -143,3 +143,46 @@ impl Display for OrderQueryFilter {
         Ok(())
     }
 }
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ModifyOrderRequest {
+    pub new_customer_id: Option<String>,
+    pub new_memo: Option<String>,
+    pub new_total_price: Option<MicroTari>,
+    pub new_currency: Option<String>,
+    pub new_status: Option<OrderStatusType>,
+}
+
+impl ModifyOrderRequest {
+    pub fn with_new_customer_id<S: Into<String>>(mut self, new_customer_id: S) -> Self {
+        self.new_customer_id = Some(new_customer_id.into());
+        self
+    }
+
+    pub fn with_new_memo<S: Into<String>>(mut self, new_memo: S) -> Self {
+        self.new_memo = Some(new_memo.into());
+        self
+    }
+
+    pub fn with_new_total_price(mut self, new_total_price: MicroTari) -> Self {
+        self.new_total_price = Some(new_total_price);
+        self
+    }
+
+    pub fn with_new_currency<S: Into<String>>(mut self, new_currency: S) -> Self {
+        self.new_currency = Some(new_currency.into());
+        self
+    }
+
+    pub fn with_new_status(mut self, new_status: OrderStatusType) -> Self {
+        self.new_status = Some(new_status);
+        self
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.new_customer_id.is_none() &&
+            self.new_total_price.is_none() &&
+            self.new_currency.is_none() &&
+            self.new_status.is_none()
+    }
+}
