@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use crate::{
-    db_types::{MicroTari, NewOrder, NewPayment, Order, OrderId, OrderStatusType, Payment, TransferStatus},
+    db_types::{CreditNote, MicroTari, NewOrder, NewPayment, Order, OrderId, OrderStatusType, Payment, TransferStatus},
     traits::{AccountApiError, AccountManagement},
 };
 
@@ -45,6 +45,14 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// * creates a new account for the public key if one does not already exist
     /// Returns the account id for the public key.
     async fn process_new_payment_for_pubkey(&self, payment: NewPayment) -> Result<i64, PaymentGatewayError>;
+
+    /// Creates a new credit note for a customer id
+    /// * Stores the payment in the database. If the payment already exists, nothing further is   done.
+    /// * The payment is marked as `Confirmed`
+    /// * The payment type is set to `Manual`
+    /// * creates a new account for the customer id if one does not already exist
+    /// Returns the account id for the customer id.
+    async fn process_credit_note_for_customer(&self, note: CreditNote) -> Result<i64, PaymentGatewayError>;
 
     /// Checks whether any orders associated with the given account id can be fulfilled.
     /// If no orders can be fulfilled, an empty vector is returned.

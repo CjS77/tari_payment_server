@@ -1,8 +1,10 @@
+use chrono::Utc;
 use sqlx::SqliteConnection;
 use tari_common_types::tari_address::TariAddress;
 
 use crate::{
-    db_types::{NewPayment, Payment, TransferStatus},
+    db_types::{CreditNote, NewPayment, Payment, TransferStatus},
+    helpers::create_dummy_address_for_cust_id,
     traits::PaymentGatewayError,
 };
 
@@ -26,6 +28,37 @@ pub async fn idempotent_insert(
     .await
     {
         Ok(row) => Ok(row.txid),
+        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+            Err(PaymentGatewayError::PaymentAlreadyExists(txid))
+        },
+        Err(e) => Err(PaymentGatewayError::from(e)),
+    }
+}
+
+/// Issues a credit note against the customer id. Since payments require a sender address,
+/// a dummy address is created that is unique to the customer id and easily identifiable as a dummy address.
+///
+/// If the credit note is successfully issued, the address of the dummy address is returned.
+pub async fn credit_note(note: CreditNote, conn: &mut SqliteConnection) -> Result<TariAddress, PaymentGatewayError> {
+    let timestamp = Utc::now().timestamp();
+    let txid = format!("credit_note_{}:{}:{timestamp}", note.customer_id, note.amount);
+    let address = create_dummy_address_for_cust_id(&note.customer_id);
+    let hex_addr = address.to_hex();
+    let memo = format!("Credit note: {}", note.reason.unwrap_or("No reason given".into()));
+    match sqlx::query!(
+        r#"
+            INSERT INTO payments (txid, sender, amount, memo, payment_type, status)
+            VALUES ($1, $2, $3, $4, 'Manual', 'Confirmed');
+        "#,
+        txid,
+        hex_addr,
+        note.amount,
+        memo
+    )
+    .execute(conn)
+    .await
+    {
+        Ok(_) => Ok(address),
         Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
             Err(PaymentGatewayError::PaymentAlreadyExists(txid))
         },

@@ -290,6 +290,23 @@ async fn check_balance(world: &mut TPGWorld, user: String, bal_type: String, bal
     assert_eq!(actual_balance, expected_balance);
 }
 
+#[then(regex = r#"^account for customer (\w+) has a (current|pending) balance of (-?\d+) Tari$"#)]
+async fn check_customer_balance(world: &mut TPGWorld, cust_id: String, bal_type: String, balance: i64) {
+    let db = world.db.as_ref().expect("No database connection");
+    let account = db
+        .fetch_user_account_for_customer_id(&cust_id)
+        .await
+        .expect("Failed to fetch account")
+        .expect("No account found");
+    let expected_balance = MicroTari::from_tari(balance);
+    let actual_balance = match bal_type.as_str() {
+        "current" => account.current_balance,
+        "pending" => account.current_pending,
+        _ => panic!("Invalid balance type: {bal_type}"),
+    };
+    assert_eq!(actual_balance, expected_balance);
+}
+
 #[then("the OnOrderPaid trigger fires with")]
 async fn check_order_paid_trigger(world: &mut TPGWorld, step: &Step) {
     let json = step.docstring().expect("No expected order");

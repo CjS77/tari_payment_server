@@ -3,6 +3,10 @@ Feature: users must supply an access token when accessing protected endpoints
     Given a database with some accounts
     Given some role assignments
 
+  Scenario: Role assignments are idempotent
+    Given some role assignments
+    Then everything is fine
+
   Scenario: User tries to access a protected endpoint without an access token
     Given the user is not logged in
     When User GETs to "/api/check_token" with body

@@ -28,7 +28,7 @@ use log::*;
 use paste::paste;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
-    db_types::{NewOrder, OrderId, OrderStatusType, Role, SerializedTariAddress},
+    db_types::{CreditNote, NewOrder, OrderId, OrderStatusType, Role, SerializedTariAddress},
     order_objects::{OrderQueryFilter, OrderResult},
     tpe_api::account_objects::FullAccount,
     traits::{AccountManagement, AuthManagement, PaymentGatewayDatabase, PaymentGatewayError, WalletAuth},
@@ -476,6 +476,27 @@ where B: AccountManagement {
             Err(ServerError::BackendError(e.to_string()))
         },
     }
+}
+
+//----------------------------------------------   Modify ----------------------------------------------------
+
+route!(issue_credit => Post "/credit" impl PaymentGatewayDatabase where requires [Role::Write]);
+/// Route handler for the credit endpoint
+/// Admin users (Write role) can use this endpoint to issue a credit note against a customer id.
+/// The user's account will be credited, and any eligible orders will immediately be fulfilled.
+///
+/// Any fulfilled orders will be returned in the response.
+pub async fn issue_credit<B: PaymentGatewayDatabase>(
+    body: web::Json<CreditNote>,
+    api: web::Data<OrderFlowApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let note = body.into_inner();
+    debug!("💻️ Credit note request for {note:?}");
+    let orders = api.issue_credit_note(note).await.map_err(|e| {
+        debug!("💻️ Could not issue credit. {e}");
+        ServerError::BackendError(e.to_string())
+    })?;
+    Ok(HttpResponse::Ok().json(orders))
 }
 
 //----------------------------------------------   Checkout  ----------------------------------------------------
