@@ -10,6 +10,7 @@ use tari_common_types::tari_address::TariAddress;
 use super::db::{auth, db_url, new_pool, orders, transfers, user_accounts, wallet_auth};
 use crate::{
     db_types::{
+        CreditNote,
         MicroTari,
         NewOrder,
         NewPayment,
@@ -114,6 +115,21 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         Ok(acc_id)
     }
 
+    async fn process_credit_note_for_customer(&self, note: CreditNote) -> Result<i64, PaymentGatewayError> {
+        let mut tx = self.pool.begin().await?;
+        let address = transfers::credit_note(note.clone(), &mut tx).await?;
+        debug!("🗃️ Credit note for {} created with address {address}", note.customer_id);
+        let CreditNote { amount, customer_id, .. } = note;
+        let sender = Some(address.clone());
+        let account_id = user_accounts::fetch_or_create_account(Some(customer_id), sender, &mut tx).await?;
+        trace!("🗃️ Credit note: account {account_id} has been retrieved/created");
+        let zero = MicroTari::from(0);
+        user_accounts::adjust_balances(account_id, amount, zero, amount, &mut tx).await?;
+        trace!("🗃️ Credit note: adjusting balances for account {account_id} by {amount}");
+        tx.commit().await?;
+        Ok(account_id)
+    }
+
     async fn fetch_payable_orders(&self, account_id: i64) -> Result<Vec<Order>, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
         let account = user_accounts::user_account_by_id(account_id, &mut tx)
@@ -151,10 +167,12 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             }
         }
         let total_paid = account.current_balance - new_balance;
-        user_accounts::update_user_balance(account_id, new_balance, &mut tx).await?;
-        trace!("Account {account_id} balance updated from {} to {new_balance}", account.current_balance);
-        user_accounts::incr_order_totals(account_id, MicroTari::from(0), -total_paid, &mut tx).await?;
-        trace!("🗃️ Adjusted account #{account_id} orders outstanding by {total_paid}.");
+        if total_paid != MicroTari::from(0) {
+            user_accounts::update_user_balance(account_id, new_balance, &mut tx).await?;
+            trace!("Account {account_id} balance updated from {} to {new_balance}", account.current_balance);
+            user_accounts::incr_order_totals(account_id, MicroTari::from(0), -total_paid, &mut tx).await?;
+            trace!("🗃️ Adjusted account #{account_id} orders outstanding by {total_paid}.");
+        }
         tx.commit().await?;
         Ok(result)
     }

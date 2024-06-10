@@ -3,14 +3,19 @@ use std::fmt::Debug;
 use log::*;
 
 use crate::{
-    db_types::{NewOrder, NewPayment, Order, TransferStatus},
+    db_types::{
+        CreditNote,
+        MicroTari,
+        NewOrder,
+        NewPayment,
+        Order,
+        OrderId,
+        OrderStatusType,
+        TransferStatus,
+    },
     events::{EventProducers, OrderPaidEvent},
-    traits::{PaymentGatewayDatabase, PaymentGatewayError},
+    traits::{AccountApiError, PaymentGatewayDatabase, PaymentGatewayError},
 };
-use crate::db_types::{MicroTari, OrderId, OrderStatusType};
-use crate::db_types::OrderStatusType::{Cancelled, Expired, New, Paid};
-use crate::helpers::create_dummy_address_for_cust_id;
-use crate::traits::AccountApiError;
 
 /// `OrderFlowApi` is the primary API for handling order and payment flows in response to merchant order events and
 /// wallet payment events.
@@ -89,25 +94,21 @@ where B: PaymentGatewayDatabase
         Ok(paid_orders)
     }
 
-    pub async fn issue_credit_note(&self, cust_id: &str, amount: MicroTari, memo: &str) -> Result<(), PaymentGatewayError> {
-        let mut account = self.db.fetch_user_account_for_customer_id(cust_id).await?;
-        if account.is_none() {
-            info!("🔄️💰️ There is no Tari Address associated with customer id {} yet. In order to continue, I am \
-                creating a dummy Tari address associated with this customer with which to apply the credit.", cust_id);
-            let address = create_dummy_address_for_cust_id(cust_id);
-            let txid = format!("credit_note_{cust_id}");
-            let mut payment = NewPayment::new(address, amount, txid);
-            // payment.with_memo(format!("Credit note: {memo}"));
-            // let acc_id = self.db.prfetch_or_create_account_for_payment(&payment).await?;
-            // let new_account = self.db.fetch_user_account(acc_id).await?
-            //     .ok_or_else(|| {
-            //         error!("🔄️💰️ Account #{acc_id} was not found straight after creating it. This is a data race bug.");
-            //         PaymentGatewayError::AccountNotFound(acc_id)
-            //     })?;
-            // account = Some(new_account);
-        }
-        //let credit_note = self.db.issue_credit_note(account_id, amount, memo).await?;
-        Ok(())
+    pub async fn issue_credit_note(&self, note: CreditNote) -> Result<Vec<Order>, PaymentGatewayError> {
+        let cust_id = note.customer_id.clone();
+        info!("🔄️💰️ Issuing credit note for customer {cust_id}");
+        let account_id = self.db.process_credit_note_for_customer(note).await?;
+        info!("🔄️💰️ Credit note issued for customer {cust_id} with account id {account_id}");
+        // todo insert hook
+        let payable = self.db.fetch_payable_orders(account_id).await?;
+        trace!("🔄️💰️ {} fulfillable orders fetched for account #{account_id} after issuing credit note", payable.len());
+        let paid_orders = self.db.try_pay_orders(account_id, &payable).await?;
+        self.call_order_paid_hook(&paid_orders).await;
+        debug!(
+            "🔄️💰️ Credit note for {cust_id} processing complete. {} orders are paid for account #{account_id}",
+            payable.len()
+        );
+        Ok(paid_orders)
     }
 
     /// Update the status of a payment to "Confirmed". This happens when a transaction in the blockchain is deep enough
@@ -196,9 +197,7 @@ where B: PaymentGatewayDatabase
         oid: &OrderId,
         new_status: OrderStatusType,
     ) -> Result<Order, PaymentGatewayError> {
-        let order =
-            self.db.fetch_order_by_order_id(oid).await?
-                .ok_or_else(|| AccountApiError::dne(oid.clone()))?;
+        let order = self.db.fetch_order_by_order_id(oid).await?.ok_or_else(|| AccountApiError::dne(oid.clone()))?;
         let old_status = order.status;
         use crate::db_types::OrderStatusType::*;
         match (old_status, new_status) {
@@ -219,7 +218,6 @@ where B: PaymentGatewayDatabase
     ///   to `Paid`.(TODO at API level)
     async fn new_to_paid(&self, order: Order) -> Result<Order, PaymentGatewayError> {
         todo!()
-
     }
 
     /// A manual order status transition from `New` to `Expired` or `Cancelled` status.
@@ -331,7 +329,6 @@ where B: PaymentGatewayDatabase
     ) -> Result<Order, PaymentGatewayError> {
         Err(PaymentGatewayError::UnsupportedAction("Multiple currencies".to_string()))
     }
-
 
     pub fn db(&self) -> &B {
         &self.db

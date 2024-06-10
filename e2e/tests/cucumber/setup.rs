@@ -212,6 +212,11 @@ async fn roles_assignments(world: &mut TPGWorld) {
     info!("🌍️ Assigned initial role assignments");
 }
 
+#[then("everything is fine")]
+async fn everything_is_fine(_world: &mut TPGWorld) {
+    // No-op
+}
+
 #[then(expr = "pause for {int} ms")]
 async fn pause_for_ms(_world: &mut TPGWorld, ms: u64) {
     tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
@@ -271,6 +276,8 @@ async fn setup_roles_assignments(world: &mut TPGWorld) {
     let users = SeedUsers::new();
     let db = world.db.clone().unwrap();
     for user in users.users.values() {
-        db.assign_roles(&user.address, &user.roles).await.unwrap();
+        if let Err(e) = db.assign_roles(&user.address, &user.roles).await {
+            warn!("Error assigning roles to {}: {e}", user.username);
+        }
     }
 }

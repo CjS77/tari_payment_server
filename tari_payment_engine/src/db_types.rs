@@ -16,7 +16,9 @@ use thiserror::Error;
 use crate::{
     helpers::{extract_and_verify_memo_signature, extract_order_number_from_memo, MemoSignatureError},
     op,
-    tpe_api::order_objects::{address_to_hex, str_to_address},
+    tpe_api::{
+        order_objects::{address_to_hex, str_to_address},
+    },
 };
 
 //--------------------------------------     MicroTari       ---------------------------------------------------------
@@ -455,6 +457,15 @@ pub struct NewPayment {
     pub memo: Option<String>,
     /// The order number associated with this payment. Generally extracted from the memo.
     pub order_id: Option<OrderId>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreditNote {
+    pub customer_id: String,
+    /// The amount to credit the user
+    pub amount: MicroTari,
+    /// The reason for the credit note
+    pub reason: Option<String>,
 }
 
 impl NewPayment {

@@ -1,8 +1,7 @@
 use blake2::{Blake2b512, Digest};
-use tari_common_types::tari_address::{TariAddress};
-use tari_crypto::ristretto::RistrettoPublicKey;
-use tari_crypto::tari_utilities::ByteArray;
 use tari_common::configuration::Network;
+use tari_common_types::tari_address::TariAddress;
+use tari_crypto::{ristretto::RistrettoPublicKey, tari_utilities::ByteArray};
 
 /// Creates a dummy TariAddress for a given customer id. The address is created by hashing the customer id and
 /// then setting the first 8 bytes to a specific prefix and the last byte to 0. The resulting hash is then
@@ -15,13 +14,13 @@ use tari_common::configuration::Network;
 ///
 /// If written as emoji ids, the prefix is 🌀🌀🌀💤🎽🎨🌀🌀
 pub fn create_dummy_address_for_cust_id(cust_id: &str) -> TariAddress {
-    let prefix = [0,0,0,0xba, 0x5e, 0x4d, 0, 0];
+    let prefix = [0, 0, 0, 0xba, 0x5e, 0x4d, 0, 0];
     let mut cust_id_hash = Blake2b512::digest(cust_id.as_bytes()).to_vec();
     cust_id_hash[..8].copy_from_slice(&prefix);
     cust_id_hash[31] = 0;
     let mut key = RistrettoPublicKey::from_canonical_bytes(&cust_id_hash[..32]);
     while key.is_err() {
-        let val= u64::from_be_bytes(cust_id_hash[24..32].try_into().unwrap()).wrapping_add(1);
+        let val = u64::from_be_bytes(cust_id_hash[24..32].try_into().unwrap()).wrapping_add(1);
         cust_id_hash[24..32].copy_from_slice(&val.to_be_bytes());
         key = RistrettoPublicKey::from_canonical_bytes(&cust_id_hash[..32]);
     }
@@ -31,8 +30,8 @@ pub fn create_dummy_address_for_cust_id(cust_id: &str) -> TariAddress {
 
 #[cfg(test)]
 mod test {
-    use rand::distributions::Alphanumeric;
-    use rand::Rng;
+    use rand::{distributions::Alphanumeric, Rng};
+
     use super::*;
 
     #[test]
@@ -49,11 +48,7 @@ mod test {
     #[test]
     fn mini_fuzz() {
         for _ in 0..1000 {
-            let id: String = rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(16)
-                .map(char::from)
-                .collect();
+            let id: String = rand::thread_rng().sample_iter(&Alphanumeric).take(16).map(char::from).collect();
             let address = create_dummy_address_for_cust_id(&id);
         }
     }
