@@ -3813,6 +3813,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
+ "tari_common",
  "tari_common_types",
  "tari_crypto",
  "thiserror",
