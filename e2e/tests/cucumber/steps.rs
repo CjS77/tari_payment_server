@@ -262,6 +262,23 @@ async fn check_current_orders(world: &mut TPGWorld, account_id: i64, total: i64)
     assert_eq!(account.current_orders, expected_current_orders);
 }
 
+#[then(regex = r"^account for (\w+) has (total|current) orders worth (-?\d+) XTR")]
+async fn account_orders(world: &mut TPGWorld, cust_id: String, total_type: String, total: i64) {
+    let db = world.db.as_ref().expect("No database connection");
+    let account = db
+        .fetch_user_account_for_customer_id(&cust_id)
+        .await
+        .expect("Failed to fetch account")
+        .expect("No account found");
+    trace!("User account: {account:?}");
+    let expected_total = match total_type.as_str() {
+        "total" => account.total_orders,
+        "current" => account.current_orders,
+        _ => panic!("Invalid total type: {total_type}"),
+    };
+    assert_eq!(expected_total, MicroTari::from_tari(total));
+}
+
 #[then(expr = "order \"{word}\" is in state {word}")]
 async fn check_order_state(world: &mut TPGWorld, order_id: String, state: String) {
     let db = world.db.as_ref().expect("No database connection");

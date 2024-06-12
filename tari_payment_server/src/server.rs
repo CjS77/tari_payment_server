@@ -23,6 +23,7 @@ use tari_payment_engine::{
 use crate::{
     auth::{build_tps_authority, TokenIssuer},
     config::{ProxyConfig, ServerConfig},
+    data_objects::FulfillmentRequest,
     errors::{AuthError, ServerError, ServerError::AuthenticationError},
     helpers::get_remote_ip,
     routes::{
@@ -31,6 +32,7 @@ use crate::{
         AuthRoute,
         CheckTokenRoute,
         CreditorsRoute,
+        FulfilOrderRoute,
         HistoryForAddressRoute,
         HistoryForIdRoute,
         IncomingPaymentNotificationRoute,
@@ -117,6 +119,7 @@ pub fn create_server_instance(
             .service(OrdersSearchRoute::<SqliteDatabase>::new())
             .service(CreditorsRoute::<SqliteDatabase>::new())
             .service(IssueCreditRoute::<SqliteDatabase>::new())
+            .service(FulfilOrderRoute::<SqliteDatabase>::new())
             .service(CheckTokenRoute::new());
         let use_x_forwarded_for = config.use_x_forwarded_for;
         let use_forwarded = config.use_forwarded;

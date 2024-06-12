@@ -23,6 +23,7 @@
 mod account_management;
 mod auth_management;
 mod payment_gateway_database;
+
 mod wallet_management;
 
 mod data_objects;

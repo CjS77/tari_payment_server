@@ -3,18 +3,9 @@ use std::fmt::Debug;
 use log::*;
 
 use crate::{
-    db_types::{
-        CreditNote,
-        MicroTari,
-        NewOrder,
-        NewPayment,
-        Order,
-        OrderId,
-        OrderStatusType,
-        TransferStatus,
-    },
-    events::{EventProducers, OrderPaidEvent},
-    traits::{AccountApiError, PaymentGatewayDatabase, PaymentGatewayError},
+    db_types::{CreditNote, MicroTari, NewOrder, NewPayment, Order, OrderId, OrderStatusType, TransferStatus},
+    events::{EventProducers, OrderAnnulledEvent, OrderPaidEvent},
+    traits::{PaymentGatewayDatabase, PaymentGatewayError},
 };
 
 /// `OrderFlowApi` is the primary API for handling order and payment flows in response to merchant order events and
@@ -67,6 +58,15 @@ where B: PaymentGatewayDatabase
                 let event = OrderPaidEvent { order: order.clone() };
                 emitter.publish_event(event).await;
             }
+        }
+    }
+
+    /// Calls the registered function when an order is cancelled or expired
+    async fn call_order_annulled_hook(&self, new_status: OrderStatusType, updated_order: &Order) {
+        debug!("🔄️📦️ Notifying order annulled hook subscribers");
+        for emitter in &self.producers.order_annulled_producer {
+            let event = OrderAnnulledEvent::new(updated_order.clone());
+            emitter.publish_event(event).await;
         }
     }
 
@@ -140,84 +140,22 @@ where B: PaymentGatewayDatabase
         Ok(())
     }
 
-    /// Changes the status of an order.
-    ///
-    /// This function has several side effects, depending on the current order status and the new order status. The
-    /// results are summarised in this table, with detailed notes provided in the subsequent sections.
-    ///
-    /// | From \ To | New  | Expired | Cancelled | Paid |
-    /// |-----------|------|---------|-----------|------|
-    /// | New       | Err  | 1       | 1         | 3    |
-    /// | Expired   | 2    | Err     | Err       | Err  |
-    /// | Cancelled | 2    | Err     | Err       | Err  |
-    /// | Paid      | Err  | Err     | Err       | Err  |
-    ///
-    /// ### (1) Changing from `New` to `Expired` or `Cancelled`
-    ///
-    /// The side effects for expiring or cancelling an order are the same. The only difference is that Expired orders
-    /// are triggered automatically based on time, whereas cancelling an order is triggered by the user or an admin.
-    ///
-    /// * The order status is updated in the database.
-    /// * The total orders for the account are updated.
-    /// * The `OnOrderModified` event is triggered.
-    /// * An audit log entry is made.
-    ///
-    /// ### (2) Changing from `Expired` or `Cancelled` to `New`
-    ///
-    /// The side effects for resetting an order are the same for both Expired and Cancelled orders.
-    /// The effect is as if a new order comes in with the given details.
-    ///
-    /// * The order status is updated in the database.
-    /// * The [`process_order`] flow is triggered.
-    /// * An `OnOrderModified` event is triggered.
-    /// * A `NewOrder` event is triggered.
-    /// * An entry is added to the audit log.
-    ///
-    /// ### (3) Changing from `New` to `Paid`
-    /// Usually, this change happens via the automated fulfillment flow. However, it can be done manually as well.
-    /// When this happens, the following side effects occur:
-    ///
-    /// * A credit note for the `total_price` is created,
-    /// * The `process_new_payment` flow is triggered, which will cause the order to be fulfilled and the status updated
-    ///   to `Paid`.
-    ///
-    /// ### Changing from `Expired` to `Cancelled` or vice versa
-    /// This change is forbidden and returns an error.
-    ///
-    /// ### Changing from `Paid` to `New`, `Expired`, or `Cancelled`
-    /// These changes are forbidden and return an error.
-    ///
-    /// ### Changing from a status to itself.
-    /// This change is a no-op and returns an error.
-    ///
-    /// ## Returns
-    /// The old status of the order.
-    pub async fn modify_status_for_order(
-        &self,
-        oid: &OrderId,
-        new_status: OrderStatusType,
-    ) -> Result<Order, PaymentGatewayError> {
-        let order = self.db.fetch_order_by_order_id(oid).await?.ok_or_else(|| AccountApiError::dne(oid.clone()))?;
-        let old_status = order.status;
-        use crate::db_types::OrderStatusType::*;
-        match (old_status, new_status) {
-            (old, new) if old == new => return Err(PaymentGatewayError::OrderModificationNoOp),
-            (New, Paid) => self.new_to_paid(order).await,
-            (New, Expired | Cancelled) => self.cancel_or_expire_order(order, new_status).await,
-            (Expired | Cancelled, New) => self.reset_order(order).await,
-            (_, _) => return Err(PaymentGatewayError::OrderModificationForbidden),
-        }
-    }
-
     /// A manual order status transition from `New` to `Paid` status.
     /// This method is called by the default implementation of [`modify_status_for_order`] when the new status is
     /// `Paid`. When this happens, the following side effects occur:
     ///
-    /// * A credit note for the `total_price` is created (TODO at API level),
-    /// * The `process_new_payment` flow is triggered, which will cause the order to be fulfilled and the status updated
-    ///   to `Paid`.(TODO at API level)
-    async fn new_to_paid(&self, order: Order) -> Result<Order, PaymentGatewayError> {
-        todo!()
+    /// * A credit note for the `total_price` is created,
+    /// * The engine tries to pay for the order. Barring an odd data race, this should always succeed.
+    /// * The order paid trigger is called.
+    pub async fn mark_new_order_as_paid(&self, order_id: &OrderId, reason: &str) -> Result<Order, PaymentGatewayError> {
+        let order = self
+            .db
+            .fetch_order_by_order_id(order_id)
+            .await?
+            .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
+        let updated_order = self.db.mark_new_order_as_paid(order, reason).await?;
+        self.call_order_paid_hook(&[updated_order.clone()]).await;
+        Ok(updated_order)
     }
 
     /// A manual order status transition from `New` to `Expired` or `Cancelled` status.
@@ -236,8 +174,11 @@ where B: PaymentGatewayDatabase
         &self,
         order: Order,
         new_status: OrderStatusType,
+        reason: &str,
     ) -> Result<Order, PaymentGatewayError> {
-        todo!()
+        let updated_order = self.db.cancel_or_expire_order(order, new_status, reason).await?;
+        self.call_order_annulled_hook(new_status, &updated_order).await;
+        Ok(updated_order)
     }
 
     /// Manually reset an order from `Expired` or `Cancelled` status to `New` status.

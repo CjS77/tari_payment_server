@@ -161,9 +161,9 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         for order in orders {
             if new_balance >= order.total_price {
                 new_balance -= order.total_price;
-                orders::update_order_status(order.id, OrderStatusType::Paid, &mut tx).await?;
+                let updated_order = orders::update_order_status(order.id, OrderStatusType::Paid, &mut tx).await?;
                 trace!("🗃️ Order #{} of {} marked as paid", order.id, order.total_price);
-                result.push(order.clone());
+                result.push(updated_order);
             }
         }
         let total_paid = account.current_balance - new_balance;
@@ -231,17 +231,27 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     /// This method is called by the default implementation of [`modify_status_for_order`] when the new status is
     /// `Paid`. When this happens, the following side effects occur:
     /// * A credit note for the `total_price` is created,
-    async fn new_to_paid(&self, order: Order) -> Result<Order, PaymentGatewayError> {
+    async fn mark_new_order_as_paid(&self, order: Order, reason: &str) -> Result<Order, PaymentGatewayError> {
         if order.status != OrderStatusType::New {
             error!("🗃️ Order {} is not in 'New' status. Cannot call **new**_to_paid", order.id);
             return Err(PaymentGatewayError::OrderModificationForbidden);
         }
-        let mut conn = self.pool.acquire().await?;
-        let update = ModifyOrderRequest::default().with_new_status(OrderStatusType::Paid);
-        let order = orders::update_order(&order.order_id, update, &mut conn)
+        let mut tx = self.pool.begin().await?;
+        let mut account = user_accounts::user_account_for_order(&order.order_id, &mut tx)
             .await?
-            .ok_or_else(|| AccountApiError::OrderDoesNotExist(order.order_id.clone()))?;
-        Ok(order)
+            .ok_or_else(|| PaymentGatewayError::AccountShouldExistForOrder(order.order_id.clone()))?;
+        let reason = format!("Admin credit overrode for order {}. Reason: {reason}", order.order_id);
+        let note = CreditNote::new(order.customer_id.clone(), order.total_price).with_reason(reason);
+        let address = transfers::credit_note(note, &mut tx).await?;
+        info!(
+            "🗃️ Credit note: Customer {} received note for {} with address {address}",
+            order.customer_id, order.total_price
+        );
+        // Update account ex-database. This is safe because the transaction will rollback if there's an error
+        account.current_balance = account.current_balance + order.total_price;
+        let updated_order = orders::try_pay_order(&account, &order, &mut tx).await?;
+        tx.commit().await?;
+        Ok(updated_order)
     }
 
     /// A manual order status transition from `New` to `Expired` or `Cancelled` status.
@@ -258,12 +268,13 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         &self,
         order: Order,
         new_status: OrderStatusType,
+        reason: &str,
     ) -> Result<Order, PaymentGatewayError> {
         if order.status != OrderStatusType::New {
             error!("🗃️ Order {} is not in 'New' status. Cannot call cancel_or_expire_order", order.id);
             return Err(PaymentGatewayError::OrderModificationForbidden);
         }
-        let update = ModifyOrderRequest::default().with_new_status(new_status);
+        let update = ModifyOrderRequest::default().with_new_status(new_status).with_new_memo(reason);
         let mut conn = self.pool.begin().await?;
         let account = user_accounts::user_account_for_order(&order.order_id, &mut conn)
             .await?
@@ -364,7 +375,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             })?;
             let _ = user_accounts::incr_order_totals(new_account_id, order.total_price, order.total_price, &mut conn)
                 .await?;
-            orders::pay_order(&new_account, &order, &mut conn).await?;
+            orders::try_pay_order(&new_account, &order, &mut conn).await?;
         }
         conn.commit().await?;
         Ok((old_account.id, new_account_id))

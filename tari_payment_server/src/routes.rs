@@ -41,7 +41,13 @@ use tari_payment_engine::{
 use crate::{
     auth::{check_login_token_signature, JwtClaims, TokenIssuer},
     config::ProxyConfig,
-    data_objects::{JsonResponse, PaymentNotification, RoleUpdateRequest, TransactionConfirmationNotification},
+    data_objects::{
+        FulfillmentRequest,
+        JsonResponse,
+        PaymentNotification,
+        RoleUpdateRequest,
+        TransactionConfirmationNotification,
+    },
     errors::{OrderConversionError, ServerError},
     helpers::get_remote_ip,
     shopify_order::ShopifyOrder,
@@ -497,6 +503,21 @@ pub async fn issue_credit<B: PaymentGatewayDatabase>(
         ServerError::BackendError(e.to_string())
     })?;
     Ok(HttpResponse::Ok().json(orders))
+}
+
+route!(fulfil_order => Post "/fulfill" impl PaymentGatewayDatabase where requires [Role::Write]);
+pub async fn fulfil_order<B: PaymentGatewayDatabase>(
+    body: web::Json<FulfillmentRequest>,
+    api: web::Data<OrderFlowApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let FulfillmentRequest { order_id, reason } = body.into_inner();
+    let id = OrderId::new(order_id);
+    debug!("💻️ Fulfilment request for {id} with reason: {reason}");
+    let order = api.mark_new_order_as_paid(&id, &reason).await.map_err(|e| {
+        debug!("💻️ Could not fulfil order. {e}");
+        e
+    })?;
+    Ok(HttpResponse::Ok().json(order))
 }
 
 //----------------------------------------------   Checkout  ----------------------------------------------------

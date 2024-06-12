@@ -16,9 +16,7 @@ use thiserror::Error;
 use crate::{
     helpers::{extract_and_verify_memo_signature, extract_order_number_from_memo, MemoSignatureError},
     op,
-    tpe_api::{
-        order_objects::{address_to_hex, str_to_address},
-    },
+    tpe_api::order_objects::{address_to_hex, str_to_address},
 };
 
 //--------------------------------------     MicroTari       ---------------------------------------------------------
@@ -459,15 +457,6 @@ pub struct NewPayment {
     pub order_id: Option<OrderId>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreditNote {
-    pub customer_id: String,
-    /// The amount to credit the user
-    pub amount: MicroTari,
-    /// The reason for the credit note
-    pub reason: Option<String>,
-}
-
 impl NewPayment {
     pub fn new(sender: TariAddress, amount: MicroTari, txid: String) -> Self {
         Self { sender: sender.into(), amount, txid, memo: None, order_id: None }
@@ -480,6 +469,26 @@ impl NewPayment {
 
     pub fn extract_order_id(&self) -> Option<OrderId> {
         self.memo.as_ref().and_then(|s| extract_order_number_from_memo(s.as_str()))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreditNote {
+    pub customer_id: String,
+    /// The amount to credit the user
+    pub amount: MicroTari,
+    /// The reason for the credit note
+    pub reason: Option<String>,
+}
+
+impl CreditNote {
+    pub fn new(customer_id: String, amount: MicroTari) -> Self {
+        Self { customer_id, amount, reason: None }
+    }
+
+    pub fn with_reason<S: Into<String>>(mut self, reason: S) -> Self {
+        self.reason = Some(reason.into());
+        self
     }
 }
 

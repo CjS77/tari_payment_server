@@ -50,6 +50,7 @@ mod test {
         for _ in 0..1000 {
             let id: String = rand::thread_rng().sample_iter(&Alphanumeric).take(16).map(char::from).collect();
             let address = create_dummy_address_for_cust_id(&id);
+            assert!(address.to_hex().starts_with("000000ba5e4d0000"));
         }
     }
 }
