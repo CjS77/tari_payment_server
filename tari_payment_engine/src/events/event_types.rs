@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 use crate::db_types::{MicroTari, Order, OrderStatus, OrderStatusType, PublicKey};
 
@@ -27,7 +28,7 @@ impl OrderPaidEvent {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OrderAnnulledEvent {
     pub order: Order,
     pub status: OrderStatusType,
