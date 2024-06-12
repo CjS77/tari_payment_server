@@ -49,6 +49,7 @@ use crate::{
         ShopifyWebhookRoute,
         TxConfirmationNotificationRoute,
         UnfulfilledOrdersRoute,
+        UpdateOrderMemoRoute,
         UpdateRolesRoute,
     },
 };
@@ -121,6 +122,7 @@ pub fn create_server_instance(
             .service(IssueCreditRoute::<SqliteDatabase>::new())
             .service(FulfilOrderRoute::<SqliteDatabase>::new())
             .service(CancelOrderRoute::<SqliteDatabase>::new())
+            .service(UpdateOrderMemoRoute::<SqliteDatabase>::new())
             .service(CheckTokenRoute::new());
         let use_x_forwarded_for = config.use_x_forwarded_for;
         let use_forwarded = config.use_forwarded;

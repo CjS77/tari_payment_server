@@ -13,7 +13,7 @@ use tari_jwt::{
 };
 use tari_payment_engine::{
     db_types::{MicroTari, Order, OrderId, OrderStatusType, Role},
-    events::{EventProducers, EventType, OrderPaidEvent},
+    events::{EventProducers, EventType, OrderModifiedEvent, OrderPaidEvent},
     traits::{AccountManagement, AuthManagement},
     OrderFlowApi,
 };
@@ -333,6 +333,21 @@ async fn check_order_paid_trigger(world: &mut TPGWorld, step: &Step) {
     let last_event = world.last_event();
     let ev = OrderPaidEvent::new(order);
     assert_eq!(last_event, Some(EventType::OrderPaid(ev)));
+}
+
+#[then("the OnOrderModified trigger fires with")]
+async fn check_order_modified_trigger(world: &mut TPGWorld, step: &Step) {
+    let last_event = world.last_event();
+    if last_event.is_none() {
+        panic!("Expected an OnOrderModified event but no event was triggered");
+    }
+    if let Some(EventType::OrderModified(ev)) = &last_event {
+        let expected = step.docstring().expect("No expected OrderModifiedEvent in docstring");
+        let json = serde_json::to_string(ev).expect("Failed to serialize order");
+        assert!(json_is_subset_of(expected, &json), "Expected order to be '{expected}', got '{json}'");
+    } else {
+        panic!("Expected an OrderModifiedEvent event but got {last_event:?}");
+    }
 }
 
 #[then(expr = "the OnOrderAnnulled trigger fires with {word} status and order")]

@@ -41,8 +41,21 @@ impl OrderAnnulledEvent {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OrderModifiedEvent {
+    pub old_order: Order,
+    pub new_order: Order,
+}
+
+impl OrderModifiedEvent {
+    pub fn new(old_order: Order, new_order: Order) -> Self {
+        Self { old_order, new_order }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EventType {
     OrderPaid(OrderPaidEvent),
     OrderAnnulled(OrderAnnulledEvent),
+    OrderModified(OrderModifiedEvent),
 }

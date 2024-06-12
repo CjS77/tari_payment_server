@@ -47,6 +47,7 @@ use crate::{
         PaymentNotification,
         RoleUpdateRequest,
         TransactionConfirmationNotification,
+        UpdateMemoParams,
     },
     errors::{OrderConversionError, ServerError},
     helpers::get_remote_ip,
@@ -540,6 +541,42 @@ pub async fn cancel_order<B: PaymentGatewayDatabase>(
     info!("💻️ Cancel order request for {order_id}. Reason: {reason}");
     let order = api.cancel_or_expire_order(&order_id, OrderStatusType::Cancelled, &reason).await.map_err(|e| {
         debug!("💻️ Could not cancel order. {e}");
+        e
+    })?;
+    Ok(HttpResponse::Ok().json(order))
+}
+
+/// Update an order's memo field.
+///
+/// Admin users (Write role) can use this endpoint to update an order's memo field.
+
+/// *Note*: the HTTP method used for this endpoint is PATCH, rather than POST.
+///
+/// The side effects of this call are:
+/// * The memo is updated
+/// * An `OrderModifiedEvent` is triggered.
+/// * An audit log entry is added.
+///
+/// The memo is *not* checked for a valid signature and an order matching
+/// cycle is not fired.
+///
+/// If a user has messed up the memo field, then we recommend cancelling the
+/// order and asking the user to try again.
+///
+/// If this becomes cumbersome, and there's a clean flow for admins helping
+/// provide a valid order signature, then we can modify this endpoint to do
+/// so. Right now, it's not clear whether the UX would be any better than
+/// re-doing the order.
+route!(update_order_memo => Patch "/order_memo" impl PaymentGatewayDatabase where requires [Role::Write]);
+pub async fn update_order_memo<B: PaymentGatewayDatabase>(
+    body: web::Json<UpdateMemoParams>,
+    api: web::Data<OrderFlowApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let UpdateMemoParams { order_id, new_memo, reason } = body.into_inner();
+    let reason = reason.unwrap_or_else(|| "No reason provided".to_string());
+    info!("💻️ Update order memos request for {order_id}. Reason: {reason}");
+    let order = api.update_memo_for_order(&order_id, &new_memo).await.map_err(|e| {
+        debug!("💻️ Could not update order memo. {e}");
         e
     })?;
     Ok(HttpResponse::Ok().json(order))

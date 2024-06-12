@@ -4,7 +4,7 @@ use log::*;
 
 use crate::{
     db_types::{CreditNote, MicroTari, NewOrder, NewPayment, Order, OrderId, OrderStatusType, TransferStatus},
-    events::{EventProducers, OrderAnnulledEvent, OrderPaidEvent},
+    events::{EventProducers, OrderAnnulledEvent, OrderModifiedEvent, OrderPaidEvent},
     traits::{PaymentGatewayDatabase, PaymentGatewayError},
 };
 
@@ -66,6 +66,14 @@ where B: PaymentGatewayDatabase
         debug!("🔄️📦️ Notifying order annulled hook subscribers");
         for emitter in &self.producers.order_annulled_producer {
             let event = OrderAnnulledEvent::new(updated_order.clone());
+            emitter.publish_event(event).await;
+        }
+    }
+
+    async fn call_order_modified_hook(&self, old_order: &Order, new_order: &Order) {
+        debug!("🔄️📦️ Notifying order modified hook subscribers");
+        for emitter in &self.producers.order_modified_producer {
+            let event = OrderModifiedEvent::new(old_order.clone(), new_order.clone());
             emitter.publish_event(event).await;
         }
     }
@@ -232,8 +240,26 @@ where B: PaymentGatewayDatabase
     ///
     /// ## Returns:
     /// The modified order
-    async fn modify_memo_for_order(&self, order_id: &OrderId, new_memo: &str) -> Result<Order, PaymentGatewayError> {
-        todo!()
+    pub async fn update_memo_for_order(
+        &self,
+        order_id: &OrderId,
+        new_memo: &str,
+    ) -> Result<Order, PaymentGatewayError> {
+        debug!("🔄️📦️ Changing memo for order [{}]", order_id);
+        let old_order = self
+            .db
+            .fetch_order_by_order_id(order_id)
+            .await?
+            .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
+        let new_order = self.db.modify_memo_for_order(order_id, new_memo).await?;
+        self.call_order_modified_hook(&old_order, &new_order).await;
+        info!(
+            "🔄️📦️ Memo for order [{}] changed from '{}' to '{}'",
+            order_id,
+            old_order.memo.unwrap_or_default(),
+            new_memo
+        );
+        Ok(new_order)
     }
 
     /// Changes the total price for an order.

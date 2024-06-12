@@ -108,6 +108,14 @@ impl TPGWorld {
                 }
                 Box::pin(async {})
             });
+            let event = Arc::clone(&last_event);
+            hooks.on_order_modified(move |ev| {
+                info!("🌍️ Received order modified event: {ev:?}");
+                if let Ok(mut le) = event.lock() {
+                    *le = Some(EventType::OrderModified(ev));
+                }
+                Box::pin(async {})
+            });
             let srv = create_server_instance(config, db, hooks).expect("Error creating server instance");
             let _res = tx.send(srv.handle());
             match srv.await {
