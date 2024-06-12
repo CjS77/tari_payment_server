@@ -4,16 +4,14 @@ use cucumber::{gherkin::Step, then, when};
 use e2e::helpers::json_is_subset_of;
 use log::*;
 use reqwest::Method;
-use serde_json::json;
 use tari_jwt::{
     jwt_compact::{AlgorithmExt, Claims, Header, UntrustedToken},
-    tari_crypto::tari_utilities::message_format::MessageFormat,
     Ristretto256,
     Ristretto256SigningKey,
 };
 use tari_payment_engine::{
     db_types::{MicroTari, Order, OrderId, OrderStatusType, Role},
-    events::{EventProducers, EventType, OrderModifiedEvent, OrderPaidEvent},
+    events::{EventProducers, EventType, OrderPaidEvent},
     traits::{AccountManagement, AuthManagement},
     OrderFlowApi,
 };

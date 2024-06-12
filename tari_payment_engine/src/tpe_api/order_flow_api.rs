@@ -5,6 +5,7 @@ use log::*;
 use crate::{
     db_types::{CreditNote, MicroTari, NewOrder, NewPayment, Order, OrderId, OrderStatusType, TransferStatus},
     events::{EventProducers, OrderAnnulledEvent, OrderModifiedEvent, OrderPaidEvent},
+    order_objects::OrderChanged,
     traits::{PaymentGatewayDatabase, PaymentGatewayError},
 };
 
@@ -70,11 +71,11 @@ where B: PaymentGatewayDatabase
         }
     }
 
-    async fn call_order_modified_hook(&self, old_order: &Order, new_order: &Order) {
+    async fn call_order_modified_hook(&self, field: &str, orders: OrderChanged) {
         debug!("🔄️📦️ Notifying order modified hook subscribers");
+        let event = OrderModifiedEvent::new(field.to_string(), orders);
         for emitter in &self.producers.order_modified_producer {
-            let event = OrderModifiedEvent::new(old_order.clone(), new_order.clone());
-            emitter.publish_event(event).await;
+            emitter.publish_event(event.clone()).await;
         }
     }
 
@@ -252,13 +253,14 @@ where B: PaymentGatewayDatabase
             .await?
             .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
         let new_order = self.db.modify_memo_for_order(order_id, new_memo).await?;
-        self.call_order_modified_hook(&old_order, &new_order).await;
+        let changes = OrderChanged::new(old_order, new_order.clone());
         info!(
             "🔄️📦️ Memo for order [{}] changed from '{}' to '{}'",
             order_id,
-            old_order.memo.unwrap_or_default(),
+            changes.old_order.memo.clone().unwrap_or_default(),
             new_memo
         );
+        self.call_order_modified_hook("memo", changes).await;
         Ok(new_order)
     }
 
@@ -268,10 +270,9 @@ where B: PaymentGatewayDatabase
     /// This function has several side effects:
     /// - The `total_price` field of the order is updated in the database.
     /// - The total orders for the account are updated.
-    /// - If the order is now fulfillable with existing payments in the account, the fulfillment flow is triggered (TODO
-    ///   at API level).
+    /// - If the order is now fulfillable with existing payments in the account, the fulfillment flow is triggered
     /// - An entry in the audit log is made.
-    /// - The `OnOrderModified` event is triggered.  (TODO at API level)
+    /// - The `OnOrderModified` event is triggered.
     ///
     /// ## Failure modes:
     /// - If the order does not exist.
@@ -280,12 +281,38 @@ where B: PaymentGatewayDatabase
     ///
     /// ## Returns
     /// The modified order
-    async fn modify_total_price_for_order(
+    pub async fn update_price_for_order(
         &self,
         order_id: &OrderId,
         new_price: MicroTari,
     ) -> Result<Order, PaymentGatewayError> {
-        todo!()
+        if new_price < MicroTari::from(0) {
+            warn!("🔄️💲️ An attempt was made to set order [{order_id}] to a negative value ({new_price})");
+            return Err(PaymentGatewayError::OrderModificationForbidden);
+        }
+        debug!("🔄️💲️ Changing price for order [{}]", order_id);
+        let OrderChanged { old_order, mut new_order } =
+            self.db.modify_total_price_for_order(order_id, new_price).await?;
+        let direction = if old_order.total_price > new_order.total_price { "DECREASED" } else { "INCREASED" };
+        info!(
+            "🔄️💲️ Price for order [{order_id}] {direction} from {} to {}",
+            old_order.total_price, new_order.total_price
+        );
+        let account_id = self
+            .db
+            .fetch_user_account_for_order(order_id)
+            .await?
+            .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
+        let order_arr = [new_order.clone()];
+        let paid_orders = self.db.try_pay_orders(account_id.id, &order_arr).await?;
+        if let Some(paid_order) = paid_orders.first() {
+            debug!("🔄️💲️ Price change has led to order {} being Paid", paid_order.order_id);
+            self.call_order_paid_hook(&paid_orders).await;
+            new_order = paid_order.clone();
+        }
+        let changes = OrderChanged::new(old_order, new_order.clone());
+        self.call_order_modified_hook("total_price", changes).await;
+        Ok(new_order)
     }
 
     /// Since only XTR is supported currently, this method will always return an error.

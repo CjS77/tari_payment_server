@@ -187,3 +187,15 @@ impl ModifyOrderRequest {
             self.new_memo.is_none()
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OrderChanged {
+    pub old_order: Order,
+    pub new_order: Order,
+}
+
+impl OrderChanged {
+    pub fn new(old_order: Order, new_order: Order) -> Self {
+        Self { old_order, new_order }
+    }
+}
