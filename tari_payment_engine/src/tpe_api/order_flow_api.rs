@@ -62,7 +62,7 @@ where B: PaymentGatewayDatabase
     }
 
     /// Calls the registered function when an order is cancelled or expired
-    async fn call_order_annulled_hook(&self, new_status: OrderStatusType, updated_order: &Order) {
+    async fn call_order_annulled_hook(&self, updated_order: &Order) {
         debug!("🔄️📦️ Notifying order annulled hook subscribers");
         for emitter in &self.producers.order_annulled_producer {
             let event = OrderAnnulledEvent::new(updated_order.clone());
@@ -168,16 +168,16 @@ where B: PaymentGatewayDatabase
     ///
     /// * The order status is updated in the database.
     /// * The total orders for the account are updated.
-    /// * The `OnOrderModified` event is triggered. (TODO at API level)
+    /// * The [`OrderAnnulledEvent`] event is triggered.
     /// * An audit log entry is made.
-    async fn cancel_or_expire_order(
+    pub async fn cancel_or_expire_order(
         &self,
-        order: Order,
+        order_id: &OrderId,
         new_status: OrderStatusType,
         reason: &str,
     ) -> Result<Order, PaymentGatewayError> {
-        let updated_order = self.db.cancel_or_expire_order(order, new_status, reason).await?;
-        self.call_order_annulled_hook(new_status, &updated_order).await;
+        let updated_order = self.db.cancel_or_expire_order(order_id, new_status, reason).await?;
+        self.call_order_annulled_hook(&updated_order).await;
         Ok(updated_order)
     }
 
@@ -214,7 +214,7 @@ where B: PaymentGatewayDatabase
     /// ## Failure modes:
     /// - If the order does not exist, an error is returned.
     /// - If the order status is already `Paid`, an error is returned.
-    async fn modify_customer_id_for_order(
+    async fn assign_order_to_new_customer(
         &self,
         order_id: &OrderId,
         new_customer_id: &str,
@@ -257,7 +257,7 @@ where B: PaymentGatewayDatabase
     async fn modify_total_price_for_order(
         &self,
         order_id: &OrderId,
-        new_total_price: MicroTari,
+        new_price: MicroTari,
     ) -> Result<Order, PaymentGatewayError> {
         todo!()
     }

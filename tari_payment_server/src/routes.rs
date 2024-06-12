@@ -42,8 +42,8 @@ use crate::{
     auth::{check_login_token_signature, JwtClaims, TokenIssuer},
     config::ProxyConfig,
     data_objects::{
-        FulfillmentRequest,
         JsonResponse,
+        ModifyOrderParams,
         PaymentNotification,
         RoleUpdateRequest,
         TransactionConfirmationNotification,
@@ -507,14 +507,39 @@ pub async fn issue_credit<B: PaymentGatewayDatabase>(
 
 route!(fulfil_order => Post "/fulfill" impl PaymentGatewayDatabase where requires [Role::Write]);
 pub async fn fulfil_order<B: PaymentGatewayDatabase>(
-    body: web::Json<FulfillmentRequest>,
+    body: web::Json<ModifyOrderParams>,
     api: web::Data<OrderFlowApi<B>>,
 ) -> Result<HttpResponse, ServerError> {
-    let FulfillmentRequest { order_id, reason } = body.into_inner();
-    let id = OrderId::new(order_id);
-    debug!("💻️ Fulfilment request for {id} with reason: {reason}");
-    let order = api.mark_new_order_as_paid(&id, &reason).await.map_err(|e| {
+    let ModifyOrderParams { order_id, reason } = body.into_inner();
+    debug!("💻️ Fulfilment request for {order_id} with reason: {reason}");
+    let order = api.mark_new_order_as_paid(&order_id, &reason).await.map_err(|e| {
         debug!("💻️ Could not fulfil order. {e}");
+        e
+    })?;
+    Ok(HttpResponse::Ok().json(order))
+}
+
+route!(cancel_order => Post "/cancel" impl PaymentGatewayDatabase where requires [Role::Write]);
+/// Order cancellation
+///
+/// Admin users (Write role) can use this endpoint to cancel an order. The order will be marked as cancelled, the
+/// user account associated with the order will have its total and current orders value decreased accordingly,
+/// and the `OnOrderAnnulled` event will fire (with status [`OrderStatusType::Cancelled`]).
+///
+/// ## Parameters
+/// * `order_id` - The order id to cancel. String.
+/// * `reason` - The reason for the cancellation. String.
+///
+/// ## Returns
+/// The cancelled order object.
+pub async fn cancel_order<B: PaymentGatewayDatabase>(
+    body: web::Json<ModifyOrderParams>,
+    api: web::Data<OrderFlowApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let ModifyOrderParams { order_id, reason } = body.into_inner();
+    info!("💻️ Cancel order request for {order_id}. Reason: {reason}");
+    let order = api.cancel_or_expire_order(&order_id, OrderStatusType::Cancelled, &reason).await.map_err(|e| {
+        debug!("💻️ Could not cancel order. {e}");
         e
     })?;
     Ok(HttpResponse::Ok().json(order))

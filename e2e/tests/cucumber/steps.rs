@@ -4,13 +4,15 @@ use cucumber::{gherkin::Step, then, when};
 use e2e::helpers::json_is_subset_of;
 use log::*;
 use reqwest::Method;
+use serde_json::json;
 use tari_jwt::{
     jwt_compact::{AlgorithmExt, Claims, Header, UntrustedToken},
+    tari_crypto::tari_utilities::message_format::MessageFormat,
     Ristretto256,
     Ristretto256SigningKey,
 };
 use tari_payment_engine::{
-    db_types::{MicroTari, Order, OrderId, Role},
+    db_types::{MicroTari, Order, OrderId, OrderStatusType, Role},
     events::{EventProducers, EventType, OrderPaidEvent},
     traits::{AccountManagement, AuthManagement},
     OrderFlowApi,
@@ -327,12 +329,26 @@ async fn check_customer_balance(world: &mut TPGWorld, cust_id: String, bal_type:
 #[then("the OnOrderPaid trigger fires with")]
 async fn check_order_paid_trigger(world: &mut TPGWorld, step: &Step) {
     let json = step.docstring().expect("No expected order");
-    let order = serde_json::from_str::<Order>(&json)
-        .map_err(|e| error!("{e}"))
-        .expect("Failed to parse transaction confirmation");
+    let order = serde_json::from_str::<Order>(&json).map_err(|e| error!("{e}")).expect("Failed to parse order");
     let last_event = world.last_event();
     let ev = OrderPaidEvent::new(order);
     assert_eq!(last_event, Some(EventType::OrderPaid(ev)));
+}
+
+#[then(expr = "the OnOrderAnnulled trigger fires with {word} status and order")]
+async fn check_order_annulled_trigger(world: &mut TPGWorld, expected_status: OrderStatusType, step: &Step) {
+    let last_event = world.last_event();
+    if last_event.is_none() {
+        panic!("Expected an OnOrderAnnulled event but no event was triggered");
+    }
+    if let Some(EventType::OrderAnnulled(ev)) = &last_event {
+        assert_eq!(ev.status, expected_status);
+        let expected_order = step.docstring().expect("No expected order");
+        let json = serde_json::to_string(&ev.order).expect("Failed to serialize order");
+        assert!(json_is_subset_of(expected_order, &json), "Expected order to be '{expected_order}', got '{json}'");
+    } else {
+        panic!("Expected an OnOrderAnnulled event but got {last_event:?}");
+    }
 }
 
 #[then(expr = "address {word} has roles {string}")]

@@ -102,7 +102,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// * An audit log entry is made.
     async fn cancel_or_expire_order(
         &self,
-        order: Order,
+        order: &OrderId,
         new_status: OrderStatusType,
         reason: &str,
     ) -> Result<Order, PaymentGatewayError>;

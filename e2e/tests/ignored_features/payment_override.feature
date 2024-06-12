@@ -3,7 +3,7 @@ Feature: Admins can mark an order as Paid
     Given a database with some accounts
     Given some role assignments
 
-  Scenario: Unuathenticated users cannot access the `/fulfill` endpoint
+  Scenario: Unauthenticated users cannot access the `/fulfill` endpoint
     When User POSTs to "/api/fulfill" with body
         """
         {

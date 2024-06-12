@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 use tari_payment_engine::{
-    db_types::{NewPayment, Role},
+    db_types::{NewPayment, OrderId, Role},
     helpers::WalletSignature,
 };
 
@@ -49,7 +49,7 @@ pub struct TransactionConfirmation {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FulfillmentRequest {
-    pub order_id: String,
+pub struct ModifyOrderParams {
+    pub order_id: OrderId,
     pub reason: String,
 }

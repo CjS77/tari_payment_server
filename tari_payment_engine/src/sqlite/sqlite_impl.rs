@@ -256,34 +256,33 @@ impl PaymentGatewayDatabase for SqliteDatabase {
 
     /// A manual order status transition from `New` to `Expired` or `Cancelled` status.
     ///
-    /// This method is called by the default implementation of [`modify_status_for_order`] when the new status
-    /// is `Expired`, or `Cancelled`.
-    ///
     /// The side effects for expiring or cancelling an order are the same. The only difference is that Expired orders
-    /// are triggered automatically based on time, whereas cancelling an order is triggered by the user or an admin.
+    /// are triggered automatically based on time, whereas cancelling an order is triggered by an admin or a shopify
+    /// webhook.
     ///
     /// * The order status is updated in the database.
     /// * The total orders for the account are updated.
     async fn cancel_or_expire_order(
         &self,
-        order: Order,
+        order_id: &OrderId,
         new_status: OrderStatusType,
         reason: &str,
     ) -> Result<Order, PaymentGatewayError> {
+        let mut tx = self.pool.begin().await?;
+        let order = orders::fetch_order_by_order_id(order_id, &mut tx)
+            .await?
+            .ok_or_else(|| AccountApiError::OrderDoesNotExist(order_id.clone()))?;
         if order.status != OrderStatusType::New {
             error!("🗃️ Order {} is not in 'New' status. Cannot call cancel_or_expire_order", order.id);
             return Err(PaymentGatewayError::OrderModificationForbidden);
         }
         let update = ModifyOrderRequest::default().with_new_status(new_status).with_new_memo(reason);
-        let mut conn = self.pool.begin().await?;
-        let account = user_accounts::user_account_for_order(&order.order_id, &mut conn)
-            .await?
-            .ok_or_else(|| PaymentGatewayError::AccountShouldExistForOrder(order.order_id.clone()))?;
-        let order = orders::update_order(&order.order_id, update, &mut conn)
+        let order = orders::update_order(&order.order_id, update, &mut tx)
             .await?
             .ok_or_else(|| AccountApiError::OrderDoesNotExist(order.order_id.clone()))?;
-        user_accounts::incr_order_totals(account.id, -order.total_price, -order.total_price, &mut conn).await?;
-        conn.commit().await?;
+        // Don't update totals, since there's a TRIGGER that effectively does this for us:
+        // user_accounts::incr_order_totals(account.id, -order.total_price, -order.total_price, &mut tx).await?;
+        tx.commit().await?;
         Ok(order)
     }
 

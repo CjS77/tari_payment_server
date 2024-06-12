@@ -92,10 +92,19 @@ impl TPGWorld {
         let (tx, rx) = channel();
         tokio::spawn(async move {
             let mut hooks = EventHooks::default();
+            let event = Arc::clone(&last_event);
             hooks.on_order_paid(move |ev| {
                 info!("🌍️ Received order paid event: {ev:?}");
-                if let Ok(mut le) = last_event.lock() {
+                if let Ok(mut le) = event.lock() {
                     *le = Some(EventType::OrderPaid(ev));
+                }
+                Box::pin(async {})
+            });
+            let event = Arc::clone(&last_event);
+            hooks.on_order_annulled(move |ev| {
+                info!("🌍️ Received order {} event: {ev:?}", ev.status.to_string().to_ascii_uppercase());
+                if let Ok(mut le) = event.lock() {
+                    *le = Some(EventType::OrderAnnulled(ev));
                 }
                 Box::pin(async {})
             });
