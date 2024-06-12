@@ -53,3 +53,11 @@ pub struct ModifyOrderParams {
     pub order_id: OrderId,
     pub reason: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateMemoParams {
+    pub order_id: OrderId,
+    pub new_memo: String,
+    // This reason is not stored in the database, but is captured in the logs
+    pub reason: Option<String>,
+}

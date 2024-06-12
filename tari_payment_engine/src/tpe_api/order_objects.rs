@@ -183,6 +183,7 @@ impl ModifyOrderRequest {
         self.new_customer_id.is_none() &&
             self.new_total_price.is_none() &&
             self.new_currency.is_none() &&
-            self.new_status.is_none()
+            self.new_status.is_none() &&
+            self.new_memo.is_none()
     }
 }
