@@ -47,3 +47,9 @@ pub struct TransactionConfirmationNotification {
 pub struct TransactionConfirmation {
     pub txid: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FulfillmentRequest {
+    pub order_id: String,
+    pub reason: String,
+}

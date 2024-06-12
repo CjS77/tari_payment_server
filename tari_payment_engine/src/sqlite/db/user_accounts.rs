@@ -349,6 +349,13 @@ pub async fn adjust_balances(
     Ok(())
 }
 
+/// Increments the total and current order counts for the given account id.
+/// Returns the new total order count.
+///
+/// # Arguments
+/// account_id - The internal account id
+/// delta_total - The amount to increment the total values of orders made by this customer
+/// delta_current - The amount to increment the current/pending order total for this customer
 pub async fn incr_order_totals(
     account_id: i64,
     delta_total: MicroTari,

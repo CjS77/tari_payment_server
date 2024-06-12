@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 
-use crate::db_types::{MicroTari, Order, OrderStatus, PublicKey};
+use crate::db_types::{MicroTari, Order, OrderStatus, OrderStatusType, PublicKey};
 
 #[derive(Debug, Clone)]
 pub struct OrderStatusMessage(pub OrderStatus);
@@ -28,6 +28,20 @@ impl OrderPaidEvent {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OrderAnnulledEvent {
+    pub order: Order,
+    pub status: OrderStatusType,
+}
+
+impl OrderAnnulledEvent {
+    pub fn new(order: Order) -> Self {
+        let status = order.status;
+        Self { order, status }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EventType {
     OrderPaid(OrderPaidEvent),
+    OrderAnnulled(OrderAnnulledEvent),
 }

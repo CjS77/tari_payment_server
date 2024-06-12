@@ -86,7 +86,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// * A credit note for the `total_price` is created,
     /// * The `process_new_payment` flow is triggered, which will cause the order to be fulfilled and the status updated
     ///   to `Paid`.(TODO at API level)
-    async fn new_to_paid(&self, order: Order) -> Result<Order, PaymentGatewayError>;
+    async fn mark_new_order_as_paid(&self, order: Order, reason: &str) -> Result<Order, PaymentGatewayError>;
 
     /// A manual order status transition from `New` to `Expired` or `Cancelled` status.
     ///
@@ -104,6 +104,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
         &self,
         order: Order,
         new_status: OrderStatusType,
+        reason: &str,
     ) -> Result<Order, PaymentGatewayError>;
 
     /// Manually reset an order from `Expired` or `Cancelled` status to `New` status.
@@ -216,6 +217,10 @@ pub enum PaymentGatewayError {
     OrderModificationNoOp,
     #[error("The requested order change is forbidden.")]
     OrderModificationForbidden,
+    #[error("The requested order (internal id {0}) does not exist")]
+    OrderIdNotFound(i64),
+    #[error("The requested order {0} does not exist")]
+    OrderNotFound(OrderId),
     #[error("{0} are not supported yet")]
     UnsupportedAction(String),
 }

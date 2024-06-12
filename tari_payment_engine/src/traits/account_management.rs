@@ -15,6 +15,8 @@ pub enum AccountApiError {
     QueryError(String),
     #[error("The requested order does not exist: {0}")]
     OrderDoesNotExist(OrderId),
+    #[error("Insufficient funds to complete the transaction")]
+    InsufficientFunds,
 }
 
 impl AccountApiError {

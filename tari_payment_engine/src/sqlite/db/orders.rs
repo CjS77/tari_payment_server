@@ -147,12 +147,15 @@ pub(crate) async fn update_order_status(
     order_id: i64,
     status: OrderStatusType,
     conn: &mut SqliteConnection,
-) -> Result<(), PaymentGatewayError> {
+) -> Result<Order, PaymentGatewayError> {
     let status = status.to_string();
-    sqlx::query!("UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", status, order_id)
-        .execute(conn)
-        .await?;
-    Ok(())
+    let result: Option<Order> =
+        sqlx::query_as("UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *")
+            .bind(status)
+            .bind(order_id)
+            .fetch_optional(conn)
+            .await?;
+    result.ok_or(PaymentGatewayError::OrderIdNotFound(order_id))
 }
 
 pub(crate) async fn update_order(
@@ -191,24 +194,25 @@ pub(crate) async fn update_order(
     Ok(res)
 }
 
-pub(crate) async fn pay_order(
+pub(crate) async fn try_pay_order(
     account: &UserAccount,
     order: &Order,
     conn: &mut SqliteConnection,
-) -> Result<(), AccountApiError> {
+) -> Result<Order, AccountApiError> {
     let mut current_balance = account.current_balance;
-    if current_balance >= order.total_price {
-        let acc_id = account.id;
-        current_balance -= order.total_price;
-        update_order_status(order.id, OrderStatusType::Paid, conn).await.map_err(|e| match e {
-            PaymentGatewayError::DatabaseError(s) => AccountApiError::DatabaseError(s),
-            _ => unreachable!("Unexpected error type: {e}"),
-        })?;
-        trace!("📝️ Order #{} of {} marked as paid", order.id, order.total_price);
-        user_accounts::update_user_balance(account.id, current_balance, conn).await?;
-        trace!("Account {acc_id} balance updated from {} to {current_balance}", account.current_balance);
-        user_accounts::incr_order_totals(account.id, MicroTari::from(0), -order.total_price, conn).await?;
-        trace!("📝️ Adjusted account #{acc_id} orders outstanding by {}.", order.total_price);
+    if current_balance < order.total_price {
+        return Err(AccountApiError::InsufficientFunds);
     }
-    Ok(())
+    let acc_id = account.id;
+    current_balance -= order.total_price;
+    let order = update_order_status(order.id, OrderStatusType::Paid, conn).await.map_err(|e| match e {
+        PaymentGatewayError::DatabaseError(s) => AccountApiError::DatabaseError(s),
+        _ => unreachable!("Unexpected error type: {e}"),
+    })?;
+    trace!("📝️ Order #{} of {} marked as paid", order.id, order.total_price);
+    user_accounts::update_user_balance(account.id, current_balance, conn).await?;
+    trace!("Account {acc_id} balance updated from {} to {current_balance}", account.current_balance);
+    user_accounts::incr_order_totals(account.id, MicroTari::from(0), -order.total_price, conn).await?;
+    trace!("📝️ Adjusted account #{acc_id} orders outstanding by {}.", order.total_price);
+    Ok(order)
 }

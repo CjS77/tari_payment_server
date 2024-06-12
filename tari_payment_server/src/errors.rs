@@ -4,7 +4,10 @@ use actix_web::{
     HttpResponse,
 };
 use log::error;
-use tari_payment_engine::{helpers::MemoSignatureError, traits::AuthApiError};
+use tari_payment_engine::{
+    helpers::MemoSignatureError,
+    traits::{AccountApiError, AuthApiError, PaymentGatewayError},
+};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -39,12 +42,15 @@ pub enum ServerError {
     InsufficientPermissions(String),
     #[error("A request was made from an unauthorized wallet.")]
     UnauthorizedWalletRequest,
+    #[error("Cannot complete this request. {0}")]
+    CannotCompleteRequest(String),
 }
 
 impl ResponseError for ServerError {
     fn status_code(&self) -> StatusCode {
         match self {
             Self::InvalidRequestBody(_) => StatusCode::BAD_REQUEST,
+            Self::CannotCompleteRequest(_) => StatusCode::BAD_REQUEST,
             Self::CouldNotDeserializePayload => StatusCode::BAD_REQUEST,
             Self::CouldNotDeserializeAuthToken => StatusCode::BAD_REQUEST,
             Self::AuthenticationError(e) => match e {
@@ -115,6 +121,20 @@ impl From<AuthApiError> for ServerError {
             AuthApiError::RoleNotFound => {
                 Self::BackendError(format!("Role definitions in Database and Code have diverged. {e}"))
             },
+        }
+    }
+}
+
+impl From<PaymentGatewayError> for ServerError {
+    fn from(e: PaymentGatewayError) -> Self {
+        use PaymentGatewayError::*;
+        match &e {
+            UserAccountError(AccountApiError::InsufficientFunds) => ServerError::CannotCompleteRequest(e.to_string()),
+            OrderModificationNoOp => ServerError::CannotCompleteRequest(e.to_string()),
+            OrderModificationForbidden => ServerError::CannotCompleteRequest(e.to_string()),
+            AccountShouldExistForOrder(_) | OrderNotFound(_) => ServerError::NoRecordFound(e.to_string()),
+            UnsupportedAction(_) => ServerError::CannotCompleteRequest(e.to_string()),
+            _ => ServerError::BackendError(e.to_string()),
         }
     }
 }
