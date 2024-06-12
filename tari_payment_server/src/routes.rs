@@ -48,6 +48,7 @@ use crate::{
         RoleUpdateRequest,
         TransactionConfirmationNotification,
         UpdateMemoParams,
+        UpdatePriceParams,
     },
     errors::{OrderConversionError, ServerError},
     helpers::get_remote_ip,
@@ -546,10 +547,10 @@ pub async fn cancel_order<B: PaymentGatewayDatabase>(
     Ok(HttpResponse::Ok().json(order))
 }
 
+route!(update_order_memo => Patch "/order_memo" impl PaymentGatewayDatabase where requires [Role::Write]);
 /// Update an order's memo field.
 ///
 /// Admin users (Write role) can use this endpoint to update an order's memo field.
-
 /// *Note*: the HTTP method used for this endpoint is PATCH, rather than POST.
 ///
 /// The side effects of this call are:
@@ -567,7 +568,6 @@ pub async fn cancel_order<B: PaymentGatewayDatabase>(
 /// provide a valid order signature, then we can modify this endpoint to do
 /// so. Right now, it's not clear whether the UX would be any better than
 /// re-doing the order.
-route!(update_order_memo => Patch "/order_memo" impl PaymentGatewayDatabase where requires [Role::Write]);
 pub async fn update_order_memo<B: PaymentGatewayDatabase>(
     body: web::Json<UpdateMemoParams>,
     api: web::Data<OrderFlowApi<B>>,
@@ -577,6 +577,31 @@ pub async fn update_order_memo<B: PaymentGatewayDatabase>(
     info!("💻️ Update order memos request for {order_id}. Reason: {reason}");
     let order = api.update_memo_for_order(&order_id, &new_memo).await.map_err(|e| {
         debug!("💻️ Could not update order memo. {e}");
+        e
+    })?;
+    Ok(HttpResponse::Ok().json(order))
+}
+
+route!(update_price => Patch "/order_price" impl PaymentGatewayDatabase where requires [Role::Write]);
+/// Provides an endpoint for admins to adjust the price of an order.
+///
+/// Admins can call PATCH /api/order_price with the order_id, new price, and
+/// a reason to adjust the price of an order up or down.
+///
+/// If the price decreases such that an existing balance in the user's
+/// account will be able to fill the order, then the order will
+/// automatically be filled.
+///
+/// The new price must be positive.
+pub async fn update_price<B: PaymentGatewayDatabase>(
+    body: web::Json<UpdatePriceParams>,
+    api: web::Data<OrderFlowApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let UpdatePriceParams { order_id, new_price, reason } = body.into_inner();
+    let reason = reason.unwrap_or_else(|| "No reason provided".to_string());
+    info!("💻️ Update order price request for {order_id}. Reason: {reason}");
+    let order = api.update_price_for_order(&order_id, new_price).await.map_err(|e| {
+        debug!("💻️ Could not update order price. {e}");
         e
     })?;
     Ok(HttpResponse::Ok().json(order))

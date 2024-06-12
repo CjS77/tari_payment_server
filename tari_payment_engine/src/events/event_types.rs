@@ -1,7 +1,10 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::db_types::{MicroTari, Order, OrderStatus, OrderStatusType, PublicKey};
+use crate::{
+    db_types::{MicroTari, Order, OrderStatus, OrderStatusType, PublicKey},
+    order_objects::OrderChanged,
+};
 
 #[derive(Debug, Clone)]
 pub struct OrderStatusMessage(pub OrderStatus);
@@ -43,13 +46,13 @@ impl OrderAnnulledEvent {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OrderModifiedEvent {
-    pub old_order: Order,
-    pub new_order: Order,
+    pub field_changed: String,
+    pub orders: OrderChanged,
 }
 
 impl OrderModifiedEvent {
-    pub fn new(old_order: Order, new_order: Order) -> Self {
-        Self { old_order, new_order }
+    pub fn new(field_changed: String, orders: OrderChanged) -> Self {
+        Self { field_changed, orders }
     }
 }
 

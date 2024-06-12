@@ -2,6 +2,7 @@ use thiserror::Error;
 
 use crate::{
     db_types::{CreditNote, MicroTari, NewOrder, NewPayment, Order, OrderId, OrderStatusType, Payment, TransferStatus},
+    order_objects::OrderChanged,
     traits::{AccountApiError, AccountManagement},
 };
 
@@ -178,7 +179,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
         &self,
         order_id: &OrderId,
         new_total_price: MicroTari,
-    ) -> Result<Order, PaymentGatewayError>;
+    ) -> Result<OrderChanged, PaymentGatewayError>;
 
     /// Since only XTR is supported currently, this method will always return an error.
     async fn modify_currency_for_order(

@@ -22,7 +22,7 @@ use crate::{
         TransferStatus,
         UserAccount,
     },
-    order_objects::{ModifyOrderRequest, OrderQueryFilter},
+    order_objects::{ModifyOrderRequest, OrderChanged, OrderQueryFilter},
     tpe_api::account_objects::FullAccount,
     traits::{
         AccountApiError,
@@ -247,7 +247,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             "🗃️ Credit note: Customer {} received note for {} with address {address}",
             order.customer_id, order.total_price
         );
-        // Update account ex-database. This is safe because the transaction will rollback if there's an error
+        // Update account ex-database. This is safe because the transaction will roll back if there's an error
         account.current_balance = account.current_balance + order.total_price;
         let updated_order = orders::try_pay_order(&account, &order, &mut tx).await?;
         tx.commit().await?;
@@ -409,17 +409,21 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         &self,
         order_id: &OrderId,
         new_total_price: MicroTari,
-    ) -> Result<Order, PaymentGatewayError> {
+    ) -> Result<OrderChanged, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
-        let order = orders::fetch_order_by_order_id(order_id, &mut tx)
+        let old_order = orders::fetch_order_by_order_id(order_id, &mut tx)
             .await?
             .ok_or_else(|| AccountApiError::OrderDoesNotExist(order_id.clone()))?;
-        if !matches!(order.status, OrderStatusType::New) {
-            info!("🗃️ Order {order_id}'s price cannot be changed since it is already {}", order.status);
+        if !matches!(old_order.status, OrderStatusType::New) {
+            info!("🗃️ Order {order_id}'s price cannot be changed since it is already {}", old_order.status);
             return Err(PaymentGatewayError::OrderModificationForbidden);
         }
+        if old_order.total_price == new_total_price {
+            info!("🗃️ Order {order_id}'s price is already {new_total_price}. No action taken.");
+            return Err(PaymentGatewayError::OrderModificationNoOp);
+        }
         let update = ModifyOrderRequest::default().with_new_total_price(new_total_price);
-        let order = orders::update_order(order_id, update, &mut tx).await?.ok_or_else(|| {
+        let new_order = orders::update_order(order_id, update, &mut tx).await?.ok_or_else(|| {
             let msg = format!(
                 "Order {order_id} does not exist, but we fetched in within this same transaction. This represents a \
                  bug and the transaction will be rolled back"
@@ -427,7 +431,9 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             error!("{msg}");
             PaymentGatewayError::DatabaseError(msg)
         })?;
-        Ok(order)
+        tx.commit().await?;
+        let delta = OrderChanged::new(old_order, new_order);
+        Ok(delta)
     }
 
     async fn close(&mut self) -> Result<(), PaymentGatewayError> {
