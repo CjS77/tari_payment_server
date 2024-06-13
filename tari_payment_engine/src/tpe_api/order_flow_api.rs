@@ -3,8 +3,8 @@ use std::fmt::Debug;
 use log::*;
 
 use crate::{
-    db_types::{CreditNote, MicroTari, NewOrder, NewPayment, Order, OrderId, OrderStatusType, TransferStatus},
-    events::{EventProducers, OrderAnnulledEvent, OrderModifiedEvent, OrderPaidEvent},
+    db_types::{CreditNote, MicroTari, NewOrder, NewPayment, Order, OrderId, OrderStatusType, Payment, TransferStatus},
+    events::{EventProducers, OrderAnnulledEvent, OrderEvent, OrderModifiedEvent, PaymentEvent},
     order_objects::OrderChanged,
     traits::{OrderMovedResult, PaymentGatewayDatabase, PaymentGatewayError},
 };
@@ -40,7 +40,11 @@ where B: PaymentGatewayDatabase
     /// If any orders are marked as paid, they are returned.
     pub async fn process_new_order(&self, order: NewOrder) -> Result<Vec<Order>, PaymentGatewayError> {
         let account_id = self.db.process_new_order_for_customer(order.clone()).await?;
-        // TODO NewOrderEvent hook handler
+        let order = self.db.fetch_order_by_order_id(&order.order_id).await?.ok_or_else(|| {
+            error!("🔄️📦️ Order [{}] was not found after being inserted. Race condition bug", order.order_id);
+            PaymentGatewayError::OrderNotFound(order.order_id.clone())
+        })?;
+        self.call_new_order_hook(&order).await;
         let payable = self.db.fetch_payable_orders(account_id).await?;
         let paid_orders = self.db.try_pay_orders(account_id, &payable).await?;
         self.call_order_paid_hook(&paid_orders).await;
@@ -56,9 +60,17 @@ where B: PaymentGatewayDatabase
         for emitter in &self.producers.order_paid_producer {
             debug!("🔄️📦️ Notifying order paid hook subscribers");
             for order in paid_orders {
-                let event = OrderPaidEvent { order: order.clone() };
+                let event = OrderEvent { order: order.clone() };
                 emitter.publish_event(event).await;
             }
+        }
+    }
+
+    async fn call_new_order_hook(&self, new_order: &Order) {
+        for emitter in &self.producers.new_order_producer {
+            debug!("🔄️📦️ Notifying new order hook subscribers");
+            let event = OrderEvent { order: new_order.clone() };
+            emitter.publish_event(event).await;
         }
     }
 
@@ -79,6 +91,14 @@ where B: PaymentGatewayDatabase
         }
     }
 
+    async fn call_payment_received_hook(&self, payment: &Payment) {
+        debug!("🔄️💰️ Notifying payment received hook subscribers");
+        for emitter in &self.producers.payment_received_producer {
+            let event = PaymentEvent::new(payment.clone());
+            emitter.publish_event(event).await;
+        }
+    }
+
     /// Submit a new payment to the order manager.
     ///
     /// This should be a brand-new payment. If the payment already exists, the order manager will return an error.
@@ -89,9 +109,9 @@ where B: PaymentGatewayDatabase
     /// If any orders are marked as paid, they are returned.
     pub async fn process_new_payment(&self, payment: NewPayment) -> Result<Vec<Order>, PaymentGatewayError> {
         let txid = payment.txid.clone();
-        let account_id = self.db.process_new_payment_for_pubkey(payment.clone()).await?;
+        let (account_id, payment) = self.db.process_new_payment_for_pubkey(payment.clone()).await?;
         trace!("🔄️💰️ Payment [{txid}] for account #{account_id} processed.");
-        // todo insert hook
+        self.call_payment_received_hook(&payment).await;
         let payable = self.db.fetch_payable_orders(account_id).await?;
         trace!("🔄️💰️ {} fulfillable orders fetched for account #{account_id}", payable.len());
         let paid_orders = self.db.try_pay_orders(account_id, &payable).await?;
@@ -106,9 +126,9 @@ where B: PaymentGatewayDatabase
     pub async fn issue_credit_note(&self, note: CreditNote) -> Result<Vec<Order>, PaymentGatewayError> {
         let cust_id = note.customer_id.clone();
         info!("🔄️💰️ Issuing credit note for customer {cust_id}");
-        let account_id = self.db.process_credit_note_for_customer(note).await?;
+        let (account_id, payment) = self.db.process_credit_note_for_customer(note).await?;
         info!("🔄️💰️ Credit note issued for customer {cust_id} with account id {account_id}");
-        // todo insert hook
+        self.call_payment_received_hook(&payment).await;
         let payable = self.db.fetch_payable_orders(account_id).await?;
         trace!("🔄️💰️ {} fulfillable orders fetched for account #{account_id} after issuing credit note", payable.len());
         let paid_orders = self.db.try_pay_orders(account_id, &payable).await?;
@@ -199,11 +219,12 @@ where B: PaymentGatewayDatabase
     /// The effect is as if a new order comes in with the given details.
     ///
     /// * The order status is updated in the database.
-    /// * The [`process_order`] flow is triggered.
-    /// * An `OnOrderModified` event is triggered. (TODO at API level)
-    /// * A `NewOrder` event is triggered. (TODO at API level)
-    /// * An entry is added to the audit log.
-    async fn reset_order(&self, order: Order) -> Result<Order, PaymentGatewayError> {
+    /// * The [`process_order`] flow is triggered. This means that if the user has enough credit, then the order is
+    ///   paid.
+    /// * An `OnOrderModified` event is triggered.
+    /// * A `NewOrder` event is triggered.
+    /// * The audit log gets a new entry.
+    pub async fn reset_order(&self, order: Order) -> Result<Order, PaymentGatewayError> {
         todo!()
     }
 
@@ -240,7 +261,7 @@ where B: PaymentGatewayDatabase
     /// Changes the memo field for an order.
     ///
     /// This function has the following side effects.
-    /// - The `OnOrderModified` event is triggered. TODO (at API level)
+    /// - The `OnOrderModified` event is triggered.
     ///
     /// Changing the memo does not trigger any other flows, does not affect
     /// the order status, and does not affect order fulfillment.
@@ -322,7 +343,7 @@ where B: PaymentGatewayDatabase
     }
 
     /// Since only XTR is supported currently, this method will always return an error.
-    async fn modify_currency_for_order(
+    pub async fn modify_currency_for_order(
         &self,
         _order_id: &OrderId,
         _new_currency: &str,

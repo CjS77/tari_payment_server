@@ -3,15 +3,6 @@ deny = [
     'unknown_lints',
     # clippy groups:
     'clippy::correctness',
-    # All clippy allows must have a reason
-    # TODO: enable lint-reasons feature
-    #    'clippy::allow_attributes_without_reason',
-    # Docs
-    #'missing_docs',
-    #    'clippy::missing_errors_doc',
-    #    'clippy::missing_safety_doc',
-    #    'clippy::missing_panics_doc',
-
     # Common mistakes
     'clippy::await_holding_lock',
     'unused_variables',

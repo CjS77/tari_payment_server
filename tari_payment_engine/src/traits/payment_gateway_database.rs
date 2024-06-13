@@ -45,7 +45,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// * The payment is marked as `Unconfirmed`
     /// * creates a new account for the public key if one does not already exist
     /// Returns the account id for the public key.
-    async fn process_new_payment_for_pubkey(&self, payment: NewPayment) -> Result<i64, PaymentGatewayError>;
+    async fn process_new_payment_for_pubkey(&self, payment: NewPayment) -> Result<(i64, Payment), PaymentGatewayError>;
 
     /// Creates a new credit note for a customer id
     /// * Stores the payment in the database. If the payment already exists, nothing further is   done.
@@ -53,7 +53,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// * The payment type is set to `Manual`
     /// * creates a new account for the customer id if one does not already exist
     /// Returns the account id for the customer id.
-    async fn process_credit_note_for_customer(&self, note: CreditNote) -> Result<i64, PaymentGatewayError>;
+    async fn process_credit_note_for_customer(&self, note: CreditNote) -> Result<(i64, Payment), PaymentGatewayError>;
 
     /// Checks whether any orders associated with the given account id can be fulfilled.
     /// If no orders can be fulfilled, an empty vector is returned.
@@ -86,7 +86,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     ///
     /// * A credit note for the `total_price` is created,
     /// * The `process_new_payment` flow is triggered, which will cause the order to be fulfilled and the status updated
-    ///   to `Paid`.(TODO at API level)
+    ///   to `Paid`.
     async fn mark_new_order_as_paid(&self, order: Order, reason: &str) -> Result<Order, PaymentGatewayError>;
 
     /// A manual order status transition from `New` to `Expired` or `Cancelled` status.
@@ -99,7 +99,6 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     ///
     /// * The order status is updated in the database.
     /// * The total orders for the account are updated.
-    /// * The `OnOrderModified` event is triggered. (TODO at API level)
     /// * An audit log entry is made.
     async fn cancel_or_expire_order(
         &self,
@@ -118,8 +117,6 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     ///
     /// * The order status is updated in the database.
     /// * The [`process_order`] flow is triggered.
-    /// * An `OnOrderModified` event is triggered. (TODO at API level)
-    /// * A `NewOrder` event is triggered. (TODO at API level)
     /// * An entry is added to the audit log.
     async fn reset_order(&self, order: Order) -> Result<Order, PaymentGatewayError>;
 
@@ -148,7 +145,6 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// Changes the memo field for an order.
     ///
     /// This function has the following side effects.
-    /// - The `OnOrderModified` event is triggered. TODO (at API level)
     ///
     /// Changing the memo does not trigger any other flows, does not affect
     /// the order status, and does not affect order fulfillment.
@@ -163,10 +159,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// This function has several side effects:
     /// - The `total_price` field of the order is updated in the database.
     /// - The total orders for the account are updated.
-    /// - If the order is now fulfillable with existing payments in the account, the fulfillment flow is triggered (TODO
-    ///   at API level).
     /// - An entry in the audit log is made.
-    /// - The `OnOrderModified` event is triggered.  (TODO at API level)
     ///
     /// ## Failure modes:
     /// - If the order does not exist.
