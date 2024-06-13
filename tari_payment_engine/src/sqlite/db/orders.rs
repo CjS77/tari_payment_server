@@ -167,7 +167,7 @@ pub(crate) async fn update_order(
         debug!("📝️ No fields to update for order {id}. Update request skipped.");
         return Err(PaymentGatewayError::OrderModificationNoOp);
     }
-    let mut builder = QueryBuilder::new("UPDATE orders SET updated_at = CURRENT_TIMESTAMP,");
+    let mut builder = QueryBuilder::new("UPDATE orders SET updated_at = CURRENT_TIMESTAMP, ");
     let mut set_clause = builder.separated(", ");
     if let Some(status) = update.new_status {
         set_clause.push("status = ");
@@ -185,9 +185,13 @@ pub(crate) async fn update_order(
         set_clause.push("currency = ");
         set_clause.push_bind_unseparated(currency);
     }
+    if let Some(cust_id) = update.new_customer_id {
+        set_clause.push("customer_id = ");
+        set_clause.push_bind_unseparated(cust_id);
+    }
     builder.push(" WHERE order_id = ");
     builder.push_bind(id.as_str());
-    builder.push("RETURNING *");
+    builder.push(" RETURNING *");
     trace!("📝️ Executing query: {}", builder.sql());
     let res = builder.build().fetch_optional(conn).await?.map(|row: SqliteRow| Order::from_row(&row)).transpose()?;
     trace!("📝️ Result of update_order: {res:?}");

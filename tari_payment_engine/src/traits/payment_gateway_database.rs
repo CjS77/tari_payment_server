@@ -3,7 +3,7 @@ use thiserror::Error;
 use crate::{
     db_types::{CreditNote, MicroTari, NewOrder, NewPayment, Order, OrderId, OrderStatusType, Payment, TransferStatus},
     order_objects::OrderChanged,
-    traits::{AccountApiError, AccountManagement},
+    traits::{data_objects::OrderMovedResult, AccountApiError, AccountManagement},
 };
 
 /// This trait defines the highest level of behaviour for backends supporting the Tari Payment Engine.
@@ -143,7 +143,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
         &self,
         order_id: &OrderId,
         new_customer_id: &str,
-    ) -> Result<(i64, i64), PaymentGatewayError>;
+    ) -> Result<OrderMovedResult, PaymentGatewayError>;
 
     /// Changes the memo field for an order.
     ///

@@ -30,6 +30,6 @@ mod data_objects;
 
 pub use account_management::{AccountApiError, AccountManagement};
 pub use auth_management::{AuthApiError, AuthManagement};
-pub use data_objects::{NewWalletInfo, UpdateWalletInfo, WalletInfo};
+pub use data_objects::{NewWalletInfo, OrderMovedResult, UpdateWalletInfo, WalletInfo};
 pub use payment_gateway_database::{PaymentGatewayDatabase, PaymentGatewayError};
 pub use wallet_management::{WalletAuth, WalletAuthApiError, WalletManagement, WalletManagementError};

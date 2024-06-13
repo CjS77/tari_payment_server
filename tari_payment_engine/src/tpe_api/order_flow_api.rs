@@ -6,7 +6,7 @@ use crate::{
     db_types::{CreditNote, MicroTari, NewOrder, NewPayment, Order, OrderId, OrderStatusType, TransferStatus},
     events::{EventProducers, OrderAnnulledEvent, OrderModifiedEvent, OrderPaidEvent},
     order_objects::OrderChanged,
-    traits::{PaymentGatewayDatabase, PaymentGatewayError},
+    traits::{OrderMovedResult, PaymentGatewayDatabase, PaymentGatewayError},
 };
 
 /// `OrderFlowApi` is the primary API for handling order and payment flows in response to merchant order events and
@@ -215,20 +215,26 @@ where B: PaymentGatewayDatabase
     /// - If the order status was `Expired`, or `Cancelled`, it is **not** automatically reset to `New`. The admin must
     ///   follow up with a "change status" call to reset the order.
     /// - The `OnOrderModified` event is triggered.
+    /// - If the order was filled, an `OnOrderPaid` event is triggered.
     ///
     /// ## Returns:
-    /// - The old and new account ids.
-    ///
+    /// - A [`OrderMovedResult`] object, which contains the old and new account ids, the orders that were moved, and
+    ///   whether the order was fulfilled.
     ///
     /// ## Failure modes:
-    /// - If the order does not exist, an error is returned.
-    /// - If the order status is already `Paid`, an error is returned.
-    async fn assign_order_to_new_customer(
+    /// - If the order does not exist, the method returns an error.
+    /// - If the order status is already `Paid`, the method returns an error.
+    pub async fn assign_order_to_new_customer(
         &self,
         order_id: &OrderId,
-        new_customer_id: &str,
-    ) -> Result<(i64, i64), PaymentGatewayError> {
-        todo!()
+        new_cust_id: &str,
+    ) -> Result<OrderMovedResult, PaymentGatewayError> {
+        let move_result = self.db.modify_customer_id_for_order(order_id, new_cust_id).await?;
+        self.call_order_modified_hook("customer_id", move_result.orders.clone()).await;
+        if let Some(order) = move_result.filled_order() {
+            self.call_order_paid_hook(&[order]).await;
+        }
+        Ok(move_result)
     }
 
     /// Changes the memo field for an order.
