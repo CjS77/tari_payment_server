@@ -69,3 +69,11 @@ pub struct UpdatePriceParams {
     // This reason is not stored in the database, but is captured in the logs
     pub reason: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MoveOrderParams {
+    pub order_id: OrderId,
+    pub new_customer_id: String,
+    // This reason is not stored in the database, but is captured in the logs
+    pub reason: String,
+}

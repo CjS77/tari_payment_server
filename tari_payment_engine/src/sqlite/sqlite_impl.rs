@@ -30,6 +30,7 @@ use crate::{
         AuthApiError,
         AuthManagement,
         NewWalletInfo,
+        OrderMovedResult,
         PaymentGatewayDatabase,
         PaymentGatewayError,
         UpdateWalletInfo,
@@ -319,15 +320,12 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     /// Change the customer id for the given `order_id`. This function has several side effects:
     /// - The `customer_id` field of the order is updated in the database.
     /// - The total orders for the old and new customer are updated.
-    /// - If the order is fulfillable with existing payments in the new account, the fulfillment flow is triggered.
-    ///   (TODO at API level)
     /// - If the new customer does not exist, a new one is created.
     /// - If the order status was `Expired`, or `Cancelled`, it is **not** automatically reset to `New`. The admin must
     ///   follow up with a "change status" call to reset the order.
     ///
     /// ## Returns:
-    /// - The old and new account ids.
-    ///
+    /// - The old and new account ids; and the updated order, if it was paid for by the new account.
     ///
     /// ## Failure modes:
     /// - If the order does not exist, an error is returned.
@@ -336,48 +334,83 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         &self,
         order_id: &OrderId,
         new_cid: &str,
-    ) -> Result<(i64, i64), PaymentGatewayError> {
+    ) -> Result<OrderMovedResult, PaymentGatewayError> {
         let update = ModifyOrderRequest::default().with_new_customer_id(new_cid);
-        let mut conn = self.pool.begin().await?;
-        let order = orders::fetch_order_by_order_id(order_id, &mut conn)
+        let mut tx = self.pool.begin().await?;
+        let old_order = orders::fetch_order_by_order_id(order_id, &mut tx)
             .await?
             .ok_or_else(|| AccountApiError::OrderDoesNotExist(order_id.clone()))?;
         // Cannot change customer id on orders that have already been paid
-        if matches!(order.status, OrderStatusType::Paid) {
+        if matches!(old_order.status, OrderStatusType::Paid) {
             return Err(PaymentGatewayError::OrderModificationForbidden);
         }
-        let old_acc = user_accounts::user_account_for_order(order_id, &mut conn).await?;
+        let old_acc = user_accounts::user_account_for_order(order_id, &mut tx).await?;
         if old_acc.is_none() {
             warn!("Order {order_id} does not have an associated account. This should not happen.");
-            conn.rollback().await?;
+            tx.rollback().await?;
             return Err(PaymentGatewayError::AccountShouldExistForOrder(order_id.clone()));
         }
         let old_account = old_acc.unwrap();
-        let order = orders::update_order(order_id, update, &mut conn).await?.ok_or_else(|| {
-            warn!(
-                "Order {order_id} does not exist, but we fetched in within this same transaction. This should not \
+        let cust_id = Some(new_cid.into());
+        let new_account_id = user_accounts::fetch_or_create_account(cust_id, None, &mut tx).await?;
+
+        if old_account.id == new_account_id {
+            debug!("🗃️ Order {order_id} is being reassigned to the same account. No action taken.");
+            tx.rollback().await?;
+            return Err(PaymentGatewayError::OrderModificationNoOp);
+        }
+        let new_order = orders::update_order(order_id, update, &mut tx).await?.ok_or_else(|| {
+            error!(
+                "Order {order_id} does not exist, but we fetched it within this same transaction. This should not \
                  happen. There's a data race of sorts happening here and should be sorted out."
             );
             AccountApiError::OrderDoesNotExist(order_id.clone())
         })?;
         // Order is either expired, cancelled or new by now. If expired or cancelled, we don't need to make any
         // adjustments but new orders need to be accounted for.
-        if let OrderStatusType::New = order.status {
-            user_accounts::incr_order_totals(old_account.id, -order.total_price, -order.total_price, &mut conn).await?;
+        if matches!(new_order.status, OrderStatusType::New) {
+            user_accounts::incr_order_totals(old_account.id, -new_order.total_price, -new_order.total_price, &mut tx)
+                .await?;
+            debug!(
+                "🗃️ We're transferring an active order {order_id} from Customer {new_cid}. Their order totals were \
+                 adjusted accordingly."
+            );
         }
-        let cust_id = Some(new_cid.into());
-        let new_account_id = user_accounts::fetch_or_create_account(cust_id, None, &mut conn).await?;
-        if let OrderStatusType::New = order.status {
-            let new_account = user_accounts::user_account_by_id(new_account_id, &mut conn).await?.ok_or_else(|| {
-                warn!("Account {new_account_id} does not exist, but we just created it. This should not happen.");
+
+        let mut filled_order = None;
+        if let OrderStatusType::New = new_order.status {
+            let new_account = user_accounts::user_account_by_id(new_account_id, &mut tx).await?.ok_or_else(|| {
+                error!("Account {new_account_id} does not exist, but we just created it. This should not happen.");
                 PaymentGatewayError::AccountShouldExistForOrder(order_id.clone())
             })?;
-            let _ = user_accounts::incr_order_totals(new_account_id, order.total_price, order.total_price, &mut conn)
-                .await?;
-            orders::try_pay_order(&new_account, &order, &mut conn).await?;
+            let _ =
+                user_accounts::incr_order_totals(new_account_id, new_order.total_price, new_order.total_price, &mut tx)
+                    .await?;
+            debug!(
+                "🗃️ We've transferred an active order, {order_id}, to Customer id {new_cid}. Their order total has \
+                 been adjusted accordingly"
+            );
+            filled_order = match orders::try_pay_order(&new_account, &new_order, &mut tx).await {
+                Ok(order) => {
+                    debug!("🗃️ Order {order_id} has been paid for by the new account {new_account_id}");
+                    Some(order)
+                },
+                Err(AccountApiError::InsufficientFunds) => {
+                    debug!(
+                        "🗃️ There weren't enough funds to pay for order {order_id} from the new account \
+                         {new_account_id} immediately, so the order remains as current"
+                    );
+                    None
+                },
+                Err(e) => return Err(e.into()),
+            };
         }
-        conn.commit().await?;
-        Ok((old_account.id, new_account_id))
+        tx.commit().await?;
+        let result = match filled_order {
+            Some(filled_order) => OrderMovedResult::new(old_account.id, new_account_id, old_order, filled_order, true),
+            None => OrderMovedResult::new(old_account.id, new_account_id, old_order, new_order, false),
+        };
+        Ok(result)
     }
 
     /// Changes the memo field for an order.

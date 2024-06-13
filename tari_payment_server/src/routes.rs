@@ -44,6 +44,7 @@ use crate::{
     data_objects::{
         JsonResponse,
         ModifyOrderParams,
+        MoveOrderParams,
         PaymentNotification,
         RoleUpdateRequest,
         TransactionConfirmationNotification,
@@ -602,6 +603,35 @@ pub async fn update_price<B: PaymentGatewayDatabase>(
     info!("💻️ Update order price request for {order_id}. Reason: {reason}");
     let order = api.update_price_for_order(&order_id, new_price).await.map_err(|e| {
         debug!("💻️ Could not update order price. {e}");
+        e
+    })?;
+    Ok(HttpResponse::Ok().json(order))
+}
+
+route!(reassign_order => Patch "/reassign_order" impl PaymentGatewayDatabase where requires [Role::Write]);
+/// Provides an endpoint for admins to adjust the price of an order.
+/// Admins can call `PATCH /api/reassign_order` with the order_id, new customer_id, and a reason to reassign an order
+/// to a different customer.
+///
+/// If that customer has a credit balance in excess of the order price, the order will be automatically fulfilled.
+///
+/// The endpoint returns a `OrderMovedResult` JSON object:
+/// ```json
+/// {
+///     "orders": { "new_order": {}, "old_order": {} },
+///     "old_account_id": 1000,
+///     "new_account_id": 1200,
+///     "is_filled": false
+///  }
+/// ```
+pub async fn reassign_order<B: PaymentGatewayDatabase>(
+    body: web::Json<MoveOrderParams>,
+    api: web::Data<OrderFlowApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let MoveOrderParams { order_id, new_customer_id, reason } = body.into_inner();
+    info!("💻️ Assigning existing order {order_id} to customer {new_customer_id}. Reason: {reason}");
+    let order = api.assign_order_to_new_customer(&order_id, &new_customer_id).await.map_err(|e| {
+        debug!("💻️ Could not assign order. {e}");
         e
     })?;
     Ok(HttpResponse::Ok().json(order))
