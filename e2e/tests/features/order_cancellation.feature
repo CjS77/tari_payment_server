@@ -53,9 +53,11 @@ Feature: Admins can cancel an order
     Then account for alice has total orders worth 65 XTR
     Then account for alice has current orders worth 65 XTR
     Then Alice has a current balance of 0 Tari
-    Then the OnOrderAnnulled trigger fires with Cancelled status and order
+    Then the OrderAnnulled trigger fires with
     """
-    {"order_id": "1", "customer_id":"alice", "total_price": 100000000, "status": "Cancelled"}
+    { "status": "Cancelled",
+      "order": {"order_id": "1", "customer_id":"alice", "total_price": 100000000, "status": "Cancelled"}
+    }
     """
 
   Scenario: Cancelling an order a second time has no effect

@@ -637,6 +637,33 @@ pub async fn reassign_order<B: PaymentGatewayDatabase>(
     Ok(HttpResponse::Ok().json(order))
 }
 
+route!(reset_order => Patch "/reset_order/{order_id}" impl PaymentGatewayDatabase where requires [Role::Write]);
+/// Provides an endpoint for admins to reset an order to the `New` state.
+///
+/// `reset_order` is a PATCH HTTP method.
+///
+/// This is useful when an order has expired or was cancelled, but the customer still wants to pay for it, or
+/// if an order was reassigned, or otherwise modified and needs to be re-processed.
+///
+/// ## Arguments
+/// Arguments for this route are set on the path, i.e.
+/// `/reset_order/{order_id}`
+///
+/// ## Returns
+/// The endpoint returns the order states before and after the reset.
+pub async fn reset_order<B: PaymentGatewayDatabase>(
+    path: web::Path<OrderId>,
+    api: web::Data<OrderFlowApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let order_id = path.into_inner();
+    info!("💻️ Resetting order {order_id}");
+    let updated_order = api.reset_order(&order_id).await.map_err(|e| {
+        debug!("💻️ Could not reset order. {e}");
+        e
+    })?;
+    Ok(HttpResponse::Ok().json(updated_order))
+}
+
 //----------------------------------------------   Checkout  ----------------------------------------------------
 
 route!(shopify_webhook => Post "webhook/checkout_create" impl PaymentGatewayDatabase);

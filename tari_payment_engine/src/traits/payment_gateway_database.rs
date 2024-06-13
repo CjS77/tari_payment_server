@@ -64,7 +64,6 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// Any order that has enough credit in the account
     /// * Will be marked as Paid
     /// * Returned in the result vector.
-    /// * Will fire an OnOrderPaid hook if one is set.
     async fn try_pay_orders(&self, account_id: i64, orders: &[Order]) -> Result<Vec<Order>, PaymentGatewayError>;
 
     /// Updates the payment status for the given transaction id. This is typically called to transition a payment from
@@ -118,7 +117,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// * The order status is updated in the database.
     /// * The [`process_order`] flow is triggered.
     /// * An entry is added to the audit log.
-    async fn reset_order(&self, order: Order) -> Result<Order, PaymentGatewayError>;
+    async fn reset_order(&self, order: &OrderId) -> Result<OrderChanged, PaymentGatewayError>;
 
     /// Change the customer id for the given `order_id`. This function has several side effects:
     /// - The `customer_id` field of the order is updated in the database.

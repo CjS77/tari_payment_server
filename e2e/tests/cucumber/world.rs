@@ -36,7 +36,7 @@ pub struct TPGWorld {
     pub wallets: HashMap<SerializedTariAddress, RistrettoSecretKey>,
     // Hashmap of order_id and whether the hook has been called.
     pub on_paid_hook_results: HashMap<String, bool>,
-    pub last_event_type: Arc<Mutex<Option<EventType>>>,
+    pub last_event_type: Arc<Mutex<HashMap<&'static str, EventType>>>,
 }
 
 impl Default for TPGWorld {
@@ -64,7 +64,7 @@ impl Default for TPGWorld {
             logged_in: false,
             wallets: HashMap::new(),
             on_paid_hook_results: HashMap::new(),
-            last_event_type: Arc::new(Mutex::new(None)),
+            last_event_type: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -95,8 +95,8 @@ impl TPGWorld {
             let event = Arc::clone(&last_event);
             hooks.on_order_paid(move |ev| {
                 info!("🌍️ Received order paid event: {ev:?}");
-                if let Ok(mut le) = event.lock() {
-                    *le = Some(EventType::OrderPaid(ev));
+                if let Ok(mut events) = event.lock() {
+                    events.insert("OrderPaid", EventType::OrderPaid(ev));
                 }
                 Box::pin(async {})
             });
@@ -104,7 +104,7 @@ impl TPGWorld {
             hooks.on_order_annulled(move |ev| {
                 info!("🌍️ Received order {} event: {ev:?}", ev.status.to_string().to_ascii_uppercase());
                 if let Ok(mut le) = event.lock() {
-                    *le = Some(EventType::OrderAnnulled(ev));
+                    le.insert("OrderAnnulled", EventType::OrderAnnulled(ev));
                 }
                 Box::pin(async {})
             });
@@ -112,7 +112,23 @@ impl TPGWorld {
             hooks.on_order_modified(move |ev| {
                 info!("🌍️ Received order modified event: {ev:?}");
                 if let Ok(mut le) = event.lock() {
-                    *le = Some(EventType::OrderModified(ev));
+                    le.insert("OrderModified", EventType::OrderModified(ev));
+                }
+                Box::pin(async {})
+            });
+            let event = Arc::clone(&last_event);
+            hooks.on_new_order(move |ev| {
+                info!("🌍️ Received new order event: {ev:?}");
+                if let Ok(mut le) = event.lock() {
+                    le.insert("NewOrder", EventType::NewOrder(ev));
+                }
+                Box::pin(async {})
+            });
+            let event = Arc::clone(&last_event);
+            hooks.on_payment_received(move |ev| {
+                info!("🌍️ Received payment event: {ev:?}");
+                if let Ok(mut le) = event.lock() {
+                    le.insert("Payment", EventType::Payment(ev));
                 }
                 Box::pin(async {})
             });
@@ -149,8 +165,8 @@ impl TPGWorld {
         (code, body)
     }
 
-    pub fn last_event(&self) -> Option<EventType> {
-        self.last_event_type.lock().unwrap().clone()
+    pub fn last_event(&self, ev_type: &str) -> Option<EventType> {
+        self.last_event_type.lock().expect("Another thread panicked while getting a lock").get(ev_type).cloned()
     }
 }
 

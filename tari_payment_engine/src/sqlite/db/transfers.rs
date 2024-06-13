@@ -46,7 +46,7 @@ pub async fn credit_note(note: CreditNote, conn: &mut SqliteConnection) -> Resul
     let payment = sqlx::query_as(
         r#"
             INSERT INTO payments (txid, sender, amount, memo, payment_type, status)
-            VALUES ($1, $2, $3, $4, 'Manual', 'Confirmed');
+            VALUES ($1, $2, $3, $4, 'Manual', 'Confirmed') RETURNING *;
         "#,
     )
     .bind(txid.clone())

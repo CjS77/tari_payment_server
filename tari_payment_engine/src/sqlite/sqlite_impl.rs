@@ -299,24 +299,28 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     ///
     /// * The order status is updated in the database.
     /// * The [`process_order`] flow is triggered.
-    async fn reset_order(&self, order: Order) -> Result<Order, PaymentGatewayError> {
-        if !matches!(order.status, OrderStatusType::Expired | OrderStatusType::Cancelled) {
-            error!("🗃️ Order {} is not in 'Expired' or 'Cancelled' status. Cannot call reset_order", order.id);
+    async fn reset_order(&self, order_id: &OrderId) -> Result<OrderChanged, PaymentGatewayError> {
+        let mut tx = self.pool.begin().await?;
+        let old_order = orders::fetch_order_by_order_id(order_id, &mut tx)
+            .await?
+            .ok_or_else(|| AccountApiError::OrderDoesNotExist(order_id.clone()))?;
+        if !matches!(old_order.status, OrderStatusType::Expired | OrderStatusType::Cancelled) {
+            error!("🗃️ Order {} is not in 'Expired' or 'Cancelled' status. Cannot call reset_order", old_order.id);
             return Err(PaymentGatewayError::OrderModificationForbidden);
         }
         let update = ModifyOrderRequest::default().with_new_status(OrderStatusType::New);
-        let mut tx = self.pool.begin().await?;
-        let order = orders::update_order(&order.order_id, update, &mut tx)
+        let updated_order = orders::update_order(&old_order.order_id, update, &mut tx)
             .await?
-            .ok_or_else(|| AccountApiError::OrderDoesNotExist(order.order_id.clone()))?;
+            .ok_or_else(|| AccountApiError::OrderDoesNotExist(old_order.order_id.clone()))?;
 
-        let price = order.total_price;
-        let account = user_accounts::user_account_for_customer_id(&order.customer_id, &mut tx)
+        let price = updated_order.total_price;
+        let account = user_accounts::user_account_for_customer_id(&updated_order.customer_id, &mut tx)
             .await?
-            .ok_or_else(|| PaymentGatewayError::AccountShouldExistForOrder(order.order_id.clone()))?;
+            .ok_or_else(|| PaymentGatewayError::AccountShouldExistForOrder(updated_order.order_id.clone()))?;
         user_accounts::incr_order_totals(account.id, price, price, &mut tx).await?;
         tx.commit().await?;
-        Ok(order)
+        let result = OrderChanged::new(old_order, updated_order);
+        Ok(result)
     }
 
     /// Change the customer id for the given `order_id`. This function has several side effects:
@@ -424,7 +428,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     async fn modify_memo_for_order(&self, order_id: &OrderId, new_memo: &str) -> Result<Order, PaymentGatewayError> {
         let update = ModifyOrderRequest::default().with_new_memo(new_memo);
         let mut conn = self.pool.acquire().await?;
-        let order = orders::update_order(&order_id, update, &mut conn)
+        let order = orders::update_order(order_id, update, &mut conn)
             .await?
             .ok_or_else(|| AccountApiError::OrderDoesNotExist(order_id.clone()))?;
         Ok(order)

@@ -53,18 +53,17 @@ Feature: Order Fulfillment
     """
     Then order "alice001" is in state Paid
     And Alice has a current balance of 100 Tari
-    And the OnOrderPaid trigger fires with
+    And the OrderPaid trigger fires with
     """
     {
+      "order": {
       "order_id": "alice001",
       "customer_id": "alice",
-      "memo": "",
       "total_price": 2400000000,
       "currency": "XTR",
       "id": 1,
-      "created_at": "2021-01-01T00:00:00Z",
-      "updated_at": "2021-01-01T00:00:00Z",
       "status": "Paid"
     }
+   }
    """
 

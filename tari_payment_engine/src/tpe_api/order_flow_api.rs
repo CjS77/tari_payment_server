@@ -212,20 +212,43 @@ where B: PaymentGatewayDatabase
 
     /// Manually reset an order from `Expired` or `Cancelled` status to `New` status.
     ///
-    /// This method is called by the default implementation of [`modify_status_for_order`] when the new status
-    /// is `New`. This is often done as a follow-up step to changing the customer id for an order.
-    ///
     /// The side effects for resetting an order are the same for both Expired and Cancelled orders.
     /// The effect is as if a new order comes in with the given details.
     ///
-    /// * The order status is updated in the database.
-    /// * The [`process_order`] flow is triggered. This means that if the user has enough credit, then the order is
-    ///   paid.
-    /// * An `OnOrderModified` event is triggered.
-    /// * A `NewOrder` event is triggered.
+    /// The reset causes the following side effects:
+    /// * Resets the order status to `New`.
+    /// * Calls the `OrderModified` event trigger.
+    /// * Calls the `NewOrder` event trigger.
+    /// * Tries to pay for the order, and if successful, triggers the `OrderPaid` event.
     /// * The audit log gets a new entry.
-    pub async fn reset_order(&self, order: Order) -> Result<Order, PaymentGatewayError> {
-        todo!()
+    pub async fn reset_order(&self, order_id: &OrderId) -> Result<OrderChanged, PaymentGatewayError> {
+        debug!("🔄️📦️ Resetting order [{}]", order_id);
+        let mut changes = self.db.reset_order(order_id).await?;
+        self.call_order_modified_hook("status", changes.clone()).await;
+        self.call_new_order_hook(&changes.new_order).await;
+        if let Some(paid_order) = self.try_pay_order(&changes.new_order).await? {
+            changes.new_order = paid_order;
+        }
+        Ok(changes)
+    }
+
+    pub async fn try_pay_order(&self, order: &Order) -> Result<Option<Order>, PaymentGatewayError> {
+        let account = self
+            .db
+            .fetch_user_account_for_order(&order.order_id)
+            .await?
+            .ok_or_else(|| PaymentGatewayError::AccountShouldExistForOrder(order.order_id.clone()))?;
+        let orders = [order.clone()];
+        let paid_orders = self.db.try_pay_orders(account.id, &orders).await?;
+        if paid_orders.len() > 1 {
+            error!(
+                "🔄️📦️ One order was supposed to be paid, but the set of paid orders was: {paid_orders:?}. This is \
+                 nota catastrophe, so I'm carrying on, but try and fix this ASAP."
+            );
+        }
+        self.call_order_paid_hook(&paid_orders).await;
+        let updated_order = paid_orders.first().cloned();
+        Ok(updated_order)
     }
 
     /// Change the customer id for the given `order_id`. This function has several side effects:

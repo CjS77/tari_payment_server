@@ -50,11 +50,14 @@ Feature: Admins can update the memo field of an order
     """
     {"order_id": "1", "memo": "Threw in some purple jelly beans"}
     """
-    Then the OnOrderModified trigger fires with
+    Then the OrderModified trigger fires with
     """
     {
-      "old_order": {"order_id": "1", "memo": "Manually inserted by Keith"},
-      "new_order": {"order_id": "1", "memo": "Threw in some purple jelly beans"}
+      "field_changed":"memo",
+      "orders": {
+        "old_order": {"order_id": "1", "memo": "Manually inserted by Keith"},
+        "new_order": {"order_id": "1", "memo": "Threw in some purple jelly beans"}
+      }
     }
     """
 

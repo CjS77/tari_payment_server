@@ -10,8 +10,8 @@ use tari_jwt::{
     Ristretto256SigningKey,
 };
 use tari_payment_engine::{
-    db_types::{MicroTari, Order, OrderId, OrderStatusType, Role},
-    events::{EventProducers, EventType, OrderEvent},
+    db_types::{MicroTari, OrderId, Role},
+    events::{EventProducers, EventType},
     traits::{AccountManagement, AuthManagement},
     OrderFlowApi,
 };
@@ -324,44 +324,23 @@ async fn check_customer_balance(world: &mut TPGWorld, cust_id: String, bal_type:
     assert_eq!(actual_balance, expected_balance);
 }
 
-#[then("the OnOrderPaid trigger fires with")]
-async fn check_order_paid_trigger(world: &mut TPGWorld, step: &Step) {
-    let json = step.docstring().expect("No expected order");
-    let order = serde_json::from_str::<Order>(&json).map_err(|e| error!("{e}")).expect("Failed to parse order");
-    let last_event = world.last_event();
-    let ev = OrderEvent::new(order);
-    assert_eq!(last_event, Some(EventType::OrderPaid(ev)));
-}
-
-#[then("the OnOrderModified trigger fires with")]
-async fn check_order_modified_trigger(world: &mut TPGWorld, step: &Step) {
-    let last_event = world.last_event();
+#[then(expr = "the {word} trigger fires with")]
+async fn check_event_trigger(world: &mut TPGWorld, event_type: String, step: &Step) {
+    let last_event = world.last_event(&event_type);
     if last_event.is_none() {
-        panic!("Expected an OnOrderModified event but no event was triggered");
+        panic!("Expected {event_type} event but no event was triggered");
     }
-    if let Some(EventType::OrderModified(ev)) = &last_event {
-        let expected = step.docstring().expect("No expected OrderModifiedEvent in docstring");
-        let json = serde_json::to_string(ev).expect("Failed to serialize order");
-        assert!(json_is_subset_of(expected, &json), "Expected order to be '{expected}', got '{json}'");
-    } else {
-        panic!("Expected an OrderModifiedEvent event but got {last_event:?}");
+    let ev = last_event.unwrap();
+    let json = match ev {
+        EventType::NewOrder(e) => serde_json::to_string(&e),
+        EventType::OrderPaid(e) => serde_json::to_string(&e),
+        EventType::OrderAnnulled(e) => serde_json::to_string(&e),
+        EventType::OrderModified(e) => serde_json::to_string(&e),
+        EventType::Payment(e) => serde_json::to_string(&e),
     }
-}
-
-#[then(expr = "the OnOrderAnnulled trigger fires with {word} status and order")]
-async fn check_order_annulled_trigger(world: &mut TPGWorld, expected_status: OrderStatusType, step: &Step) {
-    let last_event = world.last_event();
-    if last_event.is_none() {
-        panic!("Expected an OnOrderAnnulled event but no event was triggered");
-    }
-    if let Some(EventType::OrderAnnulled(ev)) = &last_event {
-        assert_eq!(ev.status, expected_status);
-        let expected_order = step.docstring().expect("No expected order");
-        let json = serde_json::to_string(&ev.order).expect("Failed to serialize order");
-        assert!(json_is_subset_of(expected_order, &json), "Expected order to be '{expected_order}', got '{json}'");
-    } else {
-        panic!("Expected an OnOrderAnnulled event but got {last_event:?}");
-    }
+    .expect("Failed to serialize event");
+    let expected = step.docstring().expect("No expected OrderModifiedEvent in docstring");
+    assert!(json_is_subset_of(expected, &json), "Expected order to be '{expected}', got '{json}'");
 }
 
 #[then(expr = "address {word} has roles {string}")]
