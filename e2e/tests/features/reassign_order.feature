@@ -49,7 +49,7 @@ Feature: Admins can assign an order to a new customer
     }
     """
     Then I receive a 200 OK response
-    Then I receive a partial JSON response:
+    And I receive a partial JSON response:
     """
     {
       "orders": {
@@ -61,7 +61,7 @@ Feature: Admins can assign an order to a new customer
       "is_filled": false
     }
     """
-    Then the OnOrderModified trigger fires with
+    And the OrderModified trigger fires with
     """
     {
       "field_changed": "customer_id",
@@ -71,8 +71,8 @@ Feature: Admins can assign an order to a new customer
       }
     }
     """
-    Then account for alice has current orders worth 65 XTR
-    Then account for bob has current orders worth 650 XTR
+    And account for alice has current orders worth 65 XTR
+    And account for bob has current orders worth 650 XTR
 
   Scenario: Assigning an order to a non-existent customer creates a new account
     When Admin authenticates with nonce = 1 and roles = "write"
@@ -85,7 +85,7 @@ Feature: Admins can assign an order to a new customer
     }
     """
     Then I receive a 200 OK response
-    Then I receive a partial JSON response:
+    And I receive a partial JSON response:
     """
     {
       "orders": {
@@ -97,7 +97,7 @@ Feature: Admins can assign an order to a new customer
       "is_filled": false
     }
     """
-    Then the OnOrderModified trigger fires with
+    And the OrderModified trigger fires with
     """
     {
       "field_changed": "customer_id",
@@ -107,8 +107,8 @@ Feature: Admins can assign an order to a new customer
       }
     }
     """
-    Then account for alice has current orders worth 65 XTR
-    Then account for dave has current orders worth 100 XTR
+    And account for alice has current orders worth 65 XTR
+    And account for dave has current orders worth 100 XTR
 
 
   Scenario: Assigning an order to the same customer returns an error
@@ -143,7 +143,7 @@ Feature: Admins can assign an order to a new customer
     }
     """
     Then I receive a 200 OK response
-    Then I receive a partial JSON response:
+    And I receive a partial JSON response:
     """
     {
       "orders": {
@@ -155,7 +155,7 @@ Feature: Admins can assign an order to a new customer
       "is_filled": true
     }
     """
-    Then the OnOrderModified trigger fires with
+    Then the OrderModified trigger fires with
     """
     {
       "field_changed": "customer_id",
@@ -165,8 +165,17 @@ Feature: Admins can assign an order to a new customer
       }
     }
     """
-    Then account for alice has current orders worth 65 XTR
-    Then account for bob has total orders worth 650 XTR
-    Then account for bob has current orders worth 550 XTR
-    Then Bob has a current balance of 5 Tari
+    And the OrderPaid trigger fires with
+    """
+    { "order": {
+        "order_id": "1",
+        "customer_id": "bob",
+        "total_price": 100000000
+      }
+    }
+    """
+    And account for alice has current orders worth 65 XTR
+    And account for bob has total orders worth 650 XTR
+    And account for bob has current orders worth 550 XTR
+    And Bob has a current balance of 5 Tari
 

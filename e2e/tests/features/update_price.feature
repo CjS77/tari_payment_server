@@ -47,7 +47,7 @@ Feature: Admins can update the price field of an order
     }
     """
     Then I receive a 200 OK response
-    Then Alice has a current balance of 45 Tari
+    And Alice has a current balance of 45 Tari
     # Reduce the price, but still not enough for the order to be filled
     When Admin PATCHs to "/api/order_price" with body
     """
@@ -57,11 +57,11 @@ Feature: Admins can update the price field of an order
     }
     """
     Then I receive a 200 OK response
-    Then I receive a partial JSON response:
+    And I receive a partial JSON response:
     """
     {"order_id": "1", "total_price": 50000000 }
     """
-    Then the OnOrderModified trigger fires with
+    And the OrderModified trigger fires with
     """
     {
       "field_changed": "total_price",
@@ -71,8 +71,8 @@ Feature: Admins can update the price field of an order
       }
     }
     """
-    Then Alice has a current balance of 45 Tari
-    Then order "1" is in state New
+    And Alice has a current balance of 45 Tari
+    And order "1" is in state New
     # Reduce the price again, but this time, the order will be filled
     When Admin PATCHs to "/api/order_price" with body
     """
@@ -82,11 +82,11 @@ Feature: Admins can update the price field of an order
     }
     """
     Then I receive a 200 OK response
-    Then I receive a partial JSON response:
+    And I receive a partial JSON response:
     """
     {"order_id": "1", "total_price": 25000000 }
     """
-    Then the OnOrderModified trigger fires with
+    And the OrderModified trigger fires with
     """
     {
       "field_changed": "total_price",
@@ -96,8 +96,17 @@ Feature: Admins can update the price field of an order
       }
     }
     """
-    Then Alice has a current balance of 20 Tari
-    Then order "1" is in state Paid
+    And the OrderPaid trigger fires with
+    """
+    { "order": {
+        "order_id": "1",
+        "customer_id": "alice",
+        "total_price": 25000000
+      }
+    }
+    """
+    And Alice has a current balance of 20 Tari
+    And order "1" is in state Paid
     # Reduce the other order's price, and fill the order
     When Admin PATCHs to "/api/order_price" with body
     """
@@ -107,11 +116,11 @@ Feature: Admins can update the price field of an order
     }
     """
     Then I receive a 200 OK response
-    Then I receive a partial JSON response:
+    And I receive a partial JSON response:
     """
     {"order_id": "3", "total_price": 0 }
     """
-    Then the OnOrderModified trigger fires with
+    And the OrderModified trigger fires with
     """
     {
       "field_changed": "total_price",
@@ -121,10 +130,19 @@ Feature: Admins can update the price field of an order
       }
     }
     """
-    Then Alice has a current balance of 20 Tari
-    Then order "3" is in state Paid
-    Then account for alice has current orders worth 0 XTR
-    Then account for alice has total orders worth 25 XTR
+    And the OrderPaid trigger fires with
+    """
+    { "order": {
+        "order_id": "3",
+        "customer_id": "alice",
+        "total_price": 0
+      }
+    }
+    """
+    And Alice has a current balance of 20 Tari
+    And order "3" is in state Paid
+    And account for alice has current orders worth 0 XTR
+    And account for alice has total orders worth 25 XTR
 
   Scenario: The price must be positive
     When Admin authenticates with nonce = 1 and roles = "write"
