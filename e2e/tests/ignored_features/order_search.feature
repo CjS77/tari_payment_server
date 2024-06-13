@@ -35,11 +35,11 @@ Feature: Admins can search orders by various criteria
     [ { "order_id": "2"}, { "order_id": "3"} ]
     """
 
-#  Scenario: Admin can search for orders with a given status
-#    When todo
-#
-#  Scenario: Admin can search for orders with two given statuses
-#    When todo
+  Scenario: Admin can search for orders with a given status
+    When todo
+
+  Scenario: Admin can search for orders with two given statuses
+    When todo
 
   Scenario: Admin can search for orders with a matching memo field
     When Admin GETs to "/api/search/orders?memo=Charlie" with body

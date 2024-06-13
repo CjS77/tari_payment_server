@@ -97,10 +97,10 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     /// * creates a new account for the public key if one does not already exist
     /// * Adds the payment amount to the account's total received, and total pending
     /// Returns the account id for the public key.
-    async fn process_new_payment_for_pubkey(&self, payment: NewPayment) -> Result<i64, PaymentGatewayError> {
+    async fn process_new_payment_for_pubkey(&self, payment: NewPayment) -> Result<(i64, Payment), PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
-        let txid = transfers::idempotent_insert(payment.clone(), &mut tx).await?;
-        debug!("🗃️ Transfer {txid} received from [{}]", payment.sender.as_address());
+        let payment = transfers::idempotent_insert(payment.clone(), &mut tx).await?;
+        debug!("🗃️ Transfer {} received from [{}]", payment.txid, payment.sender.as_address());
         let customer_id = match &payment.order_id {
             Some(order_id) => {
                 let existing_order = orders::fetch_order_by_order_id(order_id, &mut tx).await?;
@@ -108,27 +108,27 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             },
             None => None,
         };
-        let sender = Some(payment.sender.to_address());
+        let sender = Some(payment.sender.as_address().clone());
         let acc_id = user_accounts::fetch_or_create_account(customer_id, sender, &mut tx).await?;
         user_accounts::adjust_balances(acc_id, payment.amount, payment.amount, MicroTari::from(0), &mut tx).await?;
-        debug!("🗃️ Transfer {txid} processed. {} credited to pending account", payment.amount);
+        debug!("🗃️ Transfer {} processed. {} credited to pending account", payment.txid, payment.amount);
         tx.commit().await?;
-        Ok(acc_id)
+        Ok((acc_id, payment))
     }
 
-    async fn process_credit_note_for_customer(&self, note: CreditNote) -> Result<i64, PaymentGatewayError> {
+    async fn process_credit_note_for_customer(&self, note: CreditNote) -> Result<(i64, Payment), PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
-        let address = transfers::credit_note(note.clone(), &mut tx).await?;
-        debug!("🗃️ Credit note for {} created with address {address}", note.customer_id);
+        let payment = transfers::credit_note(note.clone(), &mut tx).await?;
+        debug!("🗃️ Credit note for {} created with address {}", note.customer_id, payment.sender.as_address());
         let CreditNote { amount, customer_id, .. } = note;
-        let sender = Some(address.clone());
+        let sender = Some(payment.sender.as_address().clone());
         let account_id = user_accounts::fetch_or_create_account(Some(customer_id), sender, &mut tx).await?;
         trace!("🗃️ Credit note: account {account_id} has been retrieved/created");
         let zero = MicroTari::from(0);
         user_accounts::adjust_balances(account_id, amount, zero, amount, &mut tx).await?;
         trace!("🗃️ Credit note: adjusting balances for account {account_id} by {amount}");
         tx.commit().await?;
-        Ok(account_id)
+        Ok((account_id, payment))
     }
 
     async fn fetch_payable_orders(&self, account_id: i64) -> Result<Vec<Order>, PaymentGatewayError> {
@@ -243,10 +243,12 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             .ok_or_else(|| PaymentGatewayError::AccountShouldExistForOrder(order.order_id.clone()))?;
         let reason = format!("Admin credit overrode for order {}. Reason: {reason}", order.order_id);
         let note = CreditNote::new(order.customer_id.clone(), order.total_price).with_reason(reason);
-        let address = transfers::credit_note(note, &mut tx).await?;
+        let payment = transfers::credit_note(note, &mut tx).await?;
         info!(
-            "🗃️ Credit note: Customer {} received note for {} with address {address}",
-            order.customer_id, order.total_price
+            "🗃️ Credit note: Customer {} received note for {} with address {}",
+            order.customer_id,
+            order.total_price,
+            payment.sender.as_address()
         );
         // Update account ex-database. This is safe because the transaction will roll back if there's an error
         account.current_balance = account.current_balance + order.total_price;

@@ -384,7 +384,7 @@ impl Display for NewOrder {
 }
 
 //--------------------------------------        Payment       ---------------------------------------------------------
-#[derive(Debug, Clone, Default, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, FromRow)]
 pub struct Payment {
     pub txid: String,
     /// The time the payment was received

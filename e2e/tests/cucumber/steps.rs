@@ -11,7 +11,7 @@ use tari_jwt::{
 };
 use tari_payment_engine::{
     db_types::{MicroTari, Order, OrderId, OrderStatusType, Role},
-    events::{EventProducers, EventType, OrderPaidEvent},
+    events::{EventProducers, EventType, OrderEvent},
     traits::{AccountManagement, AuthManagement},
     OrderFlowApi,
 };
@@ -329,7 +329,7 @@ async fn check_order_paid_trigger(world: &mut TPGWorld, step: &Step) {
     let json = step.docstring().expect("No expected order");
     let order = serde_json::from_str::<Order>(&json).map_err(|e| error!("{e}")).expect("Failed to parse order");
     let last_event = world.last_event();
-    let ev = OrderPaidEvent::new(order);
+    let ev = OrderEvent::new(order);
     assert_eq!(last_event, Some(EventType::OrderPaid(ev)));
 }
 

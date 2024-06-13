@@ -11,59 +11,55 @@ use crate::{
 pub async fn idempotent_insert(
     transfer: NewPayment,
     conn: &mut SqliteConnection,
-) -> Result<String, PaymentGatewayError> {
+) -> Result<Payment, PaymentGatewayError> {
     let txid = transfer.txid.clone();
     let address = transfer.sender.as_address().to_hex();
-    match sqlx::query!(
+    let payment = sqlx::query_as(
         r#"
             INSERT INTO payments (txid, sender, amount, memo) VALUES ($1, $2, $3, $4)
-            RETURNING txid;
+            RETURNING *;
         "#,
-        transfer.txid,
-        address,
-        transfer.amount,
-        transfer.memo,
     )
+    .bind(transfer.txid)
+    .bind(address)
+    .bind(transfer.amount)
+    .bind(transfer.memo)
     .fetch_one(conn)
     .await
-    {
-        Ok(row) => Ok(row.txid),
-        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
-            Err(PaymentGatewayError::PaymentAlreadyExists(txid))
-        },
-        Err(e) => Err(PaymentGatewayError::from(e)),
-    }
+    .map_err(|e| match e {
+        sqlx::Error::Database(err) if err.is_unique_violation() => PaymentGatewayError::PaymentAlreadyExists(txid),
+        _ => PaymentGatewayError::from(e),
+    })?;
+    Ok(payment)
 }
 
 /// Issues a credit note against the customer id. Since payments require a sender address,
 /// a dummy address is created that is unique to the customer id and easily identifiable as a dummy address.
 ///
 /// If the credit note is successfully issued, the address of the dummy address is returned.
-pub async fn credit_note(note: CreditNote, conn: &mut SqliteConnection) -> Result<TariAddress, PaymentGatewayError> {
+pub async fn credit_note(note: CreditNote, conn: &mut SqliteConnection) -> Result<Payment, PaymentGatewayError> {
     let timestamp = Utc::now().timestamp();
     let txid = format!("credit_note_{}:{}:{timestamp}", note.customer_id, note.amount);
     let address = create_dummy_address_for_cust_id(&note.customer_id);
     let hex_addr = address.to_hex();
     let memo = format!("Credit note: {}", note.reason.unwrap_or("No reason given".into()));
-    match sqlx::query!(
+    let payment = sqlx::query_as(
         r#"
             INSERT INTO payments (txid, sender, amount, memo, payment_type, status)
             VALUES ($1, $2, $3, $4, 'Manual', 'Confirmed');
         "#,
-        txid,
-        hex_addr,
-        note.amount,
-        memo
     )
-    .execute(conn)
+    .bind(txid.clone())
+    .bind(hex_addr)
+    .bind(note.amount)
+    .bind(memo)
+    .fetch_one(conn)
     .await
-    {
-        Ok(_) => Ok(address),
-        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
-            Err(PaymentGatewayError::PaymentAlreadyExists(txid))
-        },
-        Err(e) => Err(PaymentGatewayError::from(e)),
-    }
+    .map_err(|e| match e {
+        sqlx::Error::Database(err) if err.is_unique_violation() => PaymentGatewayError::PaymentAlreadyExists(txid),
+        _ => PaymentGatewayError::from(e),
+    })?;
+    Ok(payment)
 }
 
 pub async fn update_status(

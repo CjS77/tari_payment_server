@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    db_types::{MicroTari, Order, OrderStatus, OrderStatusType, PublicKey},
+    db_types::{MicroTari, Order, OrderStatus, OrderStatusType, Payment, PublicKey},
     order_objects::OrderChanged,
 };
 
@@ -20,12 +20,12 @@ pub struct PaymentReceived {
     pub memo: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct OrderPaidEvent {
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OrderEvent {
     pub order: Order,
 }
 
-impl OrderPaidEvent {
+impl OrderEvent {
     pub fn new(order: Order) -> Self {
         Self { order }
     }
@@ -56,9 +56,28 @@ impl OrderModifiedEvent {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PaymentEvent {
+    pub payment: Payment,
+}
+
+impl PaymentEvent {
+    pub fn new(payment: Payment) -> Self {
+        Self { payment }
+    }
+}
+
+impl From<Payment> for PaymentEvent {
+    fn from(payment: Payment) -> Self {
+        Self::new(payment)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EventType {
-    OrderPaid(OrderPaidEvent),
+    NewOrder(OrderEvent),
+    OrderPaid(OrderEvent),
     OrderAnnulled(OrderAnnulledEvent),
     OrderModified(OrderModifiedEvent),
+    Payment(PaymentEvent),
 }
