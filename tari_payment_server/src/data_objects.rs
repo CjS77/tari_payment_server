@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 use tari_payment_engine::{
-    db_types::{MicroTari, NewPayment, OrderId, Role},
+    db_types::{MicroTari, NewPayment, OrderId, Role, SerializedTariAddress},
     helpers::WalletSignature,
 };
 
@@ -74,6 +74,14 @@ pub struct UpdatePriceParams {
 pub struct MoveOrderParams {
     pub order_id: OrderId,
     pub new_customer_id: String,
+    // This reason is not stored in the database, but is captured in the logs
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttachOrderParams {
+    pub order_id: OrderId,
+    pub address: SerializedTariAddress,
     // This reason is not stored in the database, but is captured in the logs
     pub reason: String,
 }
