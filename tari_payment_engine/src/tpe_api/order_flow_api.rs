@@ -1,9 +1,21 @@
 use std::fmt::Debug;
 
 use log::*;
+use tari_common_types::tari_address::TariAddress;
 
 use crate::{
-    db_types::{CreditNote, MicroTari, NewOrder, NewPayment, Order, OrderId, OrderStatusType, Payment, TransferStatus},
+    db_types::{
+        CreditNote,
+        MicroTari,
+        NewOrder,
+        NewPayment,
+        Order,
+        OrderId,
+        OrderStatusType,
+        Payment,
+        TransferStatus,
+        UserAccount,
+    },
     events::{EventProducers, OrderAnnulledEvent, OrderEvent, OrderModifiedEvent, PaymentEvent},
     order_objects::OrderChanged,
     traits::{OrderMovedResult, PaymentGatewayDatabase, PaymentGatewayError},
@@ -372,6 +384,19 @@ where B: PaymentGatewayDatabase
         _new_currency: &str,
     ) -> Result<Order, PaymentGatewayError> {
         Err(PaymentGatewayError::UnsupportedAction("Multiple currencies".to_string()))
+    }
+
+    pub async fn attach_order_to_address(
+        &self,
+        order_id: &OrderId,
+        address: &TariAddress,
+    ) -> Result<UserAccount, PaymentGatewayError> {
+        debug!("🔄️📦️ Attaching order [{order_id}] to address [{address}]");
+        let account = self.db.attach_order_to_address(order_id, address).await?;
+        info!("🔄️📦️ Order [{order_id}] attached to address [{address}]");
+        // todo - hook required here? Nothing existing fits
+        // todo: self.try_pay_order(&account).await?;
+        Ok(account)
     }
 
     pub fn db(&self) -> &B {

@@ -28,6 +28,7 @@ use crate::{
     routes::{
         health,
         AccountRoute,
+        AttachOrderToAddressRoute,
         AuthRoute,
         CancelOrderRoute,
         CheckTokenRoute,
@@ -129,6 +130,7 @@ pub fn create_server_instance(
             .service(UpdatePriceRoute::<SqliteDatabase>::new())
             .service(ReassignOrderRoute::<SqliteDatabase>::new())
             .service(ResetOrderRoute::<SqliteDatabase>::new())
+            .service(AttachOrderToAddressRoute::<SqliteDatabase>::new())
             .service(CheckTokenRoute::new());
         let use_x_forwarded_for = config.use_x_forwarded_for;
         let use_forwarded = config.use_forwarded;

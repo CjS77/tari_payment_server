@@ -42,6 +42,7 @@ use crate::{
     auth::{check_login_token_signature, JwtClaims, TokenIssuer},
     config::ProxyConfig,
     data_objects::{
+        AttachOrderParams,
         JsonResponse,
         ModifyOrderParams,
         MoveOrderParams,
@@ -662,6 +663,37 @@ pub async fn reset_order<B: PaymentGatewayDatabase>(
         e
     })?;
     Ok(HttpResponse::Ok().json(updated_order))
+}
+
+route!(attach_order_to_address => Post "/attach_order" impl PaymentGatewayDatabase where requires [Role::Write]);
+/// Attach an order to a Tari address
+///
+/// This endpoint is used to attach an order to a Tari address. This is useful when a user has made an order but
+/// messed up the memo signature. Once support has verified the order, they can override the entry and attach
+/// the order to the correct address.
+///
+/// The address does _not_ have to exist in the database. A new account will be created if the address is not found.
+///
+/// _Note_: This feature is written, but it's not clear how it should be supported. Currently, you _must_ supply a valid
+/// memo signature with the order to prevent spoofing attacks. That signature contains the wallet address.
+/// From there, you can use `reassign_order` to move the order to a different address.
+///
+/// So I'll leave this stub here for now, and once the server is in production, either a use case will present itself,
+/// or we can remove this endpoint.
+pub async fn attach_order_to_address<B: PaymentGatewayDatabase>(
+    body: web::Json<AttachOrderParams>,
+    _api: web::Data<OrderFlowApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let AttachOrderParams { order_id, address, reason } = body.into_inner();
+    let address = address.to_address();
+    info!("💻️ Request to attach order {order_id} to address {address}. Reason: {reason}");
+    Err(ServerError::CannotCompleteRequest("This feature is not supported yet.".into()))
+    // info!("💻️ Attaching order {order_id} to address {address}. Reason: {reason}");
+    // let account = api.attach_order_to_address(&order_id, &address).await.map_err(|e| {
+    //     debug!("💻️ Could not attach order. {e}");
+    //     e
+    // })?;
+    // Ok(HttpResponse::Ok().json(account))
 }
 
 //----------------------------------------------   Checkout  ----------------------------------------------------

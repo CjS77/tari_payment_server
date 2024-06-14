@@ -475,6 +475,24 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         Ok(delta)
     }
 
+    async fn attach_order_to_address(
+        &self,
+        order_id: &OrderId,
+        address: &TariAddress,
+    ) -> Result<UserAccount, PaymentGatewayError> {
+        let mut tx = self.pool.begin().await?;
+        let order = orders::fetch_order_by_order_id(order_id, &mut tx)
+            .await?
+            .ok_or_else(|| AccountApiError::OrderDoesNotExist(order_id.clone()))?;
+        let customer_id = order.customer_id.clone();
+        let acc_id = user_accounts::fetch_or_create_account(Some(customer_id), Some(address.clone()), &mut tx).await?;
+        let account = user_accounts::user_account_by_id(acc_id, &mut tx)
+            .await?
+            .ok_or_else(|| PaymentGatewayError::AccountShouldExistForOrder(order_id.clone()))?;
+        tx.commit().await?;
+        Ok(account)
+    }
+
     async fn close(&mut self) -> Result<(), PaymentGatewayError> {
         self.pool.close().await;
         Ok(())

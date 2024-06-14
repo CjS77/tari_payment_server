@@ -1,7 +1,19 @@
+use tari_common_types::tari_address::TariAddress;
 use thiserror::Error;
 
 use crate::{
-    db_types::{CreditNote, MicroTari, NewOrder, NewPayment, Order, OrderId, OrderStatusType, Payment, TransferStatus},
+    db_types::{
+        CreditNote,
+        MicroTari,
+        NewOrder,
+        NewPayment,
+        Order,
+        OrderId,
+        OrderStatusType,
+        Payment,
+        TransferStatus,
+        UserAccount,
+    },
     order_objects::OrderChanged,
     traits::{data_objects::OrderMovedResult, AccountApiError, AccountManagement},
 };
@@ -181,6 +193,12 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     ) -> Result<Order, PaymentGatewayError> {
         Err(PaymentGatewayError::UnsupportedAction("Multiple currencies".to_string()))
     }
+
+    async fn attach_order_to_address(
+        &self,
+        order_id: &OrderId,
+        address: &TariAddress,
+    ) -> Result<UserAccount, PaymentGatewayError>;
 
     /// Closes the database connection.
     async fn close(&mut self) -> Result<(), PaymentGatewayError> {
