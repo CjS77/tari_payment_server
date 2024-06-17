@@ -79,5 +79,6 @@ pub enum EventType {
     OrderPaid(OrderEvent),
     OrderAnnulled(OrderAnnulledEvent),
     OrderModified(OrderModifiedEvent),
-    Payment(PaymentEvent),
+    PaymentReceived(PaymentEvent),
+    Confirmation(PaymentEvent),
 }

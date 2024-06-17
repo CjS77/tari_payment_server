@@ -111,6 +111,14 @@ where B: PaymentGatewayDatabase
         }
     }
 
+    async fn call_payment_confirmed_hook(&self, payment: &Payment) {
+        debug!("🔄️💰️ Notifying payment confirmed hook subscribers");
+        for emitter in &self.producers.payment_confirmed_producer {
+            let event = PaymentEvent::new(payment.clone());
+            emitter.publish_event(event).await;
+        }
+    }
+
     /// Submit a new payment to the order manager.
     ///
     /// This should be a brand-new payment. If the payment already exists, the order manager will return an error.
@@ -154,24 +162,16 @@ where B: PaymentGatewayDatabase
 
     /// Update the status of a payment to "Confirmed". This happens when a transaction in the blockchain is deep enough
     /// in the chain that a re-org and invalidation of the payment is unlikely.
-    pub async fn confirm_payment(&self, txid: String) -> Result<Vec<Order>, PaymentGatewayError> {
+    pub async fn confirm_payment(&self, txid: String) -> Result<Payment, PaymentGatewayError> {
         trace!("🔄️✅️ Payment {txid} is being marked as confirmed");
-        let account_id = self.db.update_payment_status(&txid, TransferStatus::Confirmed).await?;
-        let paid_orders = match account_id {
-            Some(acc_id) => {
-                let payable = self.db.fetch_payable_orders(acc_id).await?;
-                trace!("🔄️✅️ {} fulfillable orders fetched for account #{acc_id}", payable.len());
-                let paid_orders = self.db.try_pay_orders(acc_id, &payable).await?;
-                debug!("🔄️✅️ [{txid}] confirmed. {} orders are paid for account #{acc_id}", payable.len());
-                self.call_order_paid_hook(&paid_orders).await;
-                paid_orders
-            },
-            None => {
-                error!("🔄️✅️ [{txid}] confirmed, but it is not linked to any account!");
-                Vec::new()
-            },
-        };
-        Ok(paid_orders)
+        let (account_id, payment) = self.db.update_payment_status(&txid, TransferStatus::Confirmed).await?;
+        let payable = self.db.fetch_payable_orders(account_id).await?;
+        trace!("🔄️✅️ {} fulfillable orders fetched for account #{account_id}", payable.len());
+        let paid_orders = self.db.try_pay_orders(account_id, &payable).await?;
+        debug!("🔄️✅️ [{txid}] confirmed. {} orders are paid for account #{account_id}", paid_orders.len());
+        self.call_order_paid_hook(&paid_orders).await;
+        self.call_payment_confirmed_hook(&payment).await;
+        Ok(payment)
     }
 
     /// Mark a payment as cancelled and update orders and accounts as necessary.

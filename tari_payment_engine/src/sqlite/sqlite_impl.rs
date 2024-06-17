@@ -182,7 +182,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         &self,
         txid: &str,
         status: TransferStatus,
-    ) -> Result<Option<i64>, PaymentGatewayError> {
+    ) -> Result<(i64, Payment), PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
         let payment = transfers::fetch_payment(txid, &mut tx).await?;
         if payment.is_none() {
@@ -194,7 +194,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         use TransferStatus::*;
         if old_status == status {
             debug!("🗃️ Payment {txid} already has status {status}. No action to take");
-            return Ok(None);
+            return Err(PaymentGatewayError::PaymentModificationNoOp);
         }
         if old_status != Received {
             error!(
@@ -216,7 +216,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         let acc_id = account.id;
         let unchanged = MicroTari::from(0);
         let amount = payment.amount;
-        transfers::update_status(txid, status, &mut tx).await?;
+        let payment = transfers::update_status(txid, status, &mut tx).await?;
 
         match status {
             Confirmed => user_accounts::adjust_balances(acc_id, unchanged, -amount, amount, &mut tx).await?,
@@ -225,7 +225,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         };
         debug!("🗃️ Payment [{txid}] is now {status}. Balances have been updated.");
         tx.commit().await?;
-        Ok(Some(acc_id))
+        Ok((acc_id, payment))
     }
 
     /// A manual order status transition from `New` to `Paid` status.

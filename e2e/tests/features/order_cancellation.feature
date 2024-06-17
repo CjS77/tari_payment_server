@@ -36,6 +36,7 @@ Feature: Admins can cancel an order
     Then I receive a 403 Forbidden response with the message 'Insufficient permissions.'
 
   Scenario: An admin can cancel an order on behalf of a user
+    When account for alice has total orders worth 65 XTR
     When Admin authenticates with nonce = 1 and roles = "write"
     When Admin POSTs to "/api/cancel" with body
         """
@@ -88,31 +89,31 @@ Feature: Admins can cancel an order
     Then account for alice has current orders worth 65 XTR
     Then Alice has a current balance of 0 Tari
 
-Scenario: You cannot cancel a completed order
-  When Admin authenticates with nonce = 1 and roles = "write"
-  When Admin POSTs to "/api/fulfill" with body
-        """
-        {
-          "order_id": "1",
-          "reason": "Redeem voucher"
-        }
-        """
-  Then I receive a 200 OK response
-  Then I receive a partial JSON response:
-    """
-    {"order_id": "1", "customer_id":"alice", "total_price": 100000000, "status": "Paid"}
-    """
-  Then order "1" is in state Paid
-  When Admin POSTs to "/api/cancel" with body
-        """
-        {
-          "order_id": "1",
-          "reason": "Cancel after shipping?"
-        }
-        """
-  Then I receive a 400 BadRequest response
-  Then I receive a partial JSON response:
-    """
-    {"error": "Cannot complete this request. The requested order change is forbidden."}
-    """
-  Then order "1" is in state Paid
+  Scenario: You cannot cancel a completed order
+    When Admin authenticates with nonce = 1 and roles = "write"
+    When Admin POSTs to "/api/fulfill" with body
+          """
+          {
+            "order_id": "1",
+            "reason": "Redeem voucher"
+          }
+          """
+    Then I receive a 200 OK response
+    Then I receive a partial JSON response:
+      """
+      {"order_id": "1", "customer_id":"alice", "total_price": 100000000, "status": "Paid"}
+      """
+    Then order "1" is in state Paid
+    When Admin POSTs to "/api/cancel" with body
+          """
+          {
+            "order_id": "1",
+            "reason": "Cancel after shipping?"
+          }
+          """
+    Then I receive a 400 BadRequest response
+    Then I receive a partial JSON response:
+      """
+      {"error": "Cannot complete this request. The requested order change is forbidden."}
+      """
+    Then order "1" is in state Paid

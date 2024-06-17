@@ -128,7 +128,15 @@ impl TPGWorld {
             hooks.on_payment_received(move |ev| {
                 info!("🌍️ Received payment event: {ev:?}");
                 if let Ok(mut le) = event.lock() {
-                    le.insert("Payment", EventType::Payment(ev));
+                    le.insert("PaymentReceived", EventType::PaymentReceived(ev));
+                }
+                Box::pin(async {})
+            });
+            let event = Arc::clone(&last_event);
+            hooks.on_payment_confirmed(move |ev| {
+                info!("🌍️ Received payment confirmation event: {ev:?}");
+                if let Ok(mut le) = event.lock() {
+                    le.insert("PaymentConfirmed", EventType::PaymentReceived(ev));
                 }
                 Box::pin(async {})
             });

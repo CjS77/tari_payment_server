@@ -66,10 +66,15 @@ pub async fn update_status(
     txid: &str,
     status: TransferStatus,
     conn: &mut SqliteConnection,
-) -> Result<(), PaymentGatewayError> {
+) -> Result<Payment, PaymentGatewayError> {
     let status = status.to_string();
-    let _ = sqlx::query!("UPDATE payments SET status = $1 WHERE txid = $2", status, txid).execute(conn).await?;
-    Ok(())
+    let payment = sqlx::query_as("UPDATE payments SET status = $1 WHERE txid = $2 RETURNING *")
+        .bind(status)
+        .bind(txid)
+        .fetch_optional(conn)
+        .await?
+        .ok_or(PaymentGatewayError::PaymentStatusUpdateError(format!("Payment for {txid} does not exist")))?;
+    Ok(payment)
 }
 
 pub async fn fetch_payment(txid: &str, conn: &mut SqliteConnection) -> Result<Option<Payment>, PaymentGatewayError> {
