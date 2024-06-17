@@ -847,8 +847,9 @@ where
             error!("💻️ Could not confirm payment. {e}");
             JsonResponse::failure(String::from("Could not confirm payment."))
         },
-        Ok(orders) => {
-            info!("💻️ Payment {tx_id} confirmed successfully. {} orders have been paid as a result.", orders.len());
+        Ok(payment) => {
+            info!("💻️ Payment {} confirmed successfully.", payment.txid);
+            debug!("💻️ Payment details: {payment:?}");
             JsonResponse::success(format!("Payment {tx_id} confirmed successfully."))
         },
     };

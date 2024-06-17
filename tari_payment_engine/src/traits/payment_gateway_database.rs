@@ -89,7 +89,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
         &self,
         tx_id: &str,
         status: TransferStatus,
-    ) -> Result<Option<i64>, PaymentGatewayError>;
+    ) -> Result<(i64, Payment), PaymentGatewayError>;
 
     /// A manual order status transition from `New` to `Paid` status.
     /// This method is called by the default implementation of [`modify_status_for_order`] when the new status is
@@ -228,6 +228,8 @@ pub enum PaymentGatewayError {
     OrderModificationNoOp,
     #[error("The requested order change is forbidden.")]
     OrderModificationForbidden,
+    #[error("The requested payment update would result in a no-op.")]
+    PaymentModificationNoOp,
     #[error("The requested order (internal id {0}) does not exist")]
     OrderIdNotFound(i64),
     #[error("The requested order {0} does not exist")]

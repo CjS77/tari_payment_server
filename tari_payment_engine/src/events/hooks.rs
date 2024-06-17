@@ -22,6 +22,7 @@ pub struct EventProducers {
     pub order_annulled_producer: Vec<EventProducer<OrderAnnulledEvent>>,
     pub order_modified_producer: Vec<EventProducer<OrderModifiedEvent>>,
     pub payment_received_producer: Vec<EventProducer<PaymentEvent>>,
+    pub payment_confirmed_producer: Vec<EventProducer<PaymentEvent>>,
 }
 
 /// A container struct for holding event handlers for the different event types. These handlers are typically hooks
@@ -32,6 +33,7 @@ pub struct EventHandlers {
     pub on_order_annulled: Option<EventHandler<OrderAnnulledEvent>>,
     pub on_order_modified: Option<EventHandler<OrderModifiedEvent>>,
     pub on_payment_received: Option<EventHandler<PaymentEvent>>,
+    pub on_payment_confirmed: Option<EventHandler<PaymentEvent>>,
 }
 
 impl EventHandlers {
@@ -41,7 +43,15 @@ impl EventHandlers {
         let on_order_annulled = hooks.on_order_annulled.map(|f| EventHandler::new(buffer_size, f));
         let on_order_modified = hooks.on_order_modified.map(|f| EventHandler::new(buffer_size, f));
         let on_payment_received = hooks.on_payment_received.map(|f| EventHandler::new(buffer_size, f));
-        Self { on_order_paid, on_new_order, on_order_annulled, on_order_modified, on_payment_received }
+        let on_payment_confirmed = hooks.on_payment_confirmed.map(|f| EventHandler::new(buffer_size, f));
+        Self {
+            on_order_paid,
+            on_new_order,
+            on_order_annulled,
+            on_order_modified,
+            on_payment_received,
+            on_payment_confirmed,
+        }
     }
 
     pub fn producers(&self) -> EventProducers {
@@ -60,6 +70,9 @@ impl EventHandlers {
         }
         if let Some(handler) = &self.on_payment_received {
             producers.payment_received_producer.push(handler.subscribe());
+        }
+        if let Some(handler) = &self.on_payment_confirmed {
+            producers.payment_confirmed_producer.push(handler.subscribe());
         }
         producers
     }
@@ -90,6 +103,11 @@ impl EventHandlers {
                 handler.start_handler().await;
             });
         }
+        if let Some(handler) = self.on_payment_confirmed {
+            tokio::spawn(async move {
+                handler.start_handler().await;
+            });
+        }
     }
 }
 
@@ -107,6 +125,7 @@ pub struct EventHooks {
     pub on_order_annulled: Option<Handler<OrderAnnulledEvent>>,
     pub on_order_modified: Option<Handler<OrderModifiedEvent>>,
     pub on_payment_received: Option<Handler<PaymentEvent>>,
+    pub on_payment_confirmed: Option<Handler<PaymentEvent>>,
 }
 
 impl EventHooks {
@@ -137,6 +156,12 @@ impl EventHooks {
     pub fn on_payment_received<F>(&mut self, f: F) -> &mut Self
     where F: (Fn(PaymentEvent) -> Pin<Box<dyn Future<Output = ()> + Send>>) + Send + Sync + 'static {
         self.on_payment_received = Some(Arc::new(f));
+        self
+    }
+
+    pub fn on_payment_confirmed<F>(&mut self, f: F) -> &mut Self
+    where F: (Fn(PaymentEvent) -> Pin<Box<dyn Future<Output = ()> + Send>>) + Send + Sync + 'static {
+        self.on_payment_confirmed = Some(Arc::new(f));
         self
     }
 }
