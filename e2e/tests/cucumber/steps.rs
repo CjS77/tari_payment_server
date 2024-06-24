@@ -4,13 +4,14 @@ use cucumber::{gherkin::Step, then, when};
 use e2e::helpers::json_is_subset_of;
 use log::*;
 use reqwest::Method;
+use shopify_tools::ShopifyOrder;
 use tari_jwt::{
     jwt_compact::{AlgorithmExt, Claims, Header, UntrustedToken},
     Ristretto256,
     Ristretto256SigningKey,
 };
 use tari_payment_engine::{
-    db_types::{MicroTari, OrderId, Role},
+    db_types::{OrderId, Role},
     events::{EventProducers, EventType},
     traits::{AccountManagement, AuthManagement},
     OrderFlowApi,
@@ -18,9 +19,9 @@ use tari_payment_engine::{
 use tari_payment_server::{
     auth::{build_jwt_signer, JwtClaims},
     data_objects::{PaymentNotification, TransactionConfirmationNotification},
-    shopify_order::ShopifyOrder,
 };
 use tokio::time::sleep;
+use tpg_common::MicroTari;
 
 use crate::cucumber::{
     setup::{SeedUsers, SuperAdmin},

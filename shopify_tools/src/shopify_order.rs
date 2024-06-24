@@ -1,11 +1,6 @@
-use chrono::{DateTime, Utc};
-use log::trace;
+use chrono::Utc;
 use rand::{Rng, RngCore};
 use serde::{Deserialize, Serialize};
-use tari_payment_engine::db_types::{MicroTari, NewOrder, OrderId};
-use tpg_common::TARI_CURRENCY_CODE_LOWER;
-
-use crate::errors::OrderConversionError;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ShopifyOrder {
@@ -35,38 +30,6 @@ pub struct ShopifyOrder {
     pub total_tax: String,
     pub subtotal_price: String,
     pub customer: Customer,
-}
-
-impl TryFrom<ShopifyOrder> for NewOrder {
-    type Error = OrderConversionError;
-
-    fn try_from(value: ShopifyOrder) -> Result<Self, Self::Error> {
-        trace!("Converting ShopifyOrder to NewOrder: {:?}", value);
-        if value.currency.as_str().to_lowercase() != TARI_CURRENCY_CODE_LOWER {
-            return Err(OrderConversionError::UnsupportedCurrency(value.currency));
-        }
-        let total_price = value
-            .total_price
-            .parse::<u64>()
-            .map_err(|e| OrderConversionError::FormatError(e.to_string()))
-            .map(MicroTari::try_from)?
-            .map_err(|e| OrderConversionError::FormatError(e.to_string()))?;
-
-        let timestamp =
-            value.created_at.parse::<DateTime<Utc>>().map_err(|e| OrderConversionError::FormatError(e.to_string()))?;
-        let memo = value.note;
-        let mut order = Self {
-            order_id: OrderId(value.name),
-            customer_id: value.customer.id.to_string(),
-            currency: value.currency,
-            memo,
-            address: None,
-            created_at: timestamp,
-            total_price,
-        };
-        order.try_extract_address()?;
-        Ok(order)
-    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

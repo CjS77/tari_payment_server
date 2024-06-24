@@ -6,12 +6,12 @@ use std::fmt::Debug;
 use log::*;
 use sqlx::SqlitePool;
 use tari_common_types::tari_address::TariAddress;
+use tpg_common::MicroTari;
 
-use super::db::{auth, db_url, new_pool, orders, transfers, user_accounts, wallet_auth};
+use super::db::{auth, db_url, exchange_rates, new_pool, orders, transfers, user_accounts, wallet_auth};
 use crate::{
     db_types::{
         CreditNote,
-        MicroTari,
         NewOrder,
         NewPayment,
         Order,
@@ -23,12 +23,14 @@ use crate::{
         UserAccount,
     },
     order_objects::{ModifyOrderRequest, OrderChanged, OrderQueryFilter},
-    tpe_api::account_objects::FullAccount,
+    tpe_api::{account_objects::FullAccount, exchange_objects::ExchangeRate},
     traits::{
         AccountApiError,
         AccountManagement,
         AuthApiError,
         AuthManagement,
+        ExchangeRateError,
+        ExchangeRates,
         NewWalletInfo,
         OrderMovedResult,
         PaymentGatewayDatabase,
@@ -662,6 +664,21 @@ impl WalletManagement for SqliteDatabase {
 
     async fn update_wallet_info(&self, _wallet: UpdateWalletInfo) -> Result<(), WalletManagementError> {
         todo!()
+    }
+}
+
+impl ExchangeRates for SqliteDatabase {
+    async fn fetch_last_rate(&self, currency: &str) -> Result<ExchangeRate, ExchangeRateError> {
+        let mut conn = self.pool.acquire().await.map_err(|e| ExchangeRateError::DatabaseError(e.to_string()))?;
+        exchange_rates::fetch_last_rate(currency, &mut conn).await
+    }
+
+    /// Save the exchange rate for the given currency to the backend storage
+    ///
+    /// The `updated_at` field of the exchange rate is ignored. The backend will set this field to the current time.
+    async fn set_exchange_rate(&self, new_rate: &ExchangeRate) -> Result<(), ExchangeRateError> {
+        let mut conn = self.pool.acquire().await.map_err(|e| ExchangeRateError::DatabaseError(e.to_string()))?;
+        exchange_rates::set_exchange_rate(new_rate, &mut conn).await
     }
 }
 

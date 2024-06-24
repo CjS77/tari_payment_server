@@ -2,11 +2,11 @@ use std::fmt::Debug;
 
 use log::*;
 use tari_common_types::tari_address::TariAddress;
+use tpg_common::MicroTari;
 
 use crate::{
     db_types::{
         CreditNote,
-        MicroTari,
         NewOrder,
         NewPayment,
         Order,

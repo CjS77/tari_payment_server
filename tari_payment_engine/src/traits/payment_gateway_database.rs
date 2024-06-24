@@ -1,10 +1,10 @@
 use tari_common_types::tari_address::TariAddress;
 use thiserror::Error;
+use tpg_common::MicroTari;
 
 use crate::{
     db_types::{
         CreditNote,
-        MicroTari,
         NewOrder,
         NewPayment,
         Order,

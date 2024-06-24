@@ -1,8 +1,6 @@
 use std::{
     fmt::Display,
     hash::{Hash, Hasher},
-    iter::Sum,
-    ops::{Add, Neg, Sub, SubAssign},
     str::FromStr,
 };
 
@@ -12,78 +10,12 @@ use serde::{Deserialize, Serialize};
 use sqlx::{database::HasValueRef, Database, Decode, FromRow, Sqlite, Type};
 use tari_common_types::tari_address::{TariAddress, TariAddressError};
 use thiserror::Error;
+use tpg_common::MicroTari;
 
 use crate::{
     helpers::{extract_and_verify_memo_signature, extract_order_number_from_memo, MemoSignatureError},
-    op,
     tpe_api::order_objects::{address_to_hex, str_to_address},
 };
-
-//--------------------------------------     MicroTari       ---------------------------------------------------------
-#[derive(Debug, Clone, Copy, Default, Type, Ord, PartialOrd, Serialize, Deserialize)]
-#[sqlx(transparent)]
-pub struct MicroTari(i64);
-
-pub const T: MicroTari = MicroTari(1_000_000);
-
-op!(binary MicroTari, Add, add);
-op!(binary MicroTari, Sub, sub);
-op!(inplace MicroTari, SubAssign, sub_assign);
-op!(unary MicroTari, Neg, neg);
-
-impl Sum for MicroTari {
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(Self::default(), Add::add)
-    }
-}
-
-#[derive(Debug, Clone, Error)]
-#[error("Value cannot be represented in microTari: {0}")]
-pub struct MicroTariConversionError(String);
-
-impl From<i64> for MicroTari {
-    fn from(value: i64) -> Self {
-        Self(value)
-    }
-}
-
-impl PartialEq for MicroTari {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
-impl Eq for MicroTari {}
-
-impl TryFrom<u64> for MicroTari {
-    type Error = MicroTariConversionError;
-
-    fn try_from(value: u64) -> Result<Self, Self::Error> {
-        if value > i64::MAX as u64 {
-            Err(MicroTariConversionError(format!("Value {} is too large to convert to MicroTari", value)))
-        } else {
-            #[allow(clippy::cast_possible_wrap)]
-            Ok(Self(value as i64))
-        }
-    }
-}
-
-impl Display for MicroTari {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let tari = self.0 as f64 / 1_000_000.0;
-        write!(f, "{tari:0.3}τ")
-    }
-}
-
-impl MicroTari {
-    pub fn value(&self) -> i64 {
-        self.0
-    }
-
-    pub fn from_tari(tari: i64) -> Self {
-        Self(tari * 1_000_000)
-    }
-}
 
 //--------------------------------------     PublicKey       ---------------------------------------------------------
 /// A lightweight wrapper around a string representing a public key

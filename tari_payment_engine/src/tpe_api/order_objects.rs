@@ -3,9 +3,10 @@ use std::{fmt::Display, str::FromStr};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tari_common_types::tari_address::TariAddress;
+use tpg_common::MicroTari;
 
 use crate::{
-    db_types::{MicroTari, Order, OrderId, OrderStatusType},
+    db_types::{Order, OrderId, OrderStatusType},
     traits::AccountApiError,
 };
 

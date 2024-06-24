@@ -14,8 +14,9 @@ use tari_jwt::{
     Ristretto256VerifyingKey,
 };
 use tempfile::NamedTempFile;
+use tpg_common::Secret;
 
-use crate::{errors::ServerError, helpers::Secret};
+use crate::errors::ServerError;
 
 const DEFAULT_TPG_HOST: &str = "127.0.0.1";
 const DEFAULT_TPG_PORT: u16 = 8360;

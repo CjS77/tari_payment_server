@@ -11,9 +11,10 @@ use tari_jwt::{
     Ristretto256SigningKey,
 };
 use tari_payment_engine::{
-    db_types::{LoginToken, MicroTari, NewOrder, NewPayment, OrderId, Role},
+    db_types::{LoginToken, NewOrder, NewPayment, OrderId, Role},
     traits::{AuthManagement, NewWalletInfo, PaymentGatewayDatabase, WalletManagement},
 };
+use tpg_common::MicroTari;
 
 use crate::cucumber::TPGWorld;
 

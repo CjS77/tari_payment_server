@@ -4,11 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+shopify_tools = { version = "0.1.0", path = "../shopify_tools" }
 tari_payment_server = {version = "0.1.0", path = "../tari_payment_server"}
 tari_payment_engine = {version = "0.1.0", path = "../tari_payment_engine"}
+tpg_common = {version = "0.1.0", path = "../tpg_common"}
 
 chrono = "0.4.19"
 clap = { version = "4.5.3", features = ["derive"] }
+dotenvy = "0.15.0"
+env_logger = "0.11.3"
 rand = "0.8.4"
 tari_crypto = "0.20.0"
 tari_common = "1.0.0-rc.5"
@@ -16,3 +20,5 @@ tari_common_types = "1.0.0-rc.5"
 tari-jwt = {  version = "0.1.0", git = "https://github.com/tari-project/tari-jwt.git", branch = "main" }
 serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.117"
+tokio = "1.37.0"
+log = "0.4.21"

@@ -1,9 +1,10 @@
 use log::{debug, error, trace};
 use sqlx::{pool::PoolConnection, Sqlite, SqliteConnection};
 use tari_common_types::tari_address::TariAddress;
+use tpg_common::MicroTari;
 
 use crate::{
-    db_types::{MicroTari, OrderId, UserAccount},
+    db_types::{OrderId, UserAccount},
     order_objects::OrderQueryFilter,
     sqlite::db::{orders, transfers},
     tpe_api::account_objects::{AccountAddress, CustomerId, FullAccount},

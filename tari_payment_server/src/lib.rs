@@ -60,7 +60,7 @@ pub mod middleware;
 pub mod routes;
 pub mod server;
 
-pub mod shopify_order;
+pub mod integrations;
 
 #[cfg(test)]
 mod endpoint_tests;

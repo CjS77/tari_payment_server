@@ -17,9 +17,9 @@ use tari_payment_engine::{
 };
 use tari_payment_server::{
     config::{AuthConfig, ServerConfig},
-    helpers::Secret,
     server::create_server_instance,
 };
+use tpg_common::Secret;
 
 use crate::cucumber::setup::UserInfo;
 

@@ -35,6 +35,10 @@ pub mod accounts_api;
 pub mod auth_api;
 
 pub mod account_objects;
+
+pub mod exchange_objects;
+
+pub mod exchange_rate_api;
 pub mod order_flow_api;
 pub mod order_objects;
 pub mod payment_objects;

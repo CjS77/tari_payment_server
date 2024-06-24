@@ -2,9 +2,11 @@ use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 use tari_payment_engine::{
-    db_types::{MicroTari, NewPayment, OrderId, Role, SerializedTariAddress},
+    db_types::{NewPayment, OrderId, Role, SerializedTariAddress},
     helpers::WalletSignature,
+    tpe_api::exchange_objects::ExchangeRate,
 };
+use tpg_common::MicroTari;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoleUpdateRequest {
@@ -84,4 +86,30 @@ pub struct AttachOrderParams {
     pub address: SerializedTariAddress,
     // This reason is not stored in the database, but is captured in the logs
     pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExchangeRateUpdate {
+    pub currency: String,
+    pub rate: u64,
+}
+
+impl From<ExchangeRateUpdate> for ExchangeRate {
+    fn from(update: ExchangeRateUpdate) -> Self {
+        #[allow(clippy::cast_possible_wrap)]
+        Self::new(update.currency, update.rate as i64, None)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExchangeRateResult {
+    pub currency: String,
+    pub rate: i64,
+    pub updated_at: String,
+}
+
+impl From<ExchangeRate> for ExchangeRateResult {
+    fn from(rate: ExchangeRate) -> Self {
+        Self { currency: rate.base_currency, rate: rate.rate / 100, updated_at: rate.updated_at.to_rfc3339() }
+    }
 }

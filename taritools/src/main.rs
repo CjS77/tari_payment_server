@@ -1,4 +1,5 @@
 use clap::{Args, Parser, Subcommand};
+use dotenvy::dotenv;
 use tari_common::configuration::Network;
 
 mod jwt_token;
@@ -6,6 +7,7 @@ mod keys;
 
 mod memo;
 mod payments;
+mod shopify;
 
 use jwt_token::print_jwt_token;
 use tari_payment_engine::db_types::OrderId;
@@ -13,6 +15,7 @@ use tari_payment_engine::db_types::OrderId;
 use crate::{
     memo::print_memo_signature,
     payments::{print_payment_auth, print_tx_confirm},
+    shopify::{handle_shopify_command, ShopifyCommand},
 };
 
 #[derive(Parser, Debug)]
@@ -46,6 +49,8 @@ pub enum Command {
     PaymentAuth(PaymentAuthParams),
     #[clap(name = "confirm")]
     TxConfirm(TxConfirmParams),
+    #[command(subcommand)]
+    Shopify(ShopifyCommand),
 }
 
 #[derive(Debug, Args)]
@@ -105,7 +110,10 @@ pub struct TxConfirmParams {
     txid: String,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
+    env_logger::init();
+    dotenv().ok();
     let cli = Arguments::parse();
     match cli.command {
         Command::NewAddress => print_new_address(cli.network),
@@ -113,6 +121,7 @@ fn main() {
         Command::MemoSignature(params) => print_memo_signature(params),
         Command::PaymentAuth(params) => print_payment_auth(params),
         Command::TxConfirm(params) => print_tx_confirm(params),
+        Command::Shopify(shopify_command) => handle_shopify_command(shopify_command).await,
     }
 }
 

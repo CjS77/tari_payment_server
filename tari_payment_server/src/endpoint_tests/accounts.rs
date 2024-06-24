@@ -3,9 +3,10 @@ use chrono::{Days, TimeZone, Utc};
 use log::debug;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
-    db_types::{MicroTari, Role, UserAccount},
+    db_types::{Role, UserAccount},
     AccountApi,
 };
+use tpg_common::MicroTari;
 
 use super::helpers::{get_request, issue_token};
 use crate::{

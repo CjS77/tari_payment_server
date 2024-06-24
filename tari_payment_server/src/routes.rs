@@ -26,12 +26,20 @@ use std::{marker::PhantomData, str::FromStr};
 use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
 use log::*;
 use paste::paste;
+use shopify_tools::{ShopifyApi, ShopifyOrder};
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
-    db_types::{CreditNote, NewOrder, OrderId, OrderStatusType, Role, SerializedTariAddress},
+    db_types::{CreditNote, OrderId, OrderStatusType, Role, SerializedTariAddress},
     order_objects::{OrderQueryFilter, OrderResult},
-    tpe_api::account_objects::FullAccount,
-    traits::{AccountManagement, AuthManagement, PaymentGatewayDatabase, PaymentGatewayError, WalletAuth},
+    tpe_api::{account_objects::FullAccount, exchange_objects::ExchangeRate, exchange_rate_api::ExchangeRateApi},
+    traits::{
+        AccountManagement,
+        AuthManagement,
+        ExchangeRates,
+        PaymentGatewayDatabase,
+        PaymentGatewayError,
+        WalletAuth,
+    },
     AccountApi,
     AuthApi,
     OrderFlowApi,
@@ -43,6 +51,8 @@ use crate::{
     config::ProxyConfig,
     data_objects::{
         AttachOrderParams,
+        ExchangeRateResult,
+        ExchangeRateUpdate,
         JsonResponse,
         ModifyOrderParams,
         MoveOrderParams,
@@ -52,9 +62,9 @@ use crate::{
         UpdateMemoParams,
         UpdatePriceParams,
     },
-    errors::{OrderConversionError, ServerError},
+    errors::ServerError,
     helpers::get_remote_ip,
-    shopify_order::ShopifyOrder,
+    integrations::shopify::{new_order_from_shopify_order, OrderConversionError},
 };
 
 // Web-actix cannot handle generics in handlers, so it's implemented manually using the `route!` macro
@@ -707,7 +717,7 @@ pub async fn shopify_webhook<B: PaymentGatewayDatabase>(
     trace!("💻️ Received webhook request: {}", req.uri());
     let order = body.into_inner();
     // Webhook responses must always be in 200 range, otherwise Shopify will retry
-    let result = match NewOrder::try_from(order) {
+    let result = match new_order_from_shopify_order(order) {
         Err(OrderConversionError::FormatError(s)) => {
             warn!("💻️ Could not convert order. {s}");
             JsonResponse::failure(s)
@@ -880,4 +890,49 @@ route!(check_token => Get "/check_token" requires [Role::User]);
 pub async fn check_token(claims: JwtClaims) -> Result<HttpResponse, ServerError> {
     debug!("💻️ GET check_token for {}", claims.address);
     Ok(HttpResponse::Ok().body("Token is valid."))
+}
+
+//----------------------------------------------   Exchange rates  ----------------------------------------------------
+route!(update_shopify_exchange_rate => Post "/exchange_rate" impl ExchangeRates where requires [Role::Write]);
+pub async fn update_shopify_exchange_rate<B: ExchangeRates>(
+    body: web::Json<ExchangeRateUpdate>,
+    api: web::Data<ExchangeRateApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let update = body.into_inner();
+    update_local_exchange_rate(update, api.as_ref()).await?;
+    // update_shopify_exchange_rate_for(&update, shopify_api.as_ref()).await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+route!(get_exchange_rate => Get "/exchange_rate/{currency}" impl ExchangeRates where requires [Role::ReadAll]);
+pub async fn get_exchange_rate<B: ExchangeRates>(
+    currency: web::Path<String>,
+    api: web::Data<ExchangeRateApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let cur = currency.into_inner();
+    let rate = api.fetch_last_rate(cur.as_str()).await.map_err(|e| {
+        debug!("💻️ Could not fetch exchange rate. {e}");
+        ServerError::BackendError(e.to_string())
+    })?;
+    let rate = ExchangeRateResult::from(rate);
+    Ok(HttpResponse::Ok().json(rate))
+}
+
+async fn update_shopify_exchange_rate_for<B: ExchangeRates>(
+    update: &ExchangeRateUpdate,
+    api: &ShopifyApi,
+) -> Result<(), ServerError> {
+    todo!()
+}
+
+async fn update_local_exchange_rate<B: ExchangeRates>(
+    update: ExchangeRateUpdate,
+    api: &ExchangeRateApi<B>,
+) -> Result<(), ServerError> {
+    let rate = ExchangeRate::from(update);
+    debug!("💻️ POST update exchange rate for {rate}");
+    api.set_exchange_rate(&rate).await.map_err(|e| {
+        debug!("💻️ Could not update exchange rate. {e}");
+        ServerError::BackendError(e.to_string())
+    })
 }
