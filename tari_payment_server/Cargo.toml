@@ -12,6 +12,7 @@ tari-jwt = {  version = "0.1.0", git = "https://github.com/tari-project/tari-jwt
 tari_payment_engine = { version = "0.1.0", path = "../tari_payment_engine" }
 
 actix-jwt-auth-middleware = { version = "0.5.0", git = "https://github.com/cjs77/actix-jwt-auth-middleware.git", branch = "master" }
+actix-http = "3.8.0"
 actix-web = "4.0.0-beta.8"
 chrono = { version = "0.4.31", features = ["serde"] }
 dotenvy = "0.15.0"
@@ -26,6 +27,10 @@ thiserror = "1.0.32"
 tokio = { version = "1.20.1", features = ["full"] }
 futures = "0.3.30"
 regex = "1.10.4"
+sha2 = "0.10.8"
+base64 = "0.13.1"
+hmac = "0.12.1"
+bytes = "1.6.0"
 
 [dev-dependencies]
 anyhow = "1.0.81"

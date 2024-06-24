@@ -43,13 +43,13 @@ Feature: Admins can issue credit notes
     When Admin POSTs to "/api/credit" with body
         """
         {
-          "customer_id": "eric101",
+          "customer_id": "1024",
           "amount": 1000000000,
           "reason": "Grand prize winner"
         }
         """
     Then I receive a 200 OK response with the message "[]"
-    Then account for customer eric101 has a current balance of 1000 Tari
+    Then account for customer 1024 has a current balance of 1000 Tari
     # Eric places an order from his wallet with these credentials:
     # Secret key: 9b72bd6f55466f693c71f4a5abeb0767c4c080cc4752d336b6c0381e2dee5b01
     # Public key: ecf774d7f185295b9c2b1f87072919d4e5bd1e280697b172a0db91f7caebd364
@@ -62,7 +62,7 @@ Feature: Admins can issue credit notes
       "signature":"4e53a8ded2b424334de6e12e70f7f0b61dd4ad3a66a06aacdf4553dcf0e2f63fa9639f93df6065ad228094f1fbe50b447bed1d7324cc4e0a2093e8bbf475350c"}
     """
     Then order "order1024:1" is in state Paid
-    Then account for customer eric101 has a current balance of 750 Tari
+    Then account for customer 1024 has a current balance of 750 Tari
 
   Scenario: An admin can issue a credit note for a customer id that has a pending order, and the order will be filled
     When Admin authenticates with nonce = 1 and roles = "write"

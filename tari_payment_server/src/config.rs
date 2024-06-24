@@ -15,7 +15,7 @@ use tari_jwt::{
 };
 use tempfile::NamedTempFile;
 
-use crate::errors::ServerError;
+use crate::{errors::ServerError, helpers::Secret};
 
 const DEFAULT_TPG_HOST: &str = "127.0.0.1";
 const DEFAULT_TPG_PORT: u16 = 8360;
@@ -25,9 +25,12 @@ pub struct ServerConfig {
     pub host: String,
     pub port: u16,
     pub shopify_api_key: String,
+    pub shopify_api_secret: Secret<String>,
+    pub shopify_hmac_checks: bool,
     pub database_url: String,
     pub auth: AuthConfig,
     /// If supplied, requests against /shopify endpoints will be checked against a whitelist of Shopify IP addresses.
+    /// To explicitly disable the whitelist, set this to "false", "none", or "0".
     pub shopify_whitelist: Option<Vec<IpAddr>>,
     /// If true, the X-Forwarded-For header will be used to determine the client's IP address, rather than the
     /// connection's remote address.
@@ -43,6 +46,8 @@ impl Default for ServerConfig {
             host: DEFAULT_TPG_HOST.to_string(),
             port: DEFAULT_TPG_PORT,
             shopify_api_key: String::default(),
+            shopify_api_secret: Secret::default(),
+            shopify_hmac_checks: true,
             database_url: String::default(),
             auth: AuthConfig::default(),
             shopify_whitelist: None,
@@ -62,38 +67,88 @@ impl ServerConfig {
         let port = env::var("TPG_PORT")
             .map(|s| {
                 s.parse::<u16>().unwrap_or_else(|e| {
-                    error!("{s} is not a valid port for TPG_PORT. {e} Using the default, {DEFAULT_TPG_PORT}, instead.");
+                    error!(
+                        "🪛️ {s} is not a valid port for TPG_PORT. {e} Using the default, {DEFAULT_TPG_PORT}, instead."
+                    );
                     DEFAULT_TPG_PORT
                 })
             })
             .ok()
             .unwrap_or(DEFAULT_TPG_PORT);
         let shopify_api_key = env::var("TPG_SHOPIFY_API_KEY").ok().unwrap_or_else(|| {
-            error!("TPG_SHOPIFY_API_KEY is not set. Please set it to the API key for your Shopify app.");
+            error!("🪛️ TPG_SHOPIFY_API_KEY is not set. Please set it to the API key for your Shopify app.");
             String::default()
         });
-        let auth = AuthConfig::try_from_env().unwrap_or_default();
+        let shopify_api_secret = env::var("TPG_SHOPIFY_API_SECRET").ok().unwrap_or_else(|| {
+            error!(
+                "🪛️ TPG_SHOPIFY_API_SECRET is not set. Please set it to the client APP secret for your Shopify app."
+            );
+            String::default()
+        });
+        let shopify_api_secret = Secret::new(shopify_api_secret);
+        let shopify_hmac_checks =
+            env::var("TPG_SHOPIFY_HMAC_CHECKS").map(|s| &s == "1" || &s == "true").unwrap_or(true);
+        let auth = AuthConfig::try_from_env().unwrap_or_else(|e| {
+            warn!(
+                "🪛️ Could not load the authentication configuration from environment variables. {e}. Reverting to the \
+                 default configuration."
+            );
+            AuthConfig::default()
+        });
         let database_url = env::var("TPG_DATABASE_URL").ok().unwrap_or_else(|| {
-            error!("TPG_DATABASE_URL is not set. Please set it to the URL for the TPG database.");
+            error!("🪛️ TPG_DATABASE_URL is not set. Please set it to the URL for the TPG database.");
             String::default()
         });
-        let shopify_whitelist = env::var("TPG_SHOPIFY_IP_WHITELIST")
-            .map(|s| {
-                s.split(',')
-                    .filter_map(|s| {
-                        s.parse()
-                            .map_err(|e| {
-                                warn!("Ignoring invalid IP address ({s}) in TPG_SHOPIFY_IP_WHITELIST: {e}");
-                                None::<IpAddr>
-                            })
-                            .ok()
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .ok();
+        let shopify_whitelist = env::var("TPG_SHOPIFY_IP_WHITELIST").ok().and_then(|s| {
+            if ["none", "false", "0"].contains(&s.to_lowercase().as_str()) {
+                info!(
+                    "🪛️ Shopify IP whitelist is disabled. If this is not what you want, set TPG_SHOPIFY_IP_WHITELIST \
+                     to a comma-separated list of IP addresses to enable it."
+                );
+                return None;
+            }
+            let ip_addrs = s
+                .split(',')
+                .filter_map(|s| {
+                    s.parse()
+                        .map_err(|e| {
+                            warn!("🪛️ Ignoring invalid IP address ({s}) in TPG_SHOPIFY_IP_WHITELIST: {e}");
+                            None::<IpAddr>
+                        })
+                        .ok()
+                })
+                .collect::<Vec<IpAddr>>();
+            Some(ip_addrs)
+        });
+        match &shopify_whitelist {
+            Some(whitelist) if whitelist.is_empty() => {
+                warn!(
+                    "🚨️ The Shopify IP whitelist was configured, but is empty.  The server will run, but won't \
+                     authorise any Shopify incoming requests."
+                );
+            },
+            None => {
+                info!("🪛️ No Shopify IP whitelist is set. Only HMAC validation will be used.");
+            },
+            Some(v) => {
+                let addrs = v.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", ");
+                info!("🪛️ Shopify IP whitelist: {addrs}");
+            },
+        }
         let use_x_forwarded_for = env::var("TPG_USE_X_FORWARDED_FOR").map(|s| &s == "1" || &s == "true").is_ok();
         let use_forwarded = env::var("TPG_USE_FORWARDED").map(|s| &s == "1" || &s == "true").is_ok();
-        Self { host, port, shopify_api_key, auth, database_url, shopify_whitelist, use_forwarded, use_x_forwarded_for }
+        Self {
+            host,
+            port,
+            shopify_api_key,
+            shopify_api_secret,
+            shopify_hmac_checks,
+            auth,
+            database_url,
+            shopify_whitelist,
+            use_forwarded,
+            use_x_forwarded_for,
+        }
     }
 }
 
@@ -130,11 +185,11 @@ impl Default for AuthConfig {
                          environment variables instead. 🚨️🚨️🚨️",
                         p.to_str().unwrap_or("???")
                     ),
-                    Err(e) => warn!("Could not write the JWT signing key to the temporary file. {e}"),
+                    Err(e) => warn!("🪛️ Could not write the JWT signing key to the temporary file. {e}"),
                 }
             },
             None => {
-                warn!("Could not create a temporary file to store the JWT signing key. ");
+                warn!("🪛️ Could not create a temporary file to store the JWT signing key. ");
             },
         }
         Self { jwt_signing_key: Ristretto256SigningKey(sk), jwt_verification_key: Ristretto256VerifyingKey(pk) }
@@ -143,9 +198,10 @@ impl Default for AuthConfig {
 
 impl AuthConfig {
     pub fn try_from_env() -> Result<Self, ServerError> {
-        let jwt_sk_hex = env::var("TPG_JWT_SIGNING_KEY").map_err(|e| ServerError::ConfigurationError(e.to_string()))?;
-        let jwt_pk_hex =
-            env::var("TPG_JWT_VERIFICATION_KEY").map_err(|e| ServerError::ConfigurationError(e.to_string()))?;
+        let jwt_sk_hex = env::var("TPG_JWT_SIGNING_KEY")
+            .map_err(|e| ServerError::ConfigurationError(format!("{e} [TPG_JWT_SIGNING_KEY]")))?;
+        let jwt_pk_hex = env::var("TPG_JWT_VERIFICATION_KEY")
+            .map_err(|e| ServerError::ConfigurationError(format!("{e} [TPG_JWT_VERIFICATION_KEY]")))?;
         // Why have users specify the public key if we can just derive it from the private key?
         // The reason is that it's easy to share and/or look up the public key if it is stored in the configuration.
         let sk = RistrettoSecretKey::from_hex(&jwt_sk_hex)

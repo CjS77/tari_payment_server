@@ -25,6 +25,7 @@ use crate::{
     config::{ProxyConfig, ServerConfig},
     errors::{AuthError, ServerError, ServerError::AuthenticationError},
     helpers::get_remote_ip,
+    middleware::HmacMiddlewareFactory,
     routes::{
         health,
         AccountRoute,
@@ -57,7 +58,6 @@ use crate::{
         UpdateRolesRoute,
     },
 };
-
 /// Defines the log format for the access log middleware.
 const LOG_FORMAT: &str = concat!(
     "%t ",                                   // Time when the request was started to process
@@ -97,6 +97,11 @@ pub fn create_server_instance(
         let authority = build_tps_authority(config.auth.clone());
         let accounts_api = AccountApi::new(db.clone());
         let wallet_auth = WalletAuthApi::new(db.clone());
+        let hmac_middleware = HmacMiddlewareFactory::new(
+            "X-Shopify-Hmac-Sha256",
+            config.shopify_api_secret.clone(),
+            config.shopify_hmac_checks,
+        );
 
         let mut app = App::new()
             .wrap(Logger::new(LOG_FORMAT).log_target("access_log"))
@@ -144,6 +149,7 @@ pub fn create_server_instance(
                     ok(req.error_response(AuthenticationError(AuthError::ForbiddenPeer))).boxed_local()
                 }
             })
+            .wrap(hmac_middleware)
             .service(ShopifyWebhookRoute::<SqliteDatabase>::new())
             .service(health);
         let wallet_scope = web::scope("/wallet")
@@ -175,12 +181,13 @@ fn is_whitelisted(
     let peer_ip = get_remote_ip(req.request(), use_x_forwarded_for, use_forwarded);
     match (peer_ip, &shopify_whitelist) {
         (Some(ip), Some(whitelist)) => {
-            info!("Shopify webhook from {ip}");
-            whitelist.contains(&ip)
+            let result = whitelist.contains(&ip);
+            info!("Shopify webhook request from {ip}. Permitted peer: {result}");
+            result
         },
         (_, None) => true,
         (None, Some(_)) => {
-            warn!("No IP address found in shopify remote peer request, denying access.");
+            warn!("No IP address found in shopify remote peer request. denying access.");
             false
         },
     }

@@ -1,8 +1,16 @@
-use std::{net::IpAddr, str::FromStr};
+use std::{
+    fmt,
+    fmt::{Debug, Display},
+    net::IpAddr,
+    str::FromStr,
+};
 
 use actix_web::HttpRequest;
+use base64::encode;
+use hmac::{Hmac, Mac};
 use log::{debug, trace};
 use regex::Regex;
+use sha2::Sha256;
 
 /// Get the remote IP address from the request. It uses 3 sources to determine the IP address, in decreasing order
 /// of preference:
@@ -42,4 +50,53 @@ pub fn get_remote_ip(req: &HttpRequest, use_x_forwarded_for: bool, use_forwarded
         trace!("Using Peer address for remote address: {:?}", peer_addr);
         peer_addr.and_then(|s| IpAddr::from_str(&s).ok())
     })
+}
+
+pub fn calculate_hmac(secret: &str, data: &[u8]) -> String {
+    let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).expect("HMAC can take key of any size");
+    mac.update(data);
+    let result = mac.finalize();
+    let code_bytes = result.into_bytes();
+    encode(&code_bytes)
+}
+
+#[derive(Clone, Default)]
+pub struct Secret<T>
+where T: Clone + Default
+{
+    value: T,
+}
+
+impl<T: Clone + Default> Secret<T> {
+    pub fn new(value: T) -> Self {
+        Self { value }
+    }
+
+    pub fn reveal(&self) -> &T {
+        &self.value
+    }
+}
+
+impl<T: Clone + Default> Debug for Secret<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("****")
+    }
+}
+
+impl<T: Clone + Default> Display for Secret<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("****")
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_calculate_hmac() {
+        let data = r#"{"id":5621189509332,..."source":"shopify"}"#;
+        let hmac = calculate_hmac("my_secret", data.as_bytes());
+        assert_eq!(hmac, "1JKXEbaNTtaw8EyjOKhDEJL/hE/SKH1ZZADWGD36m6k=")
+    }
 }
