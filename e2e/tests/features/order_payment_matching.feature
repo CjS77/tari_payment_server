@@ -58,7 +58,7 @@ Feature: Order Fulfillment
     {
       "order": {
       "order_id": "alice001",
-      "customer_id": "alice",
+      "customer_id": "1",
       "total_price": 2400000000,
       "currency": "XTR",
       "id": 1,
@@ -134,7 +134,7 @@ Feature: Order Fulfillment
     {
       "order": {
         "order_id": "alice001",
-        "customer_id": "alice",
+        "customer_id": "1",
         "total_price": 2400000000,
         "currency": "XTR",
         "id": 1,
@@ -218,7 +218,7 @@ Feature: Order Fulfillment
        "signature":"86267d7373487427e0ea7af57ac2201e6b7d553faef34d701b3a2277fde54135fd5b7b073dfc8ba4a3b90589f3719c267c6b27957f18c4bfa31a31cc7f6a9a06"
     }
     """
-    Then account for customer anon has a current balance of 1 Tari
+    Then account for customer 3 has a current balance of 1 Tari
     And order "anon0001" is in state Paid
     When Customer #1 ["alice"] places order "alice0002" for 3600 XTR, with memo
     """

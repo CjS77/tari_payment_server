@@ -244,7 +244,8 @@ async fn place_order(
             order.currency = "XTR".to_string();
             order.total_price = MicroTari::from_tari(amount).value().to_string();
             order.user_id = Some(user);
-            order.email = email;
+            order.email = Some(email);
+            order.customer.id = user;
             let order = serde_json::to_string(&order).expect("Failed to serialize order");
             req.body(order).header("Content-Type", "application/json")
         })

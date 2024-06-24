@@ -1,0 +1,309 @@
+{
+  "id": 5621189509332,
+  "admin_graphql_api_id": "gid://shopify/Order/5621189509332",
+  "app_id": 580111,
+  "browser_ip": "94.63.235.150",
+  "buyer_accepts_marketing": false,
+  "cancel_reason": null,
+  "cancelled_at": null,
+  "cart_token": "Z2NwLWV1cm9wZS13ZXN0MTowMUowUlJIN1dTSEoyNURFM1M1U05NSjlLUg",
+  "checkout_id": 36497036214484,
+  "checkout_token": "fb5df8f4899923136c762fb7d55bd4bf",
+  "client_details": {
+    "accept_language": "en-US",
+    "browser_height": null,
+    "browser_ip": "94.63.235.150",
+    "browser_width": null,
+    "session_hash": null,
+    "user_agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:126.0) Gecko/20100101 Firefox/126.0"
+  },
+  "closed_at": null,
+  "confirmation_number": "RQ50HVD85",
+  "confirmed": true,
+  "created_at": "2024-06-19T18:29:13+01:00",
+  "currency": "USD",
+  "current_subtotal_price": "24.00",
+  "current_subtotal_price_set": {
+    "shop_money": {
+      "amount": "24.00",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "24.00",
+      "currency_code": "USD"
+    }
+  },
+  "current_total_additional_fees_set": null,
+  "current_total_discounts": "0.00",
+  "current_total_discounts_set": {
+    "shop_money": {
+      "amount": "0.00",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "0.00",
+      "currency_code": "USD"
+    }
+  },
+  "current_total_duties_set": null,
+  "current_total_price": "28.90",
+  "current_total_price_set": {
+    "shop_money": {
+      "amount": "28.90",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "28.90",
+      "currency_code": "USD"
+    }
+  },
+  "current_total_tax": "0.00",
+  "current_total_tax_set": {
+    "shop_money": {
+      "amount": "0.00",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "0.00",
+      "currency_code": "USD"
+    }
+  },
+  "customer_locale": "en-US",
+  "device_id": null,
+  "discount_codes": [],
+  "estimated_taxes": false,
+  "financial_status": "pending",
+  "fulfillment_status": null,
+  "landing_site": "/password",
+  "landing_site_ref": null,
+  "location_id": null,
+  "merchant_of_record_app_id": null,
+  "name": "#1003",
+  "note": "{\"address\":\"b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d\",\"order_id\":\"order1001\",\"signature\":\"ae26f3139d6505bfe28452ddd00e76ba04354114959ea95e7248a13cd673d02288e3e42f416dc42cc51ecca8bf6b44a2819cfcd4f2507c6ec9af9c92621ffa0c\"}",
+  "note_attributes": [],
+  "number": 3,
+  "order_number": 1003,
+  "original_total_additional_fees_set": null,
+  "original_total_duties_set": null,
+  "payment_gateway_names": [
+    "Tari Payment Server"
+  ],
+  "po_number": null,
+  "presentment_currency": "USD",
+  "processed_at": "2024-06-19T18:29:11+01:00",
+  "reference": "89195f12161a3ce821463e209e6d7455",
+  "referring_site": "",
+  "source_identifier": "89195f12161a3ce821463e209e6d7455",
+  "source_name": "web",
+  "source_url": null,
+  "subtotal_price": "24.00",
+  "subtotal_price_set": {
+    "shop_money": {
+      "amount": "24.00",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "24.00",
+      "currency_code": "USD"
+    }
+  },
+  "tags": "",
+  "tax_exempt": false,
+  "tax_lines": [],
+  "taxes_included": false,
+  "test": false,
+  "token": "5d3c5d2ffe01ea89bb1690bdfc537cb7",
+  "total_discounts": "0.00",
+  "total_discounts_set": {
+    "shop_money": {
+      "amount": "0.00",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "0.00",
+      "currency_code": "USD"
+    }
+  },
+  "total_line_items_price": "24.00",
+  "total_line_items_price_set": {
+    "shop_money": {
+      "amount": "24.00",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "24.00",
+      "currency_code": "USD"
+    }
+  },
+  "total_outstanding": "28.90",
+  "total_price": "28.90",
+  "total_price_set": {
+    "shop_money": {
+      "amount": "28.90",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "28.90",
+      "currency_code": "USD"
+    }
+  },
+  "total_shipping_price_set": {
+    "shop_money": {
+      "amount": "4.90",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "4.90",
+      "currency_code": "USD"
+    }
+  },
+  "total_tax": "0.00",
+  "total_tax_set": {
+    "shop_money": {
+      "amount": "0.00",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "0.00",
+      "currency_code": "USD"
+    }
+  },
+  "total_tip_received": "0.00",
+  "total_weight": 474,
+  "updated_at": "2024-06-19T18:29:14+01:00",
+  "user_id": null,
+  "billing_address": {
+    "province": "Tennessee",
+    "country": "United States",
+    "country_code": "US",
+    "province_code": "TN"
+  },
+  "customer": {
+    "id": 7345180737748,
+    "created_at": "2024-06-19T18:29:11+01:00",
+    "updated_at": "2024-06-19T18:29:14+01:00",
+    "state": "disabled",
+    "note": null,
+    "verified_email": true,
+    "multipass_identifier": null,
+    "tax_exempt": false,
+    "email_marketing_consent": {
+      "state": "not_subscribed",
+      "opt_in_level": "single_opt_in",
+      "consent_updated_at": null
+    },
+    "sms_marketing_consent": null,
+    "tags": "",
+    "currency": "USD",
+    "tax_exemptions": [],
+    "admin_graphql_api_id": "gid://shopify/Customer/7345180737748",
+    "default_address": {
+      "id": 8919793270996,
+      "customer_id": 7345180737748,
+      "company": null,
+      "province": "Tennessee",
+      "country": "United States",
+      "province_code": "TN",
+      "country_code": "US",
+      "country_name": "United States",
+      "default": true
+    }
+  },
+  "discount_applications": [],
+  "fulfillments": [],
+  "line_items": [
+    {
+      "id": 13868670189780,
+      "admin_graphql_api_id": "gid://shopify/LineItem/13868670189780",
+      "attributed_staffs": [],
+      "current_quantity": 3,
+      "fulfillable_quantity": 3,
+      "fulfillment_service": "manual",
+      "fulfillment_status": null,
+      "gift_card": false,
+      "grams": 159,
+      "name": "Fashion Forward Socks",
+      "price": "8.00",
+      "price_set": {
+        "shop_money": {
+          "amount": "8.00",
+          "currency_code": "USD"
+        },
+        "presentment_money": {
+          "amount": "8.00",
+          "currency_code": "USD"
+        }
+      },
+      "product_exists": true,
+      "product_id": 8494449066196,
+      "properties": [],
+      "quantity": 3,
+      "requires_shipping": true,
+      "sku": "TARI_LOGOSOCKS",
+      "taxable": true,
+      "title": "Fashion Forward Socks",
+      "total_discount": "0.00",
+      "total_discount_set": {
+        "shop_money": {
+          "amount": "0.00",
+          "currency_code": "USD"
+        },
+        "presentment_money": {
+          "amount": "0.00",
+          "currency_code": "USD"
+        }
+      },
+      "variant_id": 45280616513748,
+      "variant_inventory_management": "shopify",
+      "variant_title": null,
+      "vendor": "The TTL Store",
+      "tax_lines": [],
+      "duties": [],
+      "discount_allocations": []
+    }
+  ],
+  "payment_terms": null,
+  "refunds": [],
+  "shipping_address": {
+    "province": "Tennessee",
+    "country": "United States",
+    "country_code": "US",
+    "province_code": "TN"
+  },
+  "shipping_lines": [
+    {
+      "id": 4545044185300,
+      "carrier_identifier": "650f1a14fa979ec5c74d063e968411d4",
+      "code": "Economy",
+      "discounted_price": "4.90",
+      "discounted_price_set": {
+        "shop_money": {
+          "amount": "4.90",
+          "currency_code": "USD"
+        },
+        "presentment_money": {
+          "amount": "4.90",
+          "currency_code": "USD"
+        }
+      },
+      "is_removed": false,
+      "phone": null,
+      "price": "4.90",
+      "price_set": {
+        "shop_money": {
+          "amount": "4.90",
+          "currency_code": "USD"
+        },
+        "presentment_money": {
+          "amount": "4.90",
+          "currency_code": "USD"
+        }
+      },
+      "requested_fulfillment_service_id": null,
+      "source": "shopify",
+      "title": "Economy",
+      "tax_lines": [],
+      "discount_allocations": []
+    }
+  ]
+}

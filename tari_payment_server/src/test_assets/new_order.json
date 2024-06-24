@@ -1,188 +1,358 @@
 {
-  "id": 981820079255243500,
-  "token": "123123123",
-  "cart_token": "eeafa272cebfd4b22385bc4b645e762c",
-  "email": "example@email.com",
-  "gateway": null,
-  "buyer_accepts_marketing": false,
-  "created_at": "2022-12-13T13:53:06-05:00",
-  "updated_at": "2022-12-13T13:53:06-05:00",
-  "landing_site": null,
+  "id": 5714720719169,
+  "admin_graphql_api_id": "gid://shopify/Order/5714720719169",
+  "app_id": 580111,
+  "browser_ip": "176.203.83.119",
+  "buyer_accepts_marketing": true,
+  "cancel_reason": null,
+  "cancelled_at": null,
+  "cart_token": "Z2NwLWFzaWEtc291dGhlYXN0MTowMUhRNTFHQjVHODlWVjczWFhLOTdZWUQ0Sw",
+  "checkout_id": 37275602878785,
+  "checkout_token": "90e13fca5bf1958dc1bbc0866902023e",
+  "client_details": {
+    "accept_language": "en-QA",
+    "browser_height": null,
+    "browser_ip": "176.203.83.119",
+    "browser_width": null,
+    "session_hash": null,
+    "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1"
+  },
+  "closed_at": null,
+  "confirmed": true,
+  "contact_email": "maaak1997@gmail.com",
+  "created_at": "2024-02-21T08:42:27+03:00",
+  "currency": "QAR",
+  "current_subtotal_price": "160.00",
+  "current_subtotal_price_set": {
+    "shop_money": {
+      "amount": "160.00",
+      "currency_code": "QAR"
+    },
+    "presentment_money": {
+      "amount": "160.00",
+      "currency_code": "QAR"
+    }
+  },
+  "current_total_additional_fees_set": null,
+  "current_total_discounts": "0.00",
+  "current_total_discounts_set": {
+    "shop_money": {
+      "amount": "0.00",
+      "currency_code": "QAR"
+    },
+    "presentment_money": {
+      "amount": "0.00",
+      "currency_code": "QAR"
+    }
+  },
+  "current_total_duties_set": null,
+  "current_total_price": "190.00",
+  "current_total_price_set": {
+    "shop_money": {
+      "amount": "190.00",
+      "currency_code": "QAR"
+    },
+    "presentment_money": {
+      "amount": "190.00",
+      "currency_code": "QAR"
+    }
+  },
+  "current_total_tax": "0.00",
+  "current_total_tax_set": {
+    "shop_money": {
+      "amount": "0.00",
+      "currency_code": "QAR"
+    },
+    "presentment_money": {
+      "amount": "0.00",
+      "currency_code": "QAR"
+    }
+  },
+  "customer_locale": "en-QA",
+  "device_id": null,
+  "discount_codes": [],
+  "email": "maaak1997@gmail.com",
+  "estimated_taxes": false,
+  "financial_status": "pending",
+  "fulfillment_status": null,
+  "landing_site": "/collections/greeting-envelopes-cards/products/envelopes-cards-ye76",
+  "landing_site_ref": null,
+  "location_id": null,
+  "merchant_of_record_app_id": null,
+  "name": "#1318",
   "note": null,
   "note_attributes": [],
-  "referring_site": null,
-  "shipping_lines": [],
-  "taxes_included": false,
-  "total_weight": 907,
-  "currency": "USD",
-  "completed_at": null,
-  "closed_at": null,
-  "user_id": null,
-  "location_id": null,
-  "source_identifier": null,
-  "source_url": null,
-  "device_id": null,
-  "phone": null,
-  "customer_locale": null,
-  "line_items": [
-    {
-      "applied_discounts": [],
-      "discount_allocations": [],
-      "key": "778a301838998bcdbae2ff836d0d3b49",
-      "destination_location_id": 938998177,
-      "fulfillment_service": "manual",
-      "gift_card": false,
-      "grams": 454,
-      "origin_location_id": 938998176,
-      "presentment_title": "IPod Nano - 8GB",
-      "presentment_variant_title": "",
-      "product_id": 632910392,
-      "properties": null,
-      "quantity": 1,
-      "requires_shipping": true,
-      "sku": "IPOD2008PINK",
-      "tax_lines": [],
-      "taxable": true,
-      "title": "IPod Nano - 8GB",
-      "variant_id": null,
-      "variant_title": "",
-      "variant_price": null,
-      "vendor": "Apple",
-      "user_id": null,
-      "unit_price_measurement": null,
-      "rank": null,
-      "compare_at_price": null,
-      "line_price": "199.00",
-      "price": "199.00"
-    },
-    {
-      "applied_discounts": [],
-      "discount_allocations": [],
-      "key": "778a301838998bcdbae2ff836d0d3b49",
-      "destination_location_id": 938998177,
-      "fulfillment_service": "manual",
-      "gift_card": false,
-      "grams": 454,
-      "origin_location_id": 938998176,
-      "presentment_title": "IPod Nano - 8GB",
-      "presentment_variant_title": "",
-      "product_id": 632910392,
-      "properties": null,
-      "quantity": 1,
-      "requires_shipping": true,
-      "sku": "IPOD2008PINK",
-      "tax_lines": [],
-      "taxable": true,
-      "title": "IPod Nano - 8GB",
-      "variant_id": null,
-      "variant_title": "",
-      "variant_price": null,
-      "vendor": "Apple",
-      "user_id": null,
-      "unit_price_measurement": null,
-      "rank": null,
-      "compare_at_price": null,
-      "line_price": "199.00",
-      "price": "199.00"
-    }
+  "number": 318,
+  "order_number": 1318,
+  "order_status_url": "https://pixels.qa/81084612929/orders/04eaa913ca3ccc9c99603a5921a1268d/authenticate?key=8a84877a458b8039ce3c39eee46bec53",
+  "original_total_additional_fees_set": null,
+  "original_total_duties_set": null,
+  "payment_gateway_names": [
+    "Cash on Delivery (COD)"
   ],
-  "name": "#981820079255243537",
-  "source": null,
-  "abandoned_checkout_url": "https:\/\/checkout.local\/548380009\/checkouts\/123123123\/recover?key=example-secret-token",
-  "discount_codes": [],
-  "tax_lines": [],
+  "phone": null,
+  "presentment_currency": "QAR",
+  "processed_at": "2024-02-21T08:42:23+03:00",
+  "reference": "089594e1bf22f3f304f90c8762b838f5",
+  "referring_site": "https://pixels.qa/collections/greeting-envelopes-cards?page=6",
+  "source_identifier": "089594e1bf22f3f304f90c8762b838f5",
   "source_name": "web",
-  "presentment_currency": "USD",
-  "buyer_accepts_sms_marketing": false,
-  "sms_marketing_phone": null,
-  "total_discounts": "0.00",
-  "total_line_items_price": "398.00",
-  "total_price": "398.00",
-  "total_tax": "0.00",
-  "subtotal_price": "398.00",
-  "total_duties": null,
-  "billing_address": {
-    "first_name": "Bob",
-    "address1": "123 Billing Street",
-    "phone": "555-555-BILL",
-    "city": "Billtown",
-    "zip": "K2P0B0",
-    "province": "Kentucky",
-    "country": "United States",
-    "last_name": "Biller",
-    "address2": null,
-    "company": "My Company",
-    "latitude": null,
-    "longitude": null,
-    "name": "Bob Biller",
-    "country_code": "US",
-    "province_code": "KY"
+  "source_url": null,
+  "subtotal_price": "160.00",
+  "subtotal_price_set": {
+    "shop_money": {
+      "amount": "160.00",
+      "currency_code": "QAR"
+    },
+    "presentment_money": {
+      "amount": "160.00",
+      "currency_code": "QAR"
+    }
   },
-  "shipping_address": {
-    "first_name": "Steve",
-    "address1": "123 Shipping Street",
-    "phone": "555-555-SHIP",
-    "city": "Shippington",
-    "zip": "K2P0S0",
-    "province": "Kentucky",
-    "country": "United States",
-    "last_name": "Shipper",
+  "tags": "",
+  "tax_lines": [],
+  "taxes_included": false,
+  "test": false,
+  "token": "04eaa913ca3ccc9c99603a5921a1268d",
+  "total_discounts": "0.00",
+  "total_discounts_set": {
+    "shop_money": {
+      "amount": "0.00",
+      "currency_code": "QAR"
+    },
+    "presentment_money": {
+      "amount": "0.00",
+      "currency_code": "QAR"
+    }
+  },
+  "total_line_items_price": "160.00",
+  "total_line_items_price_set": {
+    "shop_money": {
+      "amount": "160.00",
+      "currency_code": "QAR"
+    },
+    "presentment_money": {
+      "amount": "160.00",
+      "currency_code": "QAR"
+    }
+  },
+  "total_outstanding": "190.00",
+  "total_price": "190.00",
+  "total_price_set": {
+    "shop_money": {
+      "amount": "190.00",
+      "currency_code": "QAR"
+    },
+    "presentment_money": {
+      "amount": "190.00",
+      "currency_code": "QAR"
+    }
+  },
+  "total_shipping_price_set": {
+    "shop_money": {
+      "amount": "30.00",
+      "currency_code": "QAR"
+    },
+    "presentment_money": {
+      "amount": "30.00",
+      "currency_code": "QAR"
+    }
+  },
+  "total_tax": "0.00",
+  "total_tax_set": {
+    "shop_money": {
+      "amount": "0.00",
+      "currency_code": "QAR"
+    },
+    "presentment_money": {
+      "amount": "0.00",
+      "currency_code": "QAR"
+    }
+  },
+  "total_tip_received": "0.00",
+  "total_weight": 0,
+  "updated_at": "2024-02-21T08:42:29+03:00",
+  "user_id": null,
+  "billing_address": {
+    "first_name": "Meme",
+    "address1": "Zone 53 Almearad, street 1215, home 23",
+    "phone": "60097002",
+    "city": "Alwajba",
+    "zip": null,
+    "province": null,
+    "country": "Qatar",
+    "last_name": "Alshamari",
     "address2": null,
-    "company": "Shipping Company",
+    "company": null,
     "latitude": null,
     "longitude": null,
-    "name": "Steve Shipper",
-    "country_code": "US",
-    "province_code": "KY"
+    "name": "Meme Alshamari",
+    "country_code": "QA",
+    "province_code": null
   },
   "customer": {
-    "id": 603851970716743400,
-    "email": "john@example.com",
-    "accepts_marketing": false,
-    "created_at": null,
-    "updated_at": null,
-    "first_name": "John",
-    "last_name": "Smith",
-    "orders_count": 0,
+    "id": 7806520164673,
+    "email": "maaak1997@gmail.com",
+    "created_at": "2024-02-21T08:27:36+03:00",
+    "updated_at": "2024-02-21T08:42:28+03:00",
+    "first_name": "Meme",
+    "last_name": "Alshamari",
     "state": "disabled",
-    "total_spent": "0.00",
-    "last_order_id": null,
     "note": null,
     "verified_email": true,
     "multipass_identifier": null,
     "tax_exempt": false,
-    "tags": "",
-    "last_order_name": null,
-    "currency": "USD",
     "phone": null,
-    "accepts_marketing_updated_at": null,
-    "marketing_opt_in_level": null,
-    "tax_exemptions": [],
     "email_marketing_consent": {
-      "state": "not_subscribed",
-      "opt_in_level": null,
-      "consent_updated_at": null
+      "state": "subscribed",
+      "opt_in_level": "single_opt_in",
+      "consent_updated_at": "2024-02-21T08:27:36+03:00"
     },
     "sms_marketing_consent": null,
-    "admin_graphql_api_id": "gid:\/\/shopify\/Customer\/603851970716743426",
+    "tags": "",
+    "currency": "QAR",
+    "accepts_marketing": true,
+    "accepts_marketing_updated_at": "2024-02-21T08:27:36+03:00",
+    "marketing_opt_in_level": "single_opt_in",
+    "tax_exemptions": [],
+    "admin_graphql_api_id": "gid://shopify/Customer/7806520164673",
     "default_address": {
-      "id": null,
-      "customer_id": 603851970716743400,
-      "first_name": null,
-      "last_name": null,
+      "id": 9874794774849,
+      "customer_id": 7806520164673,
+      "first_name": "Meme",
+      "last_name": "Alshamari",
       "company": null,
-      "address1": "123 Elm St.",
+      "address1": "Zone 53 Almearad, street 1215, home 23",
       "address2": null,
-      "city": "Ottawa",
-      "province": "Ontario",
-      "country": "Canada",
-      "zip": "K2H7A8",
-      "phone": "123-123-1234",
-      "name": "",
-      "province_code": "ON",
-      "country_code": "CA",
-      "country_name": "Canada",
+      "city": "Alwajba",
+      "province": null,
+      "country": "Qatar",
+      "zip": null,
+      "phone": "60097002",
+      "name": "Meme Alshamari",
+      "province_code": null,
+      "country_code": "QA",
+      "country_name": "Qatar",
       "default": true
     }
-  }
+  },
+  "discount_applications": [],
+  "fulfillments": [],
+  "line_items": [
+    {
+      "id": 14599558693185,
+      "admin_graphql_api_id": "gid://shopify/LineItem/14599558693185",
+      "fulfillable_quantity": 20,
+      "fulfillment_service": "manual",
+      "fulfillment_status": null,
+      "gift_card": false,
+      "grams": 0,
+      "name": "Artisan Aesthetics 47",
+      "price": "8.00",
+      "price_set": {
+        "shop_money": {
+          "amount": "8.00",
+          "currency_code": "QAR"
+        },
+        "presentment_money": {
+          "amount": "8.00",
+          "currency_code": "QAR"
+        }
+      },
+      "product_exists": true,
+      "product_id": 8549193417025,
+      "properties": [
+        {
+          "name": "Envelope Text",
+          "value": "C"
+        },
+        {
+          "name": "Card Text",
+          "value": "B"
+        },
+        {
+          "name": "Requests and Comments",
+          "value": "A"
+        }
+      ],
+      "quantity": 20,
+      "requires_shipping": true,
+      "sku": null,
+      "taxable": true,
+      "title": "Artisan Aesthetics 47",
+      "total_discount": "0.00",
+      "total_discount_set": {
+        "shop_money": {
+          "amount": "0.00",
+          "currency_code": "QAR"
+        },
+        "presentment_money": {
+          "amount": "0.00",
+          "currency_code": "QAR"
+        }
+      },
+      "variant_id": 46205971005761,
+      "variant_inventory_management": "shopify",
+      "variant_title": null,
+      "vendor": "Pixels â€¢ Ø¨ÙŠÙƒØ³Ù„Ø²",
+      "tax_lines": [],
+      "duties": [],
+      "discount_allocations": []
+    }
+  ],
+  "payment_terms": null,
+  "refunds": [],
+  "shipping_address": {
+    "first_name": "Meme",
+    "address1": "Zone 53 Almearad, street 1215, home 23",
+    "phone": "60097002",
+    "city": "Alwajba",
+    "zip": null,
+    "province": null,
+    "country": "Qatar",
+    "last_name": "Alshamari",
+    "address2": null,
+    "company": null,
+    "latitude": 25.233711,
+    "longitude": 51.4216387,
+    "name": "Meme Alshamari",
+    "country_code": "QA",
+    "province_code": null
+  },
+  "shipping_lines": [
+    {
+      "id": 4639048925505,
+      "carrier_identifier": "650f1a14fa979ec5c74d063e968411d4",
+      "code": "Standard Delivery (24h)",
+      "delivery_category": null,
+      "discounted_price": "30.00",
+      "discounted_price_set": {
+        "shop_money": {
+          "amount": "30.00",
+          "currency_code": "QAR"
+        },
+        "presentment_money": {
+          "amount": "30.00",
+          "currency_code": "QAR"
+        }
+      },
+      "phone": null,
+      "price": "30.00",
+      "price_set": {
+        "shop_money": {
+          "amount": "30.00",
+          "currency_code": "QAR"
+        },
+        "presentment_money": {
+          "amount": "30.00",
+          "currency_code": "QAR"
+        }
+      },
+      "requested_fulfillment_service_id": null,
+      "source": "shopify",
+      "title": "Standard Delivery (24h)",
+      "tax_lines": [],
+      "discount_allocations": []
+    }
+  ]
 }

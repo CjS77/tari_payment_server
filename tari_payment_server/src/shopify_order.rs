@@ -12,18 +12,23 @@ pub struct ShopifyOrder {
     pub id: i64,
     pub token: String,
     pub cart_token: String,
-    pub email: String,
+    pub email: Option<String>,
     pub buyer_accepts_marketing: bool,
     pub created_at: String,
     pub updated_at: String,
     pub note: Option<String>,
     pub currency: String,
-    pub completed_at: Option<String>,
+    pub presentment_currency: String,
+    pub cancel_reason: Option<String>,
+    pub cancelled_at: Option<String>,
+    pub checkout_id: i64,
+    pub checkout_token: String,
     pub closed_at: Option<String>,
+    pub confirmed: bool,
     pub user_id: Option<i64>,
+    pub fulfillment_status: Option<String>,
     pub name: String,
     pub source_name: String,
-    pub presentment_currency: String,
     pub total_discounts: String,
     pub total_line_items_price: String,
     pub total_price: String,
@@ -52,7 +57,7 @@ impl TryFrom<ShopifyOrder> for NewOrder {
         let memo = value.note;
         let mut order = Self {
             order_id: OrderId(value.name),
-            customer_id: value.email,
+            customer_id: value.customer.id.to_string(),
             currency: value.currency,
             memo,
             address: None,
@@ -74,15 +79,15 @@ pub struct EmailMarketingConsent {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Customer {
     pub id: i64,
-    pub email: String,
-    pub accepts_marketing: bool,
+    pub email: Option<String>,
+    pub accepts_marketing: Option<bool>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
-    pub first_name: String,
-    pub last_name: String,
-    pub orders_count: i64,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub orders_count: Option<i64>,
     pub state: String,
-    pub total_spent: String,
+    pub total_spent: Option<String>,
     pub last_order_id: Option<String>,
     pub note: Option<String>,
     pub verified_email: bool,
@@ -91,7 +96,7 @@ pub struct Customer {
     pub last_order_name: Option<String>,
     pub currency: String,
     pub phone: Option<String>,
-    pub email_marketing_consent: EmailMarketingConsent,
+    pub email_marketing_consent: Option<EmailMarketingConsent>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -216,24 +221,29 @@ impl OrderBuilder {
             id,
             token: self.token.unwrap_or_else(|| rng.next_u64().to_string()),
             cart_token: self.cart_token.unwrap_or_else(|| format!("{:x}", rng.next_u64())),
-            email: self.email.unwrap_or_else(|| format!("{}@example.com", rng.gen_range(0..1000))),
+            email: Some(self.email.unwrap_or_else(|| format!("{}@example.com", rng.gen_range(0..1000)))),
             buyer_accepts_marketing: self.buyer_accepts_marketing.unwrap_or_default(),
             created_at: self.created_at.unwrap_or_else(|| Utc::now().to_rfc3339()),
             updated_at: self.updated_at.unwrap_or_else(|| Utc::now().to_rfc3339()),
             note: self.note,
             currency: self.currency.unwrap_or_else(|| "XTR".to_string()),
-            completed_at: self.completed_at,
             closed_at: self.closed_at,
+            confirmed: false,
             user_id: self.user_id,
+            fulfillment_status: None,
             name: self.name.unwrap_or_default(),
             source_name: self.source_name.unwrap_or_default(),
             presentment_currency: self.presentment_currency.unwrap_or_else(|| "XTR".to_string()),
+            cancel_reason: None,
+            cancelled_at: None,
+            checkout_id: 12345,
             total_discounts: self.total_discounts.unwrap_or_default(),
             total_line_items_price: self.total_line_items_price.unwrap_or_default(),
             total_price: self.total_price.unwrap_or_else(|| format!("{}", rng.gen_range(1_000..250_000) * 1000)),
             total_tax: self.total_tax.unwrap_or_default(),
             subtotal_price: self.subtotal_price.unwrap_or_default(),
             customer: self.customer.unwrap_or_default(),
+            checkout_token: "checkouttoken12345".to_string(),
         }
     }
 }
@@ -246,9 +256,19 @@ mod test {
     fn deserialize_new_order() {
         let order = include_str!("./test_assets/new_order.json");
         let order: ShopifyOrder = serde_json::from_str(order).unwrap();
-        assert_eq!(order.id, 981820079255243500);
-        assert_eq!(order.token, "123123123");
-        assert_eq!(order.total_price, "398.00");
-        assert_eq!(order.customer.id, 603851970716743400);
+        assert_eq!(order.id, 5714720719169);
+        assert_eq!(order.token, "04eaa913ca3ccc9c99603a5921a1268d");
+        assert_eq!(order.total_price, "190.00");
+        assert_eq!(order.customer.id, 7806520164673);
+
+        let order = include_str!("./test_assets/actual_order.json");
+        let order: ShopifyOrder = serde_json::from_str(order).unwrap();
+        assert_eq!(order.id, 5621163655380);
+        assert_eq!(order.customer.id, 7345051926740);
+
+        let order = include_str!("./test_assets/actual_order2.json");
+        let order: ShopifyOrder = serde_json::from_str(order).unwrap();
+        assert_eq!(order.id, 5621189509332);
+        assert_eq!(order.customer.id, 7345180737748);
     }
 }

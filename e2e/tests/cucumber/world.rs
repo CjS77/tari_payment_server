@@ -17,6 +17,7 @@ use tari_payment_engine::{
 };
 use tari_payment_server::{
     config::{AuthConfig, ServerConfig},
+    helpers::Secret,
     server::create_server_instance,
 };
 
@@ -47,6 +48,8 @@ impl Default for TPGWorld {
             host: "127.0.0.1".into(),
             port: 20000 + rand::random::<u16>() % 10_000,
             shopify_api_key: String::default(),
+            shopify_api_secret: Secret::default(),
+            shopify_hmac_checks: false,
             database_url: url.clone(),
             auth: AuthConfig::default(),
             shopify_whitelist: None,
