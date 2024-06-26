@@ -3,13 +3,14 @@ use std::{str::FromStr, time::Duration};
 use log::*;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
-    db_types::{MicroTari, NewPayment},
+    db_types::NewPayment,
     events::EventProducers,
     test_utils::prepare_env::prepare_test_env,
     OrderFlowApi,
     SqliteDatabase,
 };
 use tokio::runtime::Runtime;
+use tpg_common::MicroTari;
 
 const NUM_TRANSFERS: u64 = 20;
 const RATE: u64 = 100; // transfers per second

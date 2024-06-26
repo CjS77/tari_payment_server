@@ -22,6 +22,8 @@
 //! * [`WalletManagement`] defines behavior for managing the set of authorized hot wallets associated with the server.
 mod account_management;
 mod auth_management;
+
+mod exchange_rates;
 mod payment_gateway_database;
 
 mod wallet_management;
@@ -31,5 +33,6 @@ mod data_objects;
 pub use account_management::{AccountApiError, AccountManagement};
 pub use auth_management::{AuthApiError, AuthManagement};
 pub use data_objects::{NewWalletInfo, OrderMovedResult, UpdateWalletInfo, WalletInfo};
+pub use exchange_rates::{ExchangeRateError, ExchangeRates};
 pub use payment_gateway_database::{PaymentGatewayDatabase, PaymentGatewayError};
 pub use wallet_management::{WalletAuth, WalletAuthApiError, WalletManagement, WalletManagementError};

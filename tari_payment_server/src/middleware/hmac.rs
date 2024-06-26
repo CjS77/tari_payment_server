@@ -24,8 +24,9 @@ use actix_web::{
 };
 use futures::future::LocalBoxFuture;
 use log::{trace, warn};
+use tpg_common::Secret;
 
-use crate::helpers::{calculate_hmac, Secret};
+use crate::helpers::calculate_hmac;
 
 pub struct HmacMiddlewareFactory {
     hmac_header: String,

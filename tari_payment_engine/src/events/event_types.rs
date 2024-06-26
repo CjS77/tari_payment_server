@@ -1,8 +1,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use tpg_common::MicroTari;
 
 use crate::{
-    db_types::{MicroTari, Order, OrderStatus, OrderStatusType, Payment, PublicKey},
+    db_types::{Order, OrderStatus, OrderStatusType, Payment, PublicKey},
     order_objects::OrderChanged,
 };
 

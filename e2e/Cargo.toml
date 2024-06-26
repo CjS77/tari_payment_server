@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 log = "0.4.21"
 tari_common_types = "1.0.0-pre.10"
+shopify_tools = { version = "0.1.0", path = "../shopify_tools" }
 tari_payment_engine = { version = "0.1.0", path = "../tari_payment_engine", features = ["test_utils"] }
 tari_payment_server = { version = "0.1.0", path = "../tari_payment_server" }
 tpg_common = { version = "0.1.0", path = "../tpg_common" }

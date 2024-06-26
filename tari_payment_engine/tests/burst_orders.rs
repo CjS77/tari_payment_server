@@ -9,6 +9,7 @@ use tari_payment_engine::{
     SqliteDatabase,
 };
 use tokio::runtime::Runtime;
+use tpg_common::MicroTari;
 
 const NUM_ORDERS: u64 = 20;
 const RATE: u64 = 100; // orders per second

@@ -11,6 +11,8 @@ use log::info;
 use sqlx::{sqlite::SqlitePoolOptions, Error as SqlxError, SqlitePool};
 
 pub mod auth;
+
+pub mod exchange_rates;
 pub mod orders;
 pub mod transfers;
 pub mod user_accounts;

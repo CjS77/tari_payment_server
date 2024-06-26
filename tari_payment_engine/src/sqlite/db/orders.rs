@@ -1,8 +1,9 @@
 use log::{debug, trace};
 use sqlx::{sqlite::SqliteRow, FromRow, QueryBuilder, SqliteConnection};
+use tpg_common::MicroTari;
 
 use crate::{
-    db_types::{MicroTari, NewOrder, Order, OrderId, OrderStatusType, UserAccount},
+    db_types::{NewOrder, Order, OrderId, OrderStatusType, UserAccount},
     order_objects::{ModifyOrderRequest, OrderQueryFilter},
     sqlite::db::user_accounts,
     traits::{AccountApiError, PaymentGatewayError},

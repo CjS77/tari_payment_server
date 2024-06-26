@@ -13,6 +13,7 @@ use futures::{future::ok, FutureExt};
 use log::*;
 use tari_payment_engine::{
     events::{EventHandlers, EventHooks},
+    tpe_api::exchange_rate_api::ExchangeRateApi,
     AccountApi,
     AuthApi,
     OrderFlowApi,
@@ -97,6 +98,7 @@ pub fn create_server_instance(
         let authority = build_tps_authority(config.auth.clone());
         let accounts_api = AccountApi::new(db.clone());
         let wallet_auth = WalletAuthApi::new(db.clone());
+        let exchange_rates = ExchangeRateApi::new(db.clone());
         let hmac_middleware = HmacMiddlewareFactory::new(
             "X-Shopify-Hmac-Sha256",
             config.shopify_api_secret.clone(),
@@ -110,6 +112,7 @@ pub fn create_server_instance(
             .app_data(web::Data::new(auth_api))
             .app_data(web::Data::new(jwt_signer))
             .app_data(web::Data::new(wallet_auth))
+            .app_data(web::Data::new(exchange_rates))
             .app_data(web::Data::new(proxy_config));
         // Routes that require authentication
         let auth_scope = web::scope("/api")

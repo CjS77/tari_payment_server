@@ -2,10 +2,11 @@ use serde::Serialize;
 use tari_common::configuration::Network;
 use tari_crypto::{ristretto::RistrettoSecretKey, tari_utilities::hex::Hex};
 use tari_payment_engine::{
-    db_types::{MicroTari, NewPayment, SerializedTariAddress},
+    db_types::{NewPayment, SerializedTariAddress},
     helpers::WalletSignature,
 };
 use tari_payment_server::data_objects::TransactionConfirmation;
+use tpg_common::MicroTari;
 
 use crate::{keys::KeyInfo, PaymentAuthParams, TxConfirmParams};
 
