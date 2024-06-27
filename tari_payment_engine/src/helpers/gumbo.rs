@@ -1,7 +1,12 @@
+use std::str::FromStr;
+
 use blake2::{Blake2b512, Digest};
+use log::error;
 use tari_common::configuration::Network;
 use tari_common_types::tari_address::TariAddress;
 use tari_crypto::{ristretto::RistrettoPublicKey, tari_utilities::ByteArray};
+
+pub const DONATION_WALLET_ADDRESS: &str = "0859fb3d6696579310c220d204cb21437d6658d0a05af1c8cd54fffd8725344352";
 
 /// Creates a dummy TariAddress for a given customer id. The address is created by hashing the customer id and
 /// then setting the first 8 bytes to a specific prefix and the last byte to 0. The resulting hash is then
@@ -26,6 +31,26 @@ pub fn create_dummy_address_for_cust_id(cust_id: &str) -> TariAddress {
     }
     let key = key.unwrap();
     TariAddress::new(key, Network::MainNet)
+}
+
+/// Returns the Tari wallet address that should be used to make payments.
+///
+/// This value should be set in the environment variable `TPG_PAYMENT_WALLET_ADDRESS`.
+/// If this is _not_ set, it will default to the developers' wallet, and we will gladly accept these payments :)
+pub fn get_payment_wallet_address() -> TariAddress {
+    std::env::var("TPG_PAYMENT_WALLET_ADDRESS")
+        .ok()
+        .and_then(|s| {
+            TariAddress::from_str(&s)
+                .map_err(|e| {
+                    error!(
+                        "Invalid TPG_PAYMENT_WALLET_ADDRESS: {e}. You should fix this immediately, because funds will \
+                         be sent to the developers instead."
+                    );
+                })
+                .ok()
+        })
+        .unwrap_or_else(|| TariAddress::from_str(DONATION_WALLET_ADDRESS).unwrap())
 }
 
 #[cfg(test)]

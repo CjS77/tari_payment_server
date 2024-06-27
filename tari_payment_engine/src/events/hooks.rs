@@ -5,6 +5,7 @@ use crate::events::{
     EventProducer,
     Handler,
     OrderAnnulledEvent,
+    OrderClaimedEvent,
     OrderEvent,
     OrderModifiedEvent,
     PaymentEvent,
@@ -21,6 +22,7 @@ pub struct EventProducers {
     pub new_order_producer: Vec<EventProducer<OrderEvent>>,
     pub order_annulled_producer: Vec<EventProducer<OrderAnnulledEvent>>,
     pub order_modified_producer: Vec<EventProducer<OrderModifiedEvent>>,
+    pub order_claimed_producer: Vec<EventProducer<OrderClaimedEvent>>,
     pub payment_received_producer: Vec<EventProducer<PaymentEvent>>,
     pub payment_confirmed_producer: Vec<EventProducer<PaymentEvent>>,
 }
@@ -32,6 +34,7 @@ pub struct EventHandlers {
     pub on_new_order: Option<EventHandler<OrderEvent>>,
     pub on_order_annulled: Option<EventHandler<OrderAnnulledEvent>>,
     pub on_order_modified: Option<EventHandler<OrderModifiedEvent>>,
+    pub on_order_claimed: Option<EventHandler<OrderClaimedEvent>>,
     pub on_payment_received: Option<EventHandler<PaymentEvent>>,
     pub on_payment_confirmed: Option<EventHandler<PaymentEvent>>,
 }
@@ -42,6 +45,7 @@ impl EventHandlers {
         let on_new_order = hooks.on_new_order.map(|f| EventHandler::new(buffer_size, f));
         let on_order_annulled = hooks.on_order_annulled.map(|f| EventHandler::new(buffer_size, f));
         let on_order_modified = hooks.on_order_modified.map(|f| EventHandler::new(buffer_size, f));
+        let on_order_claimed = hooks.on_order_claimed.map(|f| EventHandler::new(buffer_size, f));
         let on_payment_received = hooks.on_payment_received.map(|f| EventHandler::new(buffer_size, f));
         let on_payment_confirmed = hooks.on_payment_confirmed.map(|f| EventHandler::new(buffer_size, f));
         Self {
@@ -49,6 +53,7 @@ impl EventHandlers {
             on_new_order,
             on_order_annulled,
             on_order_modified,
+            on_order_claimed,
             on_payment_received,
             on_payment_confirmed,
         }
@@ -124,6 +129,7 @@ pub struct EventHooks {
     pub on_new_order: Option<Handler<OrderEvent>>,
     pub on_order_annulled: Option<Handler<OrderAnnulledEvent>>,
     pub on_order_modified: Option<Handler<OrderModifiedEvent>>,
+    pub on_order_claimed: Option<Handler<OrderClaimedEvent>>,
     pub on_payment_received: Option<Handler<PaymentEvent>>,
     pub on_payment_confirmed: Option<Handler<PaymentEvent>>,
 }
@@ -144,6 +150,12 @@ impl EventHooks {
     pub fn on_order_modified<F>(&mut self, f: F) -> &mut Self
     where F: (Fn(OrderModifiedEvent) -> Pin<Box<dyn Future<Output = ()> + Send>>) + Send + Sync + 'static {
         self.on_order_modified = Some(Arc::new(f));
+        self
+    }
+
+    pub fn on_order_claimed<F>(&mut self, f: F) -> &mut Self
+    where F: (Fn(OrderClaimedEvent) -> Pin<Box<dyn Future<Output = ()> + Send>>) + Send + Sync + 'static {
+        self.on_order_claimed = Some(Arc::new(f));
         self
     }
 

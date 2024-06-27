@@ -1,4 +1,3 @@
-use log::debug;
 use shopify_tools::{ExchangeRate, ShopifyApi, ShopifyConfig};
 
 use crate::shopify::{command_def::RatesCommand, OrdersCommand, ShopifyCommand};

@@ -5,19 +5,10 @@ use tari_common_types::tari_address::TariAddress;
 use tpg_common::MicroTari;
 
 use crate::{
-    db_types::{
-        CreditNote,
-        NewOrder,
-        NewPayment,
-        Order,
-        OrderId,
-        OrderStatusType,
-        Payment,
-        TransferStatus,
-        UserAccount,
-    },
-    events::{EventProducers, OrderAnnulledEvent, OrderEvent, OrderModifiedEvent, PaymentEvent},
-    order_objects::OrderChanged,
+    db_types::{CreditNote, NewOrder, NewPayment, Order, OrderId, OrderStatusType, Payment, TransferStatus},
+    events::{EventProducers, OrderAnnulledEvent, OrderClaimedEvent, OrderEvent, OrderModifiedEvent, PaymentEvent},
+    helpers::MemoSignature,
+    order_objects::{ClaimedOrder, OrderChanged},
     traits::{OrderMovedResult, PaymentGatewayDatabase, PaymentGatewayError},
 };
 
@@ -68,6 +59,39 @@ where B: PaymentGatewayDatabase
         Ok(paid_orders)
     }
 
+    /// Claims an order for a Tari wallet address.
+    ///
+    /// This function:
+    /// * Checks that the signature is valid,
+    /// * Checks that the order exists, and is in the `New` status,
+    /// If these checks pass, then
+    /// * an account for the wallet address is created, if necessary,
+    /// * the order associated with the address in the signature
+    /// * The OrderClaimed event is fired.
+    pub async fn claim_order(&self, signature: &MemoSignature) -> Result<ClaimedOrder, PaymentGatewayError> {
+        if !signature.is_valid() {
+            return Err(PaymentGatewayError::InvalidSignature);
+        }
+        let order_id = OrderId(signature.order_id.clone());
+        let order = self
+            .db
+            .fetch_order_by_order_id(&order_id)
+            .await?
+            .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
+        let address = signature.address.as_address();
+        let account = self.db.attach_order_to_address(&order_id, address).await?;
+        self.call_order_claimed_hook(&order, address).await;
+        let updated_order = match self.try_pay_order(&order).await? {
+            Some(o) => {
+                info!("🔄️📦️ Account {} had enough credit to pay for newly claimed order [{order_id}].", account.id);
+                o
+            },
+            None => order,
+        };
+        let claimed_order = ClaimedOrder::from(updated_order);
+        Ok(claimed_order)
+    }
+
     async fn call_order_paid_hook(&self, paid_orders: &[Order]) {
         for emitter in &self.producers.order_paid_producer {
             debug!("🔄️📦️ Notifying order paid hook subscribers");
@@ -92,6 +116,15 @@ where B: PaymentGatewayDatabase
         for emitter in &self.producers.order_annulled_producer {
             let event = OrderAnnulledEvent::new(updated_order.clone());
             emitter.publish_event(event).await;
+        }
+    }
+
+    /// Calls the registered function when an order is claimed by a wallet address
+    async fn call_order_claimed_hook(&self, order: &Order, address: &TariAddress) {
+        debug!("🔄️📦️ Notifying order annulled hook subscribers");
+        let event = OrderClaimedEvent::new(order.clone(), address.clone());
+        for emitter in &self.producers.order_claimed_producer {
+            emitter.publish_event(event.clone()).await;
         }
     }
 
@@ -384,19 +417,6 @@ where B: PaymentGatewayDatabase
         _new_currency: &str,
     ) -> Result<Order, PaymentGatewayError> {
         Err(PaymentGatewayError::UnsupportedAction("Multiple currencies".to_string()))
-    }
-
-    pub async fn attach_order_to_address(
-        &self,
-        order_id: &OrderId,
-        address: &TariAddress,
-    ) -> Result<UserAccount, PaymentGatewayError> {
-        debug!("🔄️📦️ Attaching order [{order_id}] to address [{address}]");
-        let account = self.db.attach_order_to_address(order_id, address).await?;
-        info!("🔄️📦️ Order [{order_id}] attached to address [{address}]");
-        // todo - hook required here? Nothing existing fits
-        // todo: self.try_pay_order(&account).await?;
-        Ok(account)
     }
 
     pub fn db(&self) -> &B {
