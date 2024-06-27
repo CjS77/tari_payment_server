@@ -251,6 +251,16 @@ impl PartialEq for Order {
 
 impl Eq for Order {}
 
+impl Order {
+    pub fn expires_at(&self) -> Option<DateTime<Utc>> {
+        match self.status {
+            OrderStatusType::New => Some(self.updated_at + chrono::Duration::hours(6)),
+            // todo! add claimed status to extend expiry time
+            _ => None,
+        }
+    }
+}
+
 //--------------------------------------        NewOrder       ---------------------------------------------------------
 #[derive(Debug, Clone)]
 pub struct NewOrder {

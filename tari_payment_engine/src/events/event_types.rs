@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use tari_common_types::tari_address::TariAddress;
 use tpg_common::MicroTari;
 
 use crate::{
@@ -54,6 +55,18 @@ pub struct OrderModifiedEvent {
 impl OrderModifiedEvent {
     pub fn new(field_changed: String, orders: OrderChanged) -> Self {
         Self { field_changed, orders }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OrderClaimedEvent {
+    pub order: Order,
+    pub claimant: TariAddress,
+}
+
+impl OrderClaimedEvent {
+    pub fn new(order: Order, claimant: TariAddress) -> Self {
+        Self { order, claimant }
     }
 }
 

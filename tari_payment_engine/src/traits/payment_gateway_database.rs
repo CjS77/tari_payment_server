@@ -43,9 +43,8 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     async fn fetch_or_create_account_for_payment(&self, payment: &Payment) -> Result<i64, PaymentGatewayError>;
 
     /// Takes a new order, and in a single atomic transaction,
-    /// * calls `save_new_order` to store the order in the database. If the order already exists, nothing further is
-    ///   done.
-    /// * creates a new account for the customer if one does not already exist
+    /// * Stores the order in the database. If the order already exists, nothing further is done.
+    /// * Creates a new account for the customer if one does not already exist
     /// * Updates the total orders value for the account
     ///
     /// Returns the account id for the customer.
@@ -236,6 +235,8 @@ pub enum PaymentGatewayError {
     OrderNotFound(OrderId),
     #[error("{0} are not supported yet")]
     UnsupportedAction(String),
+    #[error("Cannot claim order because the signature is invalid.")]
+    InvalidSignature,
 }
 
 impl From<sqlx::Error> for PaymentGatewayError {

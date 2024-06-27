@@ -30,10 +30,10 @@ use crate::{
     routes::{
         health,
         AccountRoute,
-        AttachOrderToAddressRoute,
         AuthRoute,
         CancelOrderRoute,
         CheckTokenRoute,
+        ClaimOrderRoute,
         CreditorsRoute,
         FulfilOrderRoute,
         HistoryForAddressRoute,
@@ -59,6 +59,7 @@ use crate::{
         UpdateRolesRoute,
     },
 };
+
 /// Defines the log format for the access log middleware.
 const LOG_FORMAT: &str = concat!(
     "%t ",                                   // Time when the request was started to process
@@ -127,6 +128,7 @@ pub fn create_server_instance(
             .service(UnfulfilledOrdersRoute::<SqliteDatabase>::new())
             .service(OrdersRoute::<SqliteDatabase>::new())
             .service(OrderByIdRoute::<SqliteDatabase>::new())
+            .service(ClaimOrderRoute::<SqliteDatabase>::new())
             .service(MyPaymentsRoute::<SqliteDatabase>::new())
             .service(PaymentsRoute::<SqliteDatabase>::new())
             .service(OrdersSearchRoute::<SqliteDatabase>::new())
@@ -138,7 +140,6 @@ pub fn create_server_instance(
             .service(UpdatePriceRoute::<SqliteDatabase>::new())
             .service(ReassignOrderRoute::<SqliteDatabase>::new())
             .service(ResetOrderRoute::<SqliteDatabase>::new())
-            .service(AttachOrderToAddressRoute::<SqliteDatabase>::new())
             .service(CheckTokenRoute::new());
         let use_x_forwarded_for = config.use_x_forwarded_for;
         let use_forwarded = config.use_forwarded;

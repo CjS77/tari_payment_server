@@ -7,6 +7,7 @@ use tpg_common::MicroTari;
 
 use crate::{
     db_types::{Order, OrderId, OrderStatusType},
+    helpers,
     traits::AccountApiError,
 };
 
@@ -198,5 +199,37 @@ pub struct OrderChanged {
 impl OrderChanged {
     pub fn new(old_order: Order, new_order: Order) -> Self {
         Self { old_order, new_order }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaimedOrder {
+    pub order_id: OrderId,
+    pub total_price: MicroTari,
+    pub expires_at: DateTime<Utc>,
+    pub status: OrderStatusType,
+    pub send_to: TariAddress,
+}
+
+impl ClaimedOrder {
+    pub fn new(order_id: OrderId, total_price: MicroTari) -> Self {
+        let expires_at = Utc::now() + chrono::Duration::hours(48);
+        Self {
+            order_id,
+            total_price,
+            expires_at,
+            status: OrderStatusType::New,
+            send_to: helpers::get_payment_wallet_address(),
+        }
+    }
+}
+
+impl From<Order> for ClaimedOrder {
+    fn from(o: Order) -> Self {
+        let expires_at = o.expires_at().unwrap_or(o.updated_at);
+        let mut result = ClaimedOrder::new(o.order_id, o.total_price);
+        result.expires_at = expires_at;
+        result.status = o.status;
+        result
     }
 }
