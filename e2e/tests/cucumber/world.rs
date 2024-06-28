@@ -120,6 +120,14 @@ impl TPGWorld {
                 Box::pin(async {})
             });
             let event = Arc::clone(&last_event);
+            hooks.on_order_claimed(move |ev| {
+                info!("🌍️ Received order claimed event: {ev:?}");
+                if let Ok(mut le) = event.lock() {
+                    le.insert("OrderClaimed", EventType::OrderClaimed(ev));
+                }
+                Box::pin(async {})
+            });
+            let event = Arc::clone(&last_event);
             hooks.on_new_order(move |ev| {
                 info!("🌍️ Received new order event: {ev:?}");
                 if let Ok(mut le) = event.lock() {

@@ -459,7 +459,7 @@ pub async fn claim_order<B: PaymentGatewayDatabase>(
         memo_signature.order_id
     );
     let result = api.claim_order(&memo_signature).await.map_err(|e| {
-        debug!("💻️ Error claim failed. {e}");
+        debug!("💻️ Order claim failed. {e}");
         e
     })?;
     Ok(HttpResponse::Ok().json(result))

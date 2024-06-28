@@ -174,17 +174,22 @@ pub async fn user_account_for_address(
     Ok(result)
 }
 
-/// Returns the internal account id for the given public key, if it exists, or None if it does not exist.
-async fn acc_id_for_address(pk: &TariAddress, conn: &mut SqliteConnection) -> Result<Option<i64>, AccountApiError> {
-    let pk = pk.to_hex();
-    let id = sqlx::query!("SELECT user_account_id FROM user_account_address WHERE address = $1 LIMIT 1", pk)
-        .fetch_optional(conn)
-        .await?
-        .map(|r| r.user_account_id);
-    if let Some(id) = id {
-        trace!("🧑️ Public key {pk} is linked to account #{id}");
+/// Returns the internal account ids for the given address, in order of age (youngest first).
+async fn acc_ids_for_address(addr: &TariAddress, conn: &mut SqliteConnection) -> Result<Vec<i64>, AccountApiError> {
+    let addr = addr.to_hex();
+    let ids = sqlx::query!(
+        "SELECT user_account_id FROM user_account_address WHERE address = $1 ORDER BY created_at DESC",
+        addr
+    )
+    .fetch_all(conn)
+    .await?
+    .iter()
+    .map(|r| r.user_account_id)
+    .collect::<Vec<i64>>();
+    if !ids.is_empty() {
+        trace!("🧑️ Address {addr} is linked to one or more accounts");
     }
-    Ok(id)
+    Ok(ids)
 }
 
 /// Returns the internal account id for the given customer id, if it exists, or None if it does not exist.
@@ -211,8 +216,8 @@ async fn create_account_with_links(
     link_accounts(account_id, cid, pk, tx).await
 }
 
-/// Links a customer id and/or public key in the database with the given internal account number.
-async fn link_accounts(
+/// Links a customer id and/or address in the database with the given internal account number.
+pub async fn link_accounts(
     acc_id: i64,
     cid: Option<String>,
     pk: Option<TariAddress>,
@@ -246,7 +251,9 @@ async fn link_accounts(
 }
 
 /// Fetches the user account for the given customer_id and/or public key. If both customer_id and address are
-/// provided, the resulting account id must match, otherwise an error is returned.
+/// provided, the resulting account id must match, otherwise an error is returned (This is not an issue per se,
+/// but this function doesn't have enough information to resolve the ambiguity, and so responsibility for this
+/// is handed off to the caller).
 ///
 /// If the account does not exist, one is created and the given customer id and/or public key is linked to the
 /// account.
@@ -274,30 +281,28 @@ pub async fn fetch_or_create_account(
         cid_is_linked.map_or(-1, |id| id),
     );
 
-    let pk_is_linked = match &address {
-        Some(pk) => acc_id_for_address(pk, &mut *conn).await?,
-        None => None,
+    let address_accounts = match &address {
+        Some(pk) => acc_ids_for_address(pk, &mut *conn).await?,
+        None => vec![],
     };
 
     trace!(
-        "🧑️ Public key is {} the database at account #{}",
-        pk_is_linked.map_or("NOT in", |_| "IN"),
-        pk_is_linked.map_or(-1, |id| id),
+        "🧑️ Address {} an account in the database",
+        if address_accounts.is_empty() { "does NOT have" } else { "HAS" },
     );
 
-    let id = match (cid_is_linked, pk_is_linked) {
-        (Some(acc_cid), Some(acc_pk)) => {
-            if acc_cid == acc_pk {
+    let id = match (cid_is_linked, address_accounts.is_empty()) {
+        (Some(acc_cid), false) => {
+            if address_accounts.contains(&acc_cid) {
                 Ok(acc_cid)
             } else {
-                Err(AccountApiError::QueryError(
-                    "🧑️ Customer_id and address are linked to different accounts".to_string(),
-                ))
+                Err(AccountApiError::ambiguous(address.unwrap(), address_accounts, cust_id.unwrap(), acc_cid))
             }
         },
-        (Some(account_id), None) => link_accounts(account_id, None, address, &mut *conn).await,
-        (None, Some(account_id)) => link_accounts(account_id, cust_id, None, &mut *conn).await,
-        (None, None) => create_account_with_links(cust_id, address, &mut *conn).await,
+        (Some(account_id), true) => link_accounts(account_id, None, address, &mut *conn).await,
+        // Link the customer id to the most recent account associated with this address
+        (None, false) => link_accounts(address_accounts[0], cust_id, None, &mut *conn).await,
+        (None, true) => create_account_with_links(cust_id, address, &mut *conn).await,
     }?;
     Ok(id)
 }

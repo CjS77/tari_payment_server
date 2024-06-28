@@ -16,7 +16,7 @@ Feature: Order claiming
     """
     Then I receive a 400 BadRequest response with the message 'Invalid signature'
 
-  Scenario: An unauthenticated user can claim an order with the correct signature
+  Scenario: An unauthenticated user can claim an order with the correct signature, even if they already have a previous account
     When Customer #142 ["anon@example.com"] places order "order10256" for 2400 XTR, with memo
     When User POSTs to "/order/claim" with body
     """
@@ -28,11 +28,16 @@ Feature: Order claiming
     Then I receive a 200 Ok response
     And I receive a partial JSON response:
     """
-    { "foo": "bar" }
+    { "order_id": "order10256", "total_price": 2400000000 }
     """
     Then the OrderClaimed trigger fires with
     """
     {
-
+      "order": { "order_id": "order10256", "total_price": 2400000000, "status": "New" },
+      "claimant": "680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b"
     }
     """
+
+  Scenario: Previously unlinked accounts can claim an order with the correct signature, and the order can be paid.
+
+  Scenario: New addresses can claim an order with the correct signature.

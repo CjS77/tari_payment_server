@@ -17,12 +17,36 @@ pub enum AccountApiError {
     OrderDoesNotExist(OrderId),
     #[error("Insufficient funds to complete the transaction")]
     InsufficientFunds,
+    #[error("Cannot uniquely determine the account for the address-customer pair")]
+    AmbiguousAccounts(AmbiguousAccountInfo),
 }
 
 impl AccountApiError {
     pub fn dne(oid: OrderId) -> Self {
         AccountApiError::OrderDoesNotExist(oid)
     }
+
+    pub fn ambiguous(
+        address: TariAddress,
+        address_account_ids: Vec<i64>,
+        customer_id: String,
+        customer_account_id: i64,
+    ) -> Self {
+        AccountApiError::AmbiguousAccounts(AmbiguousAccountInfo {
+            address,
+            address_account_ids,
+            customer_id,
+            customer_account_id,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AmbiguousAccountInfo {
+    pub address: TariAddress,
+    pub address_account_ids: Vec<i64>,
+    pub customer_id: String,
+    pub customer_account_id: i64,
 }
 
 impl From<sqlx::Error> for AccountApiError {

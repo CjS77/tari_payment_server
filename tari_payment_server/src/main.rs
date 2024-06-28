@@ -39,7 +39,7 @@ fn preflight_check(config: &ServerConfig) -> bool {
         error!("🚦️ Preflight check FAILED: You must set up the JWT signing keys before carrying on.");
         result = false;
     }
-    result = match env::var("TPG_PAYMENT_WALLET").ok() {
+    result &= match env::var("TPG_PAYMENT_WALLET").ok() {
         Some(addr) => {
             let valid = TariAddress::from_str(&addr).is_ok();
             if !valid {

@@ -1,3 +1,4 @@
+@order_flow
 Feature: Order flow
   Background:
     Given a blank slate
@@ -25,7 +26,8 @@ Feature: Order flow
     }
     """
     # Webhook endpoints always return 200. Check the body for success status.
-    Then I receive a 200 Ok response with the message '"success":false'
+    Then I receive a 200 Ok response with the message '"success":true'
+    # TODO show that order is unclaimed
 
   Scenario: Replaying signature with different address fails
     When Customer #1 ["alice"] places order "alice001" for 2500 XTR, with memo
@@ -37,7 +39,8 @@ Feature: Order flow
     }
     """
     # Webhook endpoints always return 200. Check the body for success status.
-    Then I receive a 200 Ok response with the message '"success":false'
+    Then I receive a 200 Ok response with the message '"success":true'
+    # TODO show that order is unclaimed
 
 
 

@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS user_account_address
 (
     id              INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     user_account_id INTEGER REFERENCES user_accounts (id) NOT NULL,
-    address         TEXT UNIQUE NOT NULL,
+    address         TEXT NOT NULL,
     created_at      TIMESTAMP NOT NULL  DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP NOT NULL  DEFAULT CURRENT_TIMESTAMP
 );
