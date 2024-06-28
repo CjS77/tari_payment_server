@@ -67,7 +67,7 @@ impl<E: Send + Sync + 'static> EventHandler<E> {
                 );
             },
         }
-        info!("📬️ Event handler has shut down");
+        debug!("📬️ Event handler has shut down");
     }
 }
 
