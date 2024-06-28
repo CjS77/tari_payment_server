@@ -86,8 +86,12 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         let price = order.total_price;
         let id = orders::idempotent_insert(order.clone(), &mut tx).await?;
         debug!("🗃️ Order #{} has been saved in the DB with id {id}", order.order_id);
+        let is_claimed = order.address.is_some();
         let account_id =
             user_accounts::fetch_or_create_account(Some(order.customer_id.clone()), order.address, &mut tx).await?;
+        if is_claimed {
+            orders::update_order_status(id, OrderStatusType::New, &mut tx).await?;
+        }
         user_accounts::incr_order_totals(account_id, price, price, &mut tx).await?;
         tx.commit().await?;
         Ok(account_id)
@@ -97,7 +101,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     /// * calls `save_payment` to store the payment in the database. If the payment already exists, nothing further is
     ///   done.
     /// * The payment is marked as `Unconfirmed`
-    /// * creates a new account for the public key if one does not already exist
+    /// * creates a new account for the address if one does not already exist
     /// * Adds the payment amount to the account's total received, and total pending
     /// Returns the account id for the public key.
     async fn process_new_payment_for_pubkey(&self, payment: NewPayment) -> Result<(i64, Payment), PaymentGatewayError> {
@@ -117,11 +121,10 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             Err(AccountApiError::AmbiguousAccounts(info)) => {
                 // There are multiple accounts for the same address-customer pair. So we need to disambiguate
                 info!(
-                    "🗃️ The wallet address {addr} is already associated with {acc_len} account(s), but the order is \
-                     associated with customer {cust} on account {o_acc}.I'm going to create a new entry linking the \
-                     address {addr} to account {o_acc}",
+                    "🗃️ The payment from address {addr} specified an order to pay, but it is already associated with \
+                     customer {cust} on account {o_acc}.I'm going to create a new entry linking the address {addr} to \
+                     account {o_acc}",
                     addr = info.address,
-                    acc_len = info.address_account_ids.len(),
                     cust = info.customer_id,
                     o_acc = info.customer_account_id
                 );
@@ -155,7 +158,10 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         let account = user_accounts::user_account_by_id(account_id, &mut tx)
             .await?
             .ok_or(PaymentGatewayError::AccountNotFound(account_id))?;
-        let query = OrderQueryFilter::default().with_account_id(account_id).with_status(OrderStatusType::New);
+        let query = OrderQueryFilter::default()
+            .with_account_id(account_id)
+            .with_status(OrderStatusType::Unclaimed)
+            .with_status(OrderStatusType::New);
         let unpaid_orders = orders::search_orders(query, &mut tx).await?;
         let balance = account.current_balance;
         trace!("🗃️ Account #{account_id} has {} unpaid orders and a balance of {}.", unpaid_orders.len(), balance);
@@ -576,11 +582,21 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         &self,
         order_id: &OrderId,
         address: &TariAddress,
-    ) -> Result<UserAccount, PaymentGatewayError> {
+    ) -> Result<(UserAccount, Order), PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
         let order = orders::fetch_order_by_order_id(order_id, &mut tx)
             .await?
             .ok_or_else(|| AccountApiError::OrderDoesNotExist(order_id.clone()))?;
+        let order = if order.status == OrderStatusType::Unclaimed {
+            orders::update_order_status(order.id, OrderStatusType::New, &mut tx).await?
+        } else {
+            warn!(
+                "🖇️️ Order {} is not 'Unclaimed' and we're trying to reassign the associated address. The current \
+                 status is {}",
+                order.order_id, order.status
+            );
+            order
+        };
         let customer_id = order.customer_id.clone();
         let acc_id =
             match user_accounts::fetch_or_create_account(Some(customer_id), Some(address.clone()), &mut tx).await {
@@ -603,7 +619,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             .await?
             .ok_or_else(|| PaymentGatewayError::AccountShouldExistForOrder(order_id.clone()))?;
         tx.commit().await?;
-        Ok(account)
+        Ok((account, order))
     }
 
     async fn close(&mut self) -> Result<(), PaymentGatewayError> {

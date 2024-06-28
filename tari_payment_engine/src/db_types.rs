@@ -141,8 +141,10 @@ pub enum OrderStatusType {
     Cancelled,
     /// The order has expired.
     Expired,
-    /// The order is newly created, and no payments have been received.
+    /// The order is newly created, unpaid, and matched to a wallet address
     New,
+    /// The order is newly created, and is not associated with any wallet address
+    Unclaimed,
 }
 
 impl Display for OrderStatusType {
@@ -152,6 +154,7 @@ impl Display for OrderStatusType {
             OrderStatusType::Cancelled => write!(f, "Cancelled"),
             OrderStatusType::Expired => write!(f, "Expired"),
             OrderStatusType::New => write!(f, "New"),
+            OrderStatusType::Unclaimed => write!(f, "Unclaimed"),
         }
     }
 }
@@ -159,8 +162,8 @@ impl Display for OrderStatusType {
 impl From<String> for OrderStatusType {
     fn from(value: String) -> Self {
         value.parse().unwrap_or_else(|_| {
-            error!("Invalid order status: {value}. But this conversion cannot fail. Defaulting to New");
-            OrderStatusType::New
+            error!("Invalid order status: {value}. But this conversion cannot fail. Defaulting to Unclaimed");
+            OrderStatusType::Unclaimed
         })
     }
 }
@@ -177,6 +180,7 @@ impl FromStr for OrderStatusType {
             "Cancelled" => Ok(Self::Cancelled),
             "Expired" => Ok(Self::Expired),
             "New" => Ok(Self::New),
+            "Unclaimed" => Ok(Self::Unclaimed),
             s => Err(ConversionError(format!("Invalid order status: {s}"))),
         }
     }
