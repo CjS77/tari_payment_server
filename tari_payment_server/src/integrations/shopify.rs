@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use log::trace;
+use log::{info, trace};
 use shopify_tools::ShopifyOrder;
 use tari_payment_engine::{
     db_types::{NewOrder, OrderId},
@@ -43,6 +43,8 @@ pub fn new_order_from_shopify_order(value: ShopifyOrder) -> Result<NewOrder, Ord
         created_at: timestamp,
         total_price,
     };
-    order.try_extract_address()?;
+    if let Err(e) = order.try_extract_address() {
+        info!("Order {} did not contain a signed memo. This order is going to remain unclaimed. Error: {e}", order.order_id);
+    }
     Ok(order)
 }

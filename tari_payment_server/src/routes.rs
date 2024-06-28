@@ -441,11 +441,13 @@ pub async fn order_by_id<B: AccountManagement>(
     Ok(HttpResponse::Ok().json(result))
 }
 
-route!(claim_order => Post "/order/claim" impl PaymentGatewayDatabase where requires [Role::User]);
+route!(claim_order => Post "/order/claim" impl PaymentGatewayDatabase);
 /// Users can claim an order (that is, associate a new order with their wallet address) using the `/order/claim`
 /// endpoint.
 ///
 /// This is a `POST` endpoint that requires a JSON body containing a [`MemoSignature`] object.
+///
+/// This route is unauthenticated
 pub async fn claim_order<B: PaymentGatewayDatabase>(
     body: web::Json<MemoSignature>,
     api: web::Data<OrderFlowApi<B>>,
