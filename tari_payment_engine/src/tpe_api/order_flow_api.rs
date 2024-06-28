@@ -93,8 +93,10 @@ where B: PaymentGatewayDatabase
     }
 
     async fn call_order_paid_hook(&self, paid_orders: &[Order]) {
+        if !paid_orders.is_empty() {
+            debug!("🔄️📦️ Notifying {} OrderPaid hook subscribers", self.producers.order_paid_producer.len());
+        }
         for emitter in &self.producers.order_paid_producer {
-            debug!("🔄️📦️ Notifying order paid hook subscribers");
             for order in paid_orders {
                 let event = OrderEvent { order: order.clone() };
                 emitter.publish_event(event).await;
@@ -121,7 +123,7 @@ where B: PaymentGatewayDatabase
 
     /// Calls the registered function when an order is claimed by a wallet address
     async fn call_order_claimed_hook(&self, order: &Order, address: &TariAddress) {
-        debug!("🔄️📦️ Notifying order annulled hook subscribers");
+        debug!("🔄️📦️ Notifying {} order claimed hook subscribers", self.producers.order_claimed_producer.len());
         let event = OrderClaimedEvent::new(order.clone(), address.clone());
         for emitter in &self.producers.order_claimed_producer {
             emitter.publish_event(event.clone()).await;

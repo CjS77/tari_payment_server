@@ -73,6 +73,9 @@ impl EventHandlers {
         if let Some(handler) = &self.on_order_modified {
             producers.order_modified_producer.push(handler.subscribe());
         }
+        if let Some(handler) = &self.on_order_claimed {
+            producers.order_claimed_producer.push(handler.subscribe());
+        }
         if let Some(handler) = &self.on_payment_received {
             producers.payment_received_producer.push(handler.subscribe());
         }
@@ -94,6 +97,11 @@ impl EventHandlers {
             });
         }
         if let Some(handler) = self.on_order_annulled {
+            tokio::spawn(async move {
+                handler.start_handler().await;
+            });
+        }
+        if let Some(handler) = self.on_order_claimed {
             tokio::spawn(async move {
                 handler.start_handler().await;
             });

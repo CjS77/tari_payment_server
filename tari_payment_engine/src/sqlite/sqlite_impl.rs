@@ -102,7 +102,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     async fn process_new_payment_for_pubkey(&self, payment: NewPayment) -> Result<(i64, Payment), PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
         let payment = transfers::idempotent_insert(payment.clone(), &mut tx).await?;
-        debug!("🗃️ Transfer {} received from [{}]", payment.txid, payment.sender.as_address());
+        debug!("🗃️ Payment {} received from [{}]", payment.txid, payment.sender.as_address());
         let customer_id = match &payment.order_id {
             Some(order_id) => {
                 let existing_order = orders::fetch_order_by_order_id(order_id, &mut tx).await?;
@@ -111,7 +111,23 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             None => None,
         };
         let sender = Some(payment.sender.as_address().clone());
-        let acc_id = user_accounts::fetch_or_create_account(customer_id, sender, &mut tx).await?;
+        let acc_id = match user_accounts::fetch_or_create_account(customer_id, sender, &mut tx).await {
+            Ok(id) => id,
+            Err(AccountApiError::AmbiguousAccounts(info)) => {
+                // There are multiple accounts for the same address-customer pair. So we need to disambiguate
+                info!(
+                    "🗃️ The wallet address {addr} is already associated with {acc_len} account(s), but the order is \
+                     associated with customer {cust} on account {o_acc}.I'm going to create a new entry linking the \
+                     address {addr} to account {o_acc}",
+                    addr = info.address,
+                    acc_len = info.address_account_ids.len(),
+                    cust = info.customer_id,
+                    o_acc = info.customer_account_id
+                );
+                user_accounts::link_accounts(info.customer_account_id, None, Some(info.address), &mut tx).await?
+            },
+            Err(e) => return Err(e.into()),
+        };
         user_accounts::adjust_balances(acc_id, payment.amount, payment.amount, MicroTari::from(0), &mut tx).await?;
         debug!("🗃️ Transfer {} processed. {} credited to pending account", payment.txid, payment.amount);
         tx.commit().await?;
@@ -487,7 +503,23 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             .await?
             .ok_or_else(|| AccountApiError::OrderDoesNotExist(order_id.clone()))?;
         let customer_id = order.customer_id.clone();
-        let acc_id = user_accounts::fetch_or_create_account(Some(customer_id), Some(address.clone()), &mut tx).await?;
+        let acc_id =
+            match user_accounts::fetch_or_create_account(Some(customer_id), Some(address.clone()), &mut tx).await {
+                Ok(id) => id,
+                Err(AccountApiError::AmbiguousAccounts(info)) => {
+                    info!(
+                        "🖇️️ The wallet address {address} is already associated with {acc_len} account(s), but the \
+                         order is associated with customer {cust} on account {o_acc}.I'm going ahead and linking \
+                         {address} to account {o_acc} anyway, since it was requested.",
+                        address = address,
+                        acc_len = info.address_account_ids.len(),
+                        cust = info.customer_id,
+                        o_acc = info.customer_account_id
+                    );
+                    user_accounts::link_accounts(info.customer_account_id, None, Some(address.clone()), &mut tx).await?
+                },
+                Err(e) => return Err(e.into()),
+            };
         let account = user_accounts::user_account_by_id(acc_id, &mut tx)
             .await?
             .ok_or_else(|| PaymentGatewayError::AccountShouldExistForOrder(order_id.clone()))?;

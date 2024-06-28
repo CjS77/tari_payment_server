@@ -340,6 +340,7 @@ async fn check_event_trigger(world: &mut TPGWorld, event_type: String, step: &St
         EventType::OrderModified(e) => serde_json::to_string(&e),
         EventType::PaymentReceived(e) => serde_json::to_string(&e),
         EventType::Confirmation(e) => serde_json::to_string(&e),
+        EventType::OrderClaimed(e) => serde_json::to_string(&e),
     }
     .expect("Failed to serialize event");
     let expected = step.docstring().expect("No expected OrderModifiedEvent in docstring");

@@ -4,7 +4,7 @@ use tari_common_types::tari_address::TariAddress;
 use tpg_common::MicroTari;
 
 use crate::{
-    db_types::{Order, OrderStatus, OrderStatusType, Payment, PublicKey},
+    db_types::{Order, OrderStatus, OrderStatusType, Payment, PublicKey, SerializedTariAddress},
     order_objects::OrderChanged,
 };
 
@@ -61,12 +61,12 @@ impl OrderModifiedEvent {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OrderClaimedEvent {
     pub order: Order,
-    pub claimant: TariAddress,
+    pub claimant: SerializedTariAddress,
 }
 
 impl OrderClaimedEvent {
     pub fn new(order: Order, claimant: TariAddress) -> Self {
-        Self { order, claimant }
+        Self { order, claimant: SerializedTariAddress::from(claimant) }
     }
 }
 
@@ -93,6 +93,7 @@ pub enum EventType {
     OrderPaid(OrderEvent),
     OrderAnnulled(OrderAnnulledEvent),
     OrderModified(OrderModifiedEvent),
+    OrderClaimed(OrderClaimedEvent),
     PaymentReceived(PaymentEvent),
     Confirmation(PaymentEvent),
 }
