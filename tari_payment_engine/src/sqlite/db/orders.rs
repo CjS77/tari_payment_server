@@ -1,5 +1,5 @@
 use log::{debug, trace};
-use sqlx::{sqlite::SqliteRow, FromRow, QueryBuilder, SqliteConnection};
+use sqlx::{sqlite::SqliteRow, FromRow, QueryBuilder, Row, SqliteConnection};
 use tpg_common::MicroTari;
 
 use crate::{
@@ -16,10 +16,13 @@ pub async fn idempotent_insert(order: NewOrder, conn: &mut SqliteConnection) -> 
     }
 }
 
-/// Inserts a new order into the database using the given connection. This is not atomic. You can embedd this call
+/// Inserts a new order into the database using the given connection. This is not atomic. You can embed this call
 /// inside a transaction if you need to ensure atomicity, and pass `&mut *tx` as the connection argument.
+///
+/// If a Tari Address is provided, and it already exists in the database, the order status is set to 'New'.
+/// If the address is not found in the database, or if it is not provided, the order status is set to 'Unclaimed'.
 async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<i64, PaymentGatewayError> {
-    let record = sqlx::query!(
+    let id = sqlx::query(
         r#"
             INSERT INTO orders (
                 order_id,
@@ -31,17 +34,18 @@ async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<i6
             ) VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING id;
         "#,
-        order.order_id,
-        order.customer_id,
-        order.memo,
-        order.total_price,
-        order.currency,
-        order.created_at
     )
+    .bind(order.order_id)
+    .bind(order.customer_id)
+    .bind(order.memo)
+    .bind(order.total_price)
+    .bind(order.currency)
+    .bind(order.created_at)
     .fetch_one(conn)
-    .await?;
+    .await?
+    .get(0);
     // The DB should trigger an automatic status entry for the order
-    Ok(record.id)
+    Ok(id)
 }
 
 /// Returns the last entry in the orders table for the corresponding `order_id`

@@ -7,7 +7,7 @@ CREATE TABLE orders (
     currency TEXT NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at   DATETIME NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-    status TEXT NOT NULL CHECK(status IN ('Paid', 'Cancelled', 'Expired', 'New')) DEFAULT 'New'
+    status TEXT NOT NULL CHECK(status IN ('Paid', 'Cancelled', 'Expired', 'New', 'Unclaimed')) DEFAULT 'Unclaimed'
 );
 
 CREATE INDEX orders_order_id_idx ON orders (order_id);

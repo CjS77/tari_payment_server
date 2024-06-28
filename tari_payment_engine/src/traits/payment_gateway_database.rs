@@ -215,7 +215,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
         &self,
         order_id: &OrderId,
         address: &TariAddress,
-    ) -> Result<UserAccount, PaymentGatewayError>;
+    ) -> Result<(UserAccount, Order), PaymentGatewayError>;
 
     /// Closes the database connection.
     async fn close(&mut self) -> Result<(), PaymentGatewayError> {

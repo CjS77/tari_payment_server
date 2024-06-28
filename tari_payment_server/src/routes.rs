@@ -369,7 +369,7 @@ pub async fn unfulfilled_orders<B: AccountManagement>(
 ) -> Result<HttpResponse, ServerError> {
     let address = path.into_inner().to_address();
     debug!("💻️ GET unfulfilled_orders for {address}");
-    let query = OrderQueryFilter::default().with_status(OrderStatusType::New);
+    let query = OrderQueryFilter::default().with_status(OrderStatusType::New).with_status(OrderStatusType::Unclaimed);
     let orders = api.search_orders(query, Some(address.clone())).await.map_err(|e| {
         debug!("💻️ Could not fetch unfulfilled orders. {e}");
         ServerError::BackendError(e.to_string())

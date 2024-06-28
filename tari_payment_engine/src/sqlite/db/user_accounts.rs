@@ -226,20 +226,20 @@ async fn acc_id_for_cust_id(cid: &str, conn: &mut SqliteConnection) -> Result<Op
 /// Creates a new user account in the database and links it to the given customer id and/or public key.
 async fn create_account_with_links(
     cid: Option<String>,
-    pk: Option<TariAddress>,
+    address: Option<TariAddress>,
     tx: &mut SqliteConnection,
 ) -> Result<i64, AccountApiError> {
     let row = sqlx::query!("INSERT INTO user_accounts DEFAULT VALUES RETURNING id").fetch_one(&mut *tx).await?;
     let account_id = row.id;
     debug!("📝️ Created new user account with id #{account_id}");
-    link_accounts(account_id, cid, pk, tx).await
+    link_accounts(account_id, cid, address, tx).await
 }
 
 /// Links a customer id and/or address in the database with the given internal account number.
 pub async fn link_accounts(
     acc_id: i64,
     cid: Option<String>,
-    pk: Option<TariAddress>,
+    address: Option<TariAddress>,
     tx: &mut SqliteConnection,
 ) -> Result<i64, AccountApiError> {
     if let Some(cid) = cid {
@@ -255,8 +255,8 @@ pub async fn link_accounts(
         }
         debug!("🧑️ Linked user account #{acc_id} to customer_id {cid}");
     };
-    if let Some(pk) = pk {
-        let addr = pk.to_hex();
+    if let Some(addr) = address {
+        let addr = addr.to_hex();
         let result =
             sqlx::query!("INSERT INTO user_account_address (user_account_id, address) VALUES ($1, $2)", acc_id, addr,)
                 .execute(tx)
@@ -264,7 +264,7 @@ pub async fn link_accounts(
         if let Err(e) = result {
             error!("Could not link tari address and user account. {e}");
         }
-        debug!("🧑️ Linked user account #{acc_id} to Tari address {pk}");
+        debug!("🧑️ Linked user account #{acc_id} to Tari address {addr}");
     };
     Ok(acc_id)
 }

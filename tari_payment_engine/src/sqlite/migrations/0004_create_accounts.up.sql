@@ -61,7 +61,7 @@ END;
 
 -- Adjust total orders received balance down if an order is expired or cancelled.
 CREATE TRIGGER order_cancelled_trigger AFTER UPDATE OF status ON orders
-WHEN OLD.status = 'New' AND NEW.status in ('Cancelled', 'Expired')
+WHEN (OLD.status = 'New' OR OLD.status = 'Unclaimed') AND NEW.status in ('Cancelled', 'Expired')
 BEGIN
     UPDATE user_accounts
     SET

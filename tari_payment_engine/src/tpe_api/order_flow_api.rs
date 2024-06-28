@@ -79,7 +79,7 @@ where B: PaymentGatewayDatabase
             .await?
             .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
         let address = signature.address.as_address();
-        let account = self.db.attach_order_to_address(&order_id, address).await?;
+        let (account, order) = self.db.attach_order_to_address(&order_id, address).await?;
         debug!("🖇️📦️ Order [{order_id}] is attached to account {}", account.id);
         self.call_order_claimed_hook(&order, address).await;
         // If payment is successful, order OrderPaid trigger will fire implicitly.
