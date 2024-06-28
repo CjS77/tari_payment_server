@@ -120,7 +120,7 @@ impl Hash for SerializedTariAddress {
 }
 
 //--------------------------------------     UserAccount       ---------------------------------------------------------
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, Default)]
 pub struct UserAccount {
     pub id: i64,
     pub created_at: DateTime<Utc>,

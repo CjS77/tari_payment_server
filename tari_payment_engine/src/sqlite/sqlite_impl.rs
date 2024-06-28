@@ -31,6 +31,7 @@ use crate::{
         AuthManagement,
         ExchangeRateError,
         ExchangeRates,
+        MultiAccountPayment,
         NewWalletInfo,
         OrderMovedResult,
         PaymentGatewayDatabase,
@@ -193,6 +194,84 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             trace!("🗃️ Adjusted account #{account_id} orders outstanding by {total_paid}.");
         }
         tx.commit().await?;
+        Ok(result)
+    }
+
+    async fn try_pay_orders_from_address(
+        &self,
+        address: &TariAddress,
+        orders: &[&Order],
+    ) -> Result<MultiAccountPayment, PaymentGatewayError> {
+        let mut tx = self.pool.begin().await?;
+        // Fetch accounts with oldest account LAST
+        let mut accounts = user_accounts::fetch_accounts_for_address(address, false, &mut tx).await?;
+        let mut total_credit = accounts.iter().map(|acc| acc.current_balance).sum::<MicroTari>();
+        trace!("🗃️ Address {address} has {} accounts with a total credit of {total_credit}", accounts.len());
+        let mut paid_orders = Vec::with_capacity(orders.len());
+        let mut used_accounts: Vec<(i64, MicroTari)> = Vec::with_capacity(accounts.len());
+        for &order in orders {
+            // We must be able to pay for the entire order, or no deal.
+            trace!("🗃️ Trying to pay order {}", order.id);
+            if order.total_price > total_credit {
+                break;
+            }
+            trace!("🗃️ Order {} can be paid", order.id);
+            let mut outstanding_amount = order.total_price;
+            // Pay for order using oldest accounts FIRST (they're at the end of the list)
+            while accounts[0].current_balance < outstanding_amount {
+                let Some(used_acc) = accounts.pop() else {
+                    error!(
+                        "🗃️ Not enough funds to partially pay for order {} from address {address}. This is a bug, \
+                         because I've just checked that there are enough funds to cover the payment. Aborting this \
+                         transaction, and fix this ASAP",
+                        order.id
+                    );
+                    return Err(PaymentGatewayError::DatabaseError("Internal bug. Check Logs".into()));
+                };
+                if used_acc.current_balance == MicroTari::from(0) {
+                    trace!("🗃️ Skipping account {} because it has a balance of 0", used_acc.id);
+                    continue;
+                }
+                trace!(
+                    "🗃️ Used {} in account {} to pay part of order {}",
+                    used_acc.current_balance,
+                    used_acc.id,
+                    order.id
+                );
+                total_credit -= used_acc.current_balance;
+                outstanding_amount -= used_acc.current_balance;
+                used_accounts.push((used_acc.id, used_acc.current_balance));
+            }
+            // This top account now has enough balance to pay for the order
+            let Some(used_acc) = accounts.last_mut() else {
+                error!(
+                    "🗃️ Not enough funds to complete payment for order {} from address {address}. This is a bug, \
+                     because I've just checked that there are enough funds to cover the payment. Aborting this \
+                     transaction, and fix this ASAP",
+                    order.id
+                );
+                return Err(PaymentGatewayError::DatabaseError("Internal bug. Check Logs".into()));
+            };
+            trace!(
+                "🗃️ Using {} in account {} to pay remainder of order {}",
+                used_acc.current_balance,
+                used_acc.id,
+                order.id
+            );
+            total_credit -= outstanding_amount;
+            used_accounts.push((used_acc.id, outstanding_amount));
+            used_acc.current_balance -= outstanding_amount;
+            let updated_order = orders::update_order_status(order.id, OrderStatusType::Paid, &mut tx).await?;
+            debug!("🗃️ Order {} paid for during multi-account payment", order.id);
+            paid_orders.push(updated_order);
+        }
+        // Update user balances
+        trace!("🗃️ Updating balances for for used accounts: {used_accounts:?}");
+        for (acc_id, amount) in &used_accounts {
+            let zero = MicroTari::from(0);
+            user_accounts::adjust_balances(*acc_id, zero, zero, -(*amount), &mut tx).await?;
+        }
+        let result = MultiAccountPayment::new(address.clone().into(), paid_orders, &used_accounts);
         Ok(result)
     }
 

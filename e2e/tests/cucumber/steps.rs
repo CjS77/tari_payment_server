@@ -1,19 +1,20 @@
 use std::str::FromStr;
 
-use cucumber::{gherkin::Step, then, when};
+use cucumber::{gherkin::Step, given, then, when};
 use e2e::helpers::json_is_subset_of;
 use log::*;
 use reqwest::Method;
 use shopify_tools::ShopifyOrder;
+use tari_common_types::tari_address::TariAddress;
 use tari_jwt::{
     jwt_compact::{AlgorithmExt, Claims, Header, UntrustedToken},
     Ristretto256,
     Ristretto256SigningKey,
 };
 use tari_payment_engine::{
-    db_types::{OrderId, Role},
+    db_types::{NewPayment, OrderId, Role},
     events::{EventProducers, EventType},
-    traits::{AccountManagement, AuthManagement},
+    traits::{AccountManagement, AuthManagement, PaymentGatewayDatabase},
     OrderFlowApi,
 };
 use tari_payment_server::{
@@ -355,6 +356,16 @@ async fn check_roles(world: &mut TPGWorld, address: String, roles: String) {
     let account =
         db.check_address_has_roles(&address, &roles).await.map_err(|e| error!("Failed to fetch account. {e}"));
     assert!(account.is_ok())
+}
+
+#[given(expr = "a payment of {int} XTR from address {word} in tx {word}")]
+async fn instapay(world: &mut TPGWorld, amount: i64, sender: TariAddress, txid: String) {
+    let amount = MicroTari::from_tari(amount);
+    let db = world.db.as_ref().expect("No database connection");
+    let payment = NewPayment::new(sender, amount, txid);
+    let (acc, payment) = db.process_new_payment_for_pubkey(payment).await.expect("Failed to process payment");
+    info!("Processed payment for account {acc}: {payment:?}");
+    confirm_payment(world, payment.txid).await;
 }
 
 fn modify_signature(token: String, value: &str) -> String {

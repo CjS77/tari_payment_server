@@ -175,7 +175,10 @@ pub async fn user_account_for_address(
 }
 
 /// Returns the internal account ids for the given address, in order of age (youngest first).
-async fn acc_ids_for_address(addr: &TariAddress, conn: &mut SqliteConnection) -> Result<Vec<i64>, AccountApiError> {
+pub async fn fetch_account_ids_for_address(
+    addr: &TariAddress,
+    conn: &mut SqliteConnection,
+) -> Result<Vec<i64>, AccountApiError> {
     let addr = addr.to_hex();
     let ids = sqlx::query!(
         "SELECT user_account_id FROM user_account_address WHERE address = $1 ORDER BY created_at DESC",
@@ -190,6 +193,22 @@ async fn acc_ids_for_address(addr: &TariAddress, conn: &mut SqliteConnection) ->
         trace!("🧑️ Address {addr} is linked to one or more accounts");
     }
     Ok(ids)
+}
+
+/// Returns the full accounts for the given address, in order of age (youngest first).
+pub async fn fetch_accounts_for_address(
+    addr: &TariAddress,
+    oldest_first: bool,
+    conn: &mut SqliteConnection,
+) -> Result<Vec<UserAccount>, AccountApiError> {
+    let addr = addr.to_hex();
+    let q = format!(
+        "SELECT * FROM user_accounts WHERE id in (SELECT user_account_id from user_account_address WHERE address = \
+         $1) ORDER BY created_at {}",
+        if oldest_first { "ASC" } else { "DESC" }
+    );
+    let accounts = sqlx::query_as(&q).bind(addr).fetch_all(conn).await?;
+    Ok(accounts)
 }
 
 /// Returns the internal account id for the given customer id, if it exists, or None if it does not exist.
@@ -282,7 +301,7 @@ pub async fn fetch_or_create_account(
     );
 
     let address_accounts = match &address {
-        Some(pk) => acc_ids_for_address(pk, &mut *conn).await?,
+        Some(pk) => fetch_account_ids_for_address(pk, &mut *conn).await?,
         None => vec![],
     };
 

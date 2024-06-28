@@ -9,7 +9,7 @@ use crate::{
     events::{EventProducers, OrderAnnulledEvent, OrderClaimedEvent, OrderEvent, OrderModifiedEvent, PaymentEvent},
     helpers::MemoSignature,
     order_objects::{ClaimedOrder, OrderChanged},
-    traits::{OrderMovedResult, PaymentGatewayDatabase, PaymentGatewayError},
+    traits::{MultiAccountPayment, OrderMovedResult, PaymentGatewayDatabase, PaymentGatewayError},
 };
 
 /// `OrderFlowApi` is the primary API for handling order and payment flows in response to merchant order events and
@@ -80,15 +80,16 @@ where B: PaymentGatewayDatabase
             .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
         let address = signature.address.as_address();
         let account = self.db.attach_order_to_address(&order_id, address).await?;
+        debug!("🖇️📦️ Order [{order_id}] is attached to account {}", account.id);
         self.call_order_claimed_hook(&order, address).await;
-        let updated_order = match self.try_pay_order(&order).await? {
-            Some(o) => {
-                info!("🔄️📦️ Account {} had enough credit to pay for newly claimed order [{order_id}].", account.id);
-                o
-            },
-            None => order,
-        };
-        let claimed_order = ClaimedOrder::from(updated_order);
+        // If payment is successful, order OrderPaid trigger will fire implicitly.
+        trace!("🖇️📦️ Checking if order [{}] can be fulfilled immediately", order.order_id);
+        let result = self.try_pay_orders_from_address(address, &[&order]).await?;
+        if result.orders_paid.is_empty() {
+            trace!("🖇️📦️ Order [{}] cannot be fulfilled immediately", order.order_id);
+        }
+        let updated_order = result.orders_paid.first().unwrap_or(&order);
+        let claimed_order = ClaimedOrder::from(updated_order.clone());
         Ok(claimed_order)
     }
 
@@ -279,6 +280,9 @@ where B: PaymentGatewayDatabase
         Ok(changes)
     }
 
+    /// Tries to pay for an order using _only_ the account that is linked to the order via the customer id.
+    /// If a wallet that is linked to the customer id has another account entry with credit on it, this method will
+    /// not realise this.
     pub async fn try_pay_order(&self, order: &Order) -> Result<Option<Order>, PaymentGatewayError> {
         let account = self
             .db
@@ -296,6 +300,19 @@ where B: PaymentGatewayDatabase
         self.call_order_paid_hook(&paid_orders).await;
         let updated_order = paid_orders.first().cloned();
         Ok(updated_order)
+    }
+
+    /// Tries to pay for the given set of orders using _any_ account linked to the given address.
+    ///
+    /// See [`PaymentGatewayDatabase::try_pay_orders_from_address`] for more details.
+    pub async fn try_pay_orders_from_address(
+        &self,
+        address: &TariAddress,
+        orders: &[&Order],
+    ) -> Result<MultiAccountPayment, PaymentGatewayError> {
+        let result = self.db.try_pay_orders_from_address(address, orders).await?;
+        self.call_order_paid_hook(&result.orders_paid).await;
+        Ok(result)
     }
 
     /// Change the customer id for the given `order_id`. This function has several side effects:

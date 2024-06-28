@@ -15,7 +15,11 @@ use crate::{
         UserAccount,
     },
     order_objects::OrderChanged,
-    traits::{data_objects::OrderMovedResult, AccountApiError, AccountManagement},
+    traits::{
+        data_objects::{MultiAccountPayment, OrderMovedResult},
+        AccountApiError,
+        AccountManagement,
+    },
 };
 
 /// This trait defines the highest level of behaviour for backends supporting the Tari Payment Engine.
@@ -76,6 +80,20 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// * Will be marked as Paid
     /// * Returned in the result vector.
     async fn try_pay_orders(&self, account_id: i64, orders: &[Order]) -> Result<Vec<Order>, PaymentGatewayError>;
+
+    /// Tries to fulfil the orders using _any_ accounts that are linked to the given wallet address.
+    ///
+    /// Credit may be split across accounts. For example, if two accounts, A1 and A2, are linked to the address, and
+    /// A1 has 10 XTR and A2 has 5 XTR, then an order for 13 Tari will be split between the two accounts will use
+    /// all 10 XTR from A1 and 3 XTR from A2.
+    ///
+    /// The orders will take priority in the order they are given. If the first order cannot be fulfilled, the second
+    /// order will be attempted, and so on.
+    async fn try_pay_orders_from_address(
+        &self,
+        address: &TariAddress,
+        orders: &[&Order],
+    ) -> Result<MultiAccountPayment, PaymentGatewayError>;
 
     /// Updates the payment status for the given transaction id. This is typically called to transition a payment from
     /// `Unconfirmed` to `Confirmed` or `Cancelled`.
