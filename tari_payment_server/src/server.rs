@@ -12,7 +12,7 @@ use actix_web::{
 use futures::{future::ok, FutureExt};
 use log::*;
 use tari_payment_engine::{
-    events::{EventHandlers, EventHooks},
+    events::{EventHandlers, EventHooks, EventProducers},
     tpe_api::exchange_rate_api::ExchangeRateApi,
     AccountApi,
     AuthApi,
@@ -25,6 +25,7 @@ use crate::{
     auth::{build_tps_authority, TokenIssuer},
     config::{ProxyConfig, ServerConfig},
     errors::{AuthError, ServerError, ServerError::AuthenticationError},
+    expiry_worker::start_expiry_worker,
     helpers::get_remote_ip,
     middleware::HmacMiddlewareFactory,
     routes::{
@@ -78,20 +79,25 @@ pub async fn run_server(config: ServerConfig) -> Result<(), ServerError> {
     let db = SqliteDatabase::new_with_url(&config.database_url, 25)
         .await
         .map_err(|e| ServerError::InitializeError(e.to_string()))?;
-    let srv = create_server_instance(config, db, EventHooks::default())?;
+    let hooks = EventHooks::default();
+    let handlers = EventHandlers::new(128, hooks);
+    let producers = handlers.producers();
+    let srv = create_server_instance(config.clone(), db.clone(), producers.clone())?;
+    // Start the event handlers
+    tokio::spawn(async move {
+        handlers.start_handlers().await;
+    });
+    let _never_ends =
+        start_expiry_worker(db.clone(), producers.clone(), config.unclaimed_order_timeout, config.unpaid_order_timeout);
     srv.await.map_err(|e| ServerError::Unspecified(e.to_string()))
 }
 
 pub fn create_server_instance(
     config: ServerConfig,
     db: SqliteDatabase,
-    hooks: EventHooks,
+    producers: EventProducers,
 ) -> Result<Server, ServerError> {
     let proxy_config = ProxyConfig::from_config(&config);
-
-    let handlers = EventHandlers::new(128, hooks);
-    let producers = handlers.producers();
-
     let srv = HttpServer::new(move || {
         let orders_api = OrderFlowApi::new(db.clone(), producers.clone());
         let auth_api = AuthApi::new(db.clone());
@@ -168,11 +174,6 @@ pub fn create_server_instance(
     .keep_alive(KeepAlive::Timeout(Duration::from_secs(600)))
     .bind((config.host.as_str(), config.port))?
     .run();
-
-    // Start the event handlers
-    tokio::spawn(async move {
-        handlers.start_handlers().await;
-    });
     Ok(srv)
 }
 

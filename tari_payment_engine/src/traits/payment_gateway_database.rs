@@ -220,7 +220,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
         address: &TariAddress,
     ) -> Result<(UserAccount, Order), PaymentGatewayError>;
 
-    /// Marks unapid and unclimaed orders as expired.
+    /// Marks unapid and unclaimed orders as expired.
     ///
     /// Any orders that have not been _updated_ (based on the `updated_at` field) for longer than the given duration
     /// will be marked as `Expired`.
