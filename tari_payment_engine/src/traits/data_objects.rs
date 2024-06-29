@@ -90,3 +90,27 @@ impl Display for MultiAccountPayment {
         )
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExpiryResult {
+    pub unclaimed: Vec<Order>,
+    pub unpaid: Vec<Order>,
+}
+
+impl ExpiryResult {
+    pub fn new(unclaimed: Vec<Order>, unpaid: Vec<Order>) -> Self {
+        Self { unclaimed, unpaid }
+    }
+
+    pub fn unclaimed_count(&self) -> usize {
+        self.unclaimed.len()
+    }
+
+    pub fn unpaid_count(&self) -> usize {
+        self.unpaid.len()
+    }
+
+    pub fn total_count(&self) -> usize {
+        self.unclaimed_count() + self.unpaid_count()
+    }
+}

@@ -32,7 +32,14 @@ mod data_objects;
 
 pub use account_management::{AccountApiError, AccountManagement};
 pub use auth_management::{AuthApiError, AuthManagement};
-pub use data_objects::{MultiAccountPayment, NewWalletInfo, OrderMovedResult, UpdateWalletInfo, WalletInfo};
+pub use data_objects::{
+    ExpiryResult,
+    MultiAccountPayment,
+    NewWalletInfo,
+    OrderMovedResult,
+    UpdateWalletInfo,
+    WalletInfo,
+};
 pub use exchange_rates::{ExchangeRateError, ExchangeRates};
 pub use payment_gateway_database::{PaymentGatewayDatabase, PaymentGatewayError};
 pub use wallet_management::{WalletAuth, WalletAuthApiError, WalletManagement, WalletManagementError};

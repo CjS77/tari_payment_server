@@ -1,3 +1,4 @@
+use chrono::Duration;
 use tari_common_types::tari_address::TariAddress;
 use thiserror::Error;
 use tpg_common::MicroTari;
@@ -16,7 +17,7 @@ use crate::{
     },
     order_objects::OrderChanged,
     traits::{
-        data_objects::{MultiAccountPayment, OrderMovedResult},
+        data_objects::{ExpiryResult, MultiAccountPayment, OrderMovedResult},
         AccountApiError,
         AccountManagement,
     },
@@ -211,11 +212,27 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
         Err(PaymentGatewayError::UnsupportedAction("Multiple currencies".to_string()))
     }
 
+    /// Attaches an order to an address. This is used to link an order to a wallet address for payment.
+    /// The user account associated with the address, as well as the modified Order object are returned.
     async fn attach_order_to_address(
         &self,
         order_id: &OrderId,
         address: &TariAddress,
     ) -> Result<(UserAccount, Order), PaymentGatewayError>;
+
+    /// Marks unapid and unclimaed orders as expired.
+    ///
+    /// Any orders that have not been _updated_ (based on the `updated_at` field) for longer than the given duration
+    /// will be marked as `Expired`.
+    ///
+    /// Typical values for the `unclaimed_limit` are 2 hours, and for the `unpaid_limit` are 48 hours.
+    ///
+    /// The result is a list of orders that were expired.
+    async fn expire_old_orders(
+        &self,
+        unclaimed_limit: Duration,
+        unpaid_limit: Duration,
+    ) -> Result<ExpiryResult, PaymentGatewayError>;
 
     /// Closes the database connection.
     async fn close(&mut self) -> Result<(), PaymentGatewayError> {
