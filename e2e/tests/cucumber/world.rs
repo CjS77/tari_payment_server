@@ -4,6 +4,7 @@ use std::{
 };
 
 use actix_web::dev::ServerHandle;
+use chrono::Duration;
 use cucumber::World;
 use log::*;
 use reqwest::{Client, Method, RequestBuilder, StatusCode};
@@ -55,6 +56,8 @@ impl Default for TPGWorld {
             shopify_whitelist: None,
             use_x_forwarded_for: false,
             use_forwarded: false,
+            unclaimed_order_timeout: Duration::seconds(1),
+            unpaid_order_timeout: Duration::seconds(2),
         };
         Self {
             config,

@@ -1,6 +1,7 @@
 use std::{env, io::Write, net::IpAddr};
 
 use actix_jwt_auth_middleware::FromRequest;
+use chrono::Duration;
 use log::*;
 use rand::thread_rng;
 use serde_json::json;
@@ -21,6 +22,9 @@ use crate::errors::ServerError;
 const DEFAULT_TPG_HOST: &str = "127.0.0.1";
 const DEFAULT_TPG_PORT: u16 = 8360;
 
+const DEFAULT_UNCLAIMED_ORDER_TIMEOUT: Duration = Duration::hours(2);
+const DEFAULT_UNPAID_ORDER_TIMEOUT: Duration = Duration::hours(48);
+
 #[derive(Clone, Debug)]
 pub struct ServerConfig {
     pub host: String,
@@ -39,6 +43,10 @@ pub struct ServerConfig {
     /// If true, the X-Forwarded-Proto header will be used to determine the client's protocol, rather than the
     /// connection's remote address.
     pub use_forwarded: bool,
+    /// The time before an unclaimed order is considered abandoned and marked as expired.
+    pub unclaimed_order_timeout: Duration,
+    /// The time before an unpaid order is considered expired and marked as such.
+    pub unpaid_order_timeout: Duration,
 }
 
 impl Default for ServerConfig {
@@ -54,6 +62,8 @@ impl Default for ServerConfig {
             shopify_whitelist: None,
             use_x_forwarded_for: false,
             use_forwarded: false,
+            unclaimed_order_timeout: DEFAULT_UNCLAIMED_ORDER_TIMEOUT,
+            unpaid_order_timeout: DEFAULT_UNPAID_ORDER_TIMEOUT,
         }
     }
 }
@@ -138,6 +148,34 @@ impl ServerConfig {
         }
         let use_x_forwarded_for = env::var("TPG_USE_X_FORWARDED_FOR").map(|s| &s == "1" || &s == "true").is_ok();
         let use_forwarded = env::var("TPG_USE_FORWARDED").map(|s| &s == "1" || &s == "true").is_ok();
+        let unclaimed_order_timeout = env::var("TPG_UNCLAIMED_ORDER_TIMEOUT")
+            .map_err(|_| {
+                info!(
+                    "🪛️ TPG_UNCLAIMED_ORDER_TIMEOUT is not set. Using the default value of \
+                     {DEFAULT_UNCLAIMED_ORDER_TIMEOUT}."
+                )
+            })
+            .and_then(|s| {
+                s.parse::<i64>()
+                    .map(Duration::hours)
+                    .map_err(|e| warn!("🪛️ Invalid configuration value for TPG_UNCLAIMED_ORDER_TIMEOUT. {e}"))
+            })
+            .ok()
+            .unwrap_or(DEFAULT_UNCLAIMED_ORDER_TIMEOUT);
+        let unpaid_order_timeout = env::var("TPG_UNPAID_ORDER_TIMEOUT")
+            .map_err(|_| {
+                info!(
+                    "🪛️ TPG_UNPAID_ORDER_TIMEOUT is not set. Using the default value of \
+                     {DEFAULT_UNPAID_ORDER_TIMEOUT}."
+                )
+            })
+            .and_then(|s| {
+                s.parse::<i64>()
+                    .map(Duration::hours)
+                    .map_err(|e| warn!("🪛️ Invalid configuration value for TPG_UNPAID_ORDER_TIMEOUT. {e}"))
+            })
+            .ok()
+            .unwrap_or(DEFAULT_UNPAID_ORDER_TIMEOUT);
         Self {
             host,
             port,
@@ -149,6 +187,8 @@ impl ServerConfig {
             shopify_whitelist,
             use_forwarded,
             use_x_forwarded_for,
+            unclaimed_order_timeout,
+            unpaid_order_timeout,
         }
     }
 }
