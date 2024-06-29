@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use chrono::Duration;
 use cucumber::{gherkin::Step, given, then, when};
 use e2e::helpers::json_is_subset_of;
 use log::*;
@@ -366,6 +367,15 @@ async fn instapay(world: &mut TPGWorld, amount: i64, sender: TariAddress, txid: 
     let (acc, payment) = db.process_new_payment_for_pubkey(payment).await.expect("Failed to process payment");
     info!("Processed payment for account {acc}: {payment:?}");
     confirm_payment(world, payment.txid).await;
+}
+
+#[when(expr = "I expire old orders")]
+async fn expire_old_orders(world: &mut TPGWorld) {
+    let db = world.db.as_ref().expect("No database connection");
+    let unclaimed_limit = Duration::seconds(1);
+    let unpaid_limit = Duration::seconds(2);
+    let orders = db.expire_old_orders(unclaimed_limit, unpaid_limit).await.expect("Failed to expire orders");
+    info!("Expired orders: {}", serde_json::to_string(&orders).expect("Failed to serialize orders"));
 }
 
 fn modify_signature(token: String, value: &str) -> String {

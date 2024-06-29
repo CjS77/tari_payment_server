@@ -3,6 +3,7 @@
 //! Unsurprisingly, it uses SQLite as the backend and implements all the traits defined in the [`traits`] module.
 use std::fmt::Debug;
 
+use chrono::Duration;
 use log::*;
 use sqlx::SqlitePool;
 use tari_common_types::tari_address::TariAddress;
@@ -31,6 +32,7 @@ use crate::{
         AuthManagement,
         ExchangeRateError,
         ExchangeRates,
+        ExpiryResult,
         MultiAccountPayment,
         NewWalletInfo,
         OrderMovedResult,
@@ -620,6 +622,18 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             .ok_or_else(|| PaymentGatewayError::AccountShouldExistForOrder(order_id.clone()))?;
         tx.commit().await?;
         Ok((account, order))
+    }
+
+    async fn expire_old_orders(
+        &self,
+        unclaimed_limit: Duration,
+        unpaid_limit: Duration,
+    ) -> Result<ExpiryResult, PaymentGatewayError> {
+        let mut tx = self.pool.begin().await?;
+        let unclaimed_orders = orders::expire_orders(OrderStatusType::Unclaimed, unclaimed_limit, &mut tx).await?;
+        let unpaid_orders = orders::expire_orders(OrderStatusType::New, unpaid_limit, &mut tx).await?;
+        tx.commit().await?;
+        Ok(ExpiryResult::new(unclaimed_orders, unpaid_orders))
     }
 
     async fn close(&mut self) -> Result<(), PaymentGatewayError> {

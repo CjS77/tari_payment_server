@@ -1,3 +1,4 @@
+use chrono::Duration;
 use log::{debug, trace};
 use sqlx::{sqlite::SqliteRow, FromRow, QueryBuilder, Row, SqliteConnection};
 use tpg_common::MicroTari;
@@ -224,4 +225,22 @@ pub(crate) async fn try_pay_order(
     user_accounts::incr_order_totals(account.id, MicroTari::from(0), -order.total_price, conn).await?;
     trace!("📝️ Adjusted account #{acc_id} orders outstanding by {}.", order.total_price);
     Ok(order)
+}
+
+pub(crate) async fn expire_orders(
+    status: OrderStatusType,
+    limit: Duration,
+    conn: &mut SqliteConnection,
+) -> Result<Vec<Order>, PaymentGatewayError> {
+    let rows = sqlx::query_as(
+        format!(
+            "UPDATE orders SET updated_at = CURRENT_TIMESTAMP, status = 'Expired' WHERE status = '{status}' AND \
+             (unixepoch(CURRENT_TIMESTAMP) - unixepoch(updated_at)) > {} RETURNING *;",
+            limit.num_seconds()
+        )
+        .as_str(),
+    )
+    .fetch_all(conn)
+    .await?;
+    Ok(rows)
 }
