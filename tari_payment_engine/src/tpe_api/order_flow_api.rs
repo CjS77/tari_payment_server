@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use chrono::Duration;
 use log::*;
 use tari_common_types::tari_address::TariAddress;
 use tpg_common::MicroTari;
@@ -9,7 +10,7 @@ use crate::{
     events::{EventProducers, OrderAnnulledEvent, OrderClaimedEvent, OrderEvent, OrderModifiedEvent, PaymentEvent},
     helpers::MemoSignature,
     order_objects::{ClaimedOrder, OrderChanged},
-    traits::{MultiAccountPayment, OrderMovedResult, PaymentGatewayDatabase, PaymentGatewayError},
+    traits::{ExpiryResult, MultiAccountPayment, OrderMovedResult, PaymentGatewayDatabase, PaymentGatewayError},
 };
 
 /// `OrderFlowApi` is the primary API for handling order and payment flows in response to merchant order events and
@@ -436,6 +437,21 @@ where B: PaymentGatewayDatabase
         _new_currency: &str,
     ) -> Result<Order, PaymentGatewayError> {
         Err(PaymentGatewayError::UnsupportedAction("Multiple currencies".to_string()))
+    }
+
+    pub async fn expire_old_orders(
+        &self,
+        unclaimed_expiry: Duration,
+        unpaid_expiry: Duration,
+    ) -> Result<ExpiryResult, PaymentGatewayError> {
+        let result = self.db.expire_old_orders(unclaimed_expiry, unpaid_expiry).await?;
+        for order in &result.unclaimed {
+            self.call_order_annulled_hook(order).await;
+        }
+        for order in &result.unpaid {
+            self.call_order_annulled_hook(order).await;
+        }
+        Ok(result)
     }
 
     pub fn db(&self) -> &B {

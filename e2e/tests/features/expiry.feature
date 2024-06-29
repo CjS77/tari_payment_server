@@ -21,9 +21,9 @@ Feature: Expire old orders
     When Customer #1 ["Alex"] places order "order1" for 1 XTR, with memo
     Then order "order1" is in state Unclaimed
     Then order "1" is in state New
-    Then pause for 1000 ms
+    Then pause for 500 ms
     When Customer #2 ["Barb"] places order "order2" for 1 XTR, with memo
-    Then pause for 800 ms
+    Then pause for 550 ms
     When I expire old orders
     Then order "order1" is in state Expired
     Then order "order2" is in state Unclaimed

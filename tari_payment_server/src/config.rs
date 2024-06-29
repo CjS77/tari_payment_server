@@ -86,19 +86,10 @@ impl ServerConfig {
             })
             .ok()
             .unwrap_or(DEFAULT_TPG_PORT);
-        let shopify_api_key = env::var("TPG_SHOPIFY_API_KEY").ok().unwrap_or_else(|| {
-            error!("🪛️ TPG_SHOPIFY_API_KEY is not set. Please set it to the API key for your Shopify app.");
+        let database_url = env::var("TPG_DATABASE_URL").ok().unwrap_or_else(|| {
+            error!("🪛️ TPG_DATABASE_URL is not set. Please set it to the URL for the TPG database.");
             String::default()
         });
-        let shopify_api_secret = env::var("TPG_SHOPIFY_API_SECRET").ok().unwrap_or_else(|| {
-            error!(
-                "🪛️ TPG_SHOPIFY_API_SECRET is not set. Please set it to the client APP secret for your Shopify app."
-            );
-            String::default()
-        });
-        let shopify_api_secret = Secret::new(shopify_api_secret);
-        let shopify_hmac_checks =
-            env::var("TPG_SHOPIFY_HMAC_CHECKS").map(|s| &s == "1" || &s == "true").unwrap_or(true);
         let auth = AuthConfig::try_from_env().unwrap_or_else(|e| {
             warn!(
                 "🪛️ Could not load the authentication configuration from environment variables. {e}. Reverting to the \
@@ -106,76 +97,10 @@ impl ServerConfig {
             );
             AuthConfig::default()
         });
-        let database_url = env::var("TPG_DATABASE_URL").ok().unwrap_or_else(|| {
-            error!("🪛️ TPG_DATABASE_URL is not set. Please set it to the URL for the TPG database.");
-            String::default()
-        });
-        let shopify_whitelist = env::var("TPG_SHOPIFY_IP_WHITELIST").ok().and_then(|s| {
-            if ["none", "false", "0"].contains(&s.to_lowercase().as_str()) {
-                info!(
-                    "🪛️ Shopify IP whitelist is disabled. If this is not what you want, set TPG_SHOPIFY_IP_WHITELIST \
-                     to a comma-separated list of IP addresses to enable it."
-                );
-                return None;
-            }
-            let ip_addrs = s
-                .split(',')
-                .filter_map(|s| {
-                    s.parse()
-                        .map_err(|e| {
-                            warn!("🪛️ Ignoring invalid IP address ({s}) in TPG_SHOPIFY_IP_WHITELIST: {e}");
-                            None::<IpAddr>
-                        })
-                        .ok()
-                })
-                .collect::<Vec<IpAddr>>();
-            Some(ip_addrs)
-        });
-        match &shopify_whitelist {
-            Some(whitelist) if whitelist.is_empty() => {
-                warn!(
-                    "🚨️ The Shopify IP whitelist was configured, but is empty.  The server will run, but won't \
-                     authorise any Shopify incoming requests."
-                );
-            },
-            None => {
-                info!("🪛️ No Shopify IP whitelist is set. Only HMAC validation will be used.");
-            },
-            Some(v) => {
-                let addrs = v.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", ");
-                info!("🪛️ Shopify IP whitelist: {addrs}");
-            },
-        }
+        let (shopify_api_key, shopify_api_secret, shopify_hmac_checks, shopify_whitelist) = configure_shopify();
         let use_x_forwarded_for = env::var("TPG_USE_X_FORWARDED_FOR").map(|s| &s == "1" || &s == "true").is_ok();
         let use_forwarded = env::var("TPG_USE_FORWARDED").map(|s| &s == "1" || &s == "true").is_ok();
-        let unclaimed_order_timeout = env::var("TPG_UNCLAIMED_ORDER_TIMEOUT")
-            .map_err(|_| {
-                info!(
-                    "🪛️ TPG_UNCLAIMED_ORDER_TIMEOUT is not set. Using the default value of \
-                     {DEFAULT_UNCLAIMED_ORDER_TIMEOUT}."
-                )
-            })
-            .and_then(|s| {
-                s.parse::<i64>()
-                    .map(Duration::hours)
-                    .map_err(|e| warn!("🪛️ Invalid configuration value for TPG_UNCLAIMED_ORDER_TIMEOUT. {e}"))
-            })
-            .ok()
-            .unwrap_or(DEFAULT_UNCLAIMED_ORDER_TIMEOUT);
-        let unpaid_order_timeout = env::var("TPG_UNPAID_ORDER_TIMEOUT")
-            .map_err(|_| {
-                info!(
-                    "🪛️ TPG_UNPAID_ORDER_TIMEOUT is not set. Using the default value of \
-                     {DEFAULT_UNPAID_ORDER_TIMEOUT}."
-                )
-            })
-            .and_then(|s| {
-                s.parse::<i64>()
-                    .map(Duration::hours)
-                    .map_err(|e| warn!("🪛️ Invalid configuration value for TPG_UNPAID_ORDER_TIMEOUT. {e}"))
-            })
-            .ok()
-            .unwrap_or(DEFAULT_UNPAID_ORDER_TIMEOUT);
+        let (unclaimed_order_timeout, unpaid_order_timeout) = configure_order_timeouts();
         Self {
             host,
             port,
@@ -191,6 +116,89 @@ impl ServerConfig {
             unpaid_order_timeout,
         }
     }
+}
+
+fn configure_shopify() -> (String, Secret<String>, bool, Option<Vec<IpAddr>>) {
+    let shopify_api_key = env::var("TPG_SHOPIFY_API_KEY").ok().unwrap_or_else(|| {
+        error!("🪛️ TPG_SHOPIFY_API_KEY is not set. Please set it to the API key for your Shopify app.");
+        String::default()
+    });
+    let shopify_api_secret = env::var("TPG_SHOPIFY_API_SECRET").ok().unwrap_or_else(|| {
+        error!("🪛️ TPG_SHOPIFY_API_SECRET is not set. Please set it to the client APP secret for your Shopify app.");
+        String::default()
+    });
+    let shopify_api_secret = Secret::new(shopify_api_secret);
+    let shopify_hmac_checks = env::var("TPG_SHOPIFY_HMAC_CHECKS").map(|s| &s == "1" || &s == "true").unwrap_or(true);
+
+    let shopify_whitelist = env::var("TPG_SHOPIFY_IP_WHITELIST").ok().and_then(|s| {
+        if ["none", "false", "0"].contains(&s.to_lowercase().as_str()) {
+            info!(
+                "🪛️ Shopify IP whitelist is disabled. If this is not what you want, set TPG_SHOPIFY_IP_WHITELIST to a \
+                 comma-separated list of IP addresses to enable it."
+            );
+            return None;
+        }
+        let ip_addrs = s
+            .split(',')
+            .filter_map(|s| {
+                s.parse()
+                    .map_err(|e| {
+                        warn!("🪛️ Ignoring invalid IP address ({s}) in TPG_SHOPIFY_IP_WHITELIST: {e}");
+                        None::<IpAddr>
+                    })
+                    .ok()
+            })
+            .collect::<Vec<IpAddr>>();
+        Some(ip_addrs)
+    });
+    match &shopify_whitelist {
+        Some(whitelist) if whitelist.is_empty() => {
+            warn!(
+                "🚨️ The Shopify IP whitelist was configured, but is empty.  The server will run, but won't authorise \
+                 any Shopify incoming requests."
+            );
+        },
+        None => {
+            info!("🪛️ No Shopify IP whitelist is set. Only HMAC validation will be used.");
+        },
+        Some(v) => {
+            let addrs = v.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", ");
+            info!("🪛️ Shopify IP whitelist: {addrs}");
+        },
+    }
+    (shopify_api_key, shopify_api_secret, shopify_hmac_checks, shopify_whitelist)
+}
+
+fn configure_order_timeouts() -> (Duration, Duration) {
+    let unclaimed_order_timeout = env::var("TPG_UNCLAIMED_ORDER_TIMEOUT")
+        .map_err(|_| {
+            info!(
+                "🪛️ TPG_UNCLAIMED_ORDER_TIMEOUT is not set. Using the default value of {} hrs.",
+                DEFAULT_UNCLAIMED_ORDER_TIMEOUT.num_hours()
+            )
+        })
+        .and_then(|s| {
+            s.parse::<i64>()
+                .map(Duration::hours)
+                .map_err(|e| warn!("🪛️ Invalid configuration value for TPG_UNCLAIMED_ORDER_TIMEOUT. {e}"))
+        })
+        .ok()
+        .unwrap_or(DEFAULT_UNCLAIMED_ORDER_TIMEOUT);
+    let unpaid_order_timeout = env::var("TPG_UNPAID_ORDER_TIMEOUT")
+        .map_err(|_| {
+            info!(
+                "🪛️ TPG_UNPAID_ORDER_TIMEOUT is not set. Using the default value of {} hrs.",
+                DEFAULT_UNPAID_ORDER_TIMEOUT.num_hours()
+            )
+        })
+        .and_then(|s| {
+            s.parse::<i64>()
+                .map(Duration::hours)
+                .map_err(|e| warn!("🪛️ Invalid configuration value for TPG_UNPAID_ORDER_TIMEOUT. {e}"))
+        })
+        .ok()
+        .unwrap_or(DEFAULT_UNPAID_ORDER_TIMEOUT);
+    (unclaimed_order_timeout, unpaid_order_timeout)
 }
 
 //-------------------------------------------------  AuthConfig  -------------------------------------------------------

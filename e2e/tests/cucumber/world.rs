@@ -11,7 +11,7 @@ use reqwest::{Client, Method, RequestBuilder, StatusCode};
 use tari_jwt::tari_crypto::ristretto::RistrettoSecretKey;
 use tari_payment_engine::{
     db_types::SerializedTariAddress,
-    events::{EventHooks, EventType},
+    events::{EventHandlers, EventHooks, EventType},
     test_utils::prepare_env::{create_database, random_db_path, run_migrations},
     traits::PaymentGatewayDatabase,
     SqliteDatabase,
@@ -154,7 +154,13 @@ impl TPGWorld {
                 }
                 Box::pin(async {})
             });
-            let srv = create_server_instance(config, db, hooks).expect("Error creating server instance");
+            let handlers = EventHandlers::new(1, hooks);
+            let producers = handlers.producers();
+            let srv = create_server_instance(config, db, producers).expect("Error creating server instance");
+            // Start the event handlers
+            tokio::spawn(async move {
+                handlers.start_handlers().await;
+            });
             let _res = tx.send(srv.handle());
             match srv.await {
                 Ok(_) => info!("🌍️ Server shut down"),

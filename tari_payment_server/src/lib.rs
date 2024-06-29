@@ -53,6 +53,8 @@ pub mod config;
 pub mod data_objects;
 pub mod errors;
 
+pub mod expiry_worker;
+
 pub mod helpers;
 
 pub mod middleware;
