@@ -372,8 +372,8 @@ async fn instapay(world: &mut TPGWorld, amount: i64, sender: TariAddress, txid: 
 #[when(expr = "I expire old orders")]
 async fn expire_old_orders(world: &mut TPGWorld) {
     let db = world.db.as_ref().expect("No database connection");
-    let unclaimed_limit = Duration::seconds(1);
-    let unpaid_limit = Duration::seconds(2);
+    let unclaimed_limit = Duration::seconds(2);
+    let unpaid_limit = Duration::seconds(4);
     let orders = db.expire_old_orders(unclaimed_limit, unpaid_limit).await.expect("Failed to expire orders");
     info!("Expired orders: {}", serde_json::to_string(&orders).expect("Failed to serialize orders"));
 }

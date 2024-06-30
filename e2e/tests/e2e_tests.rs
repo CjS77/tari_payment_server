@@ -30,7 +30,7 @@ fn post_test_hook<'a>(
         if let Some(w) = world {
             if let Some(h) = w.server_handle.take() {
                 info!("🚀️ Stopping server");
-                h.stop(true).await;
+                h.stop(false).await;
                 info!("🚀️ Server stopped");
             }
         }

@@ -1,7 +1,7 @@
 @expiry
 Feature: Expire old orders
   Background:
-    # For testing, the expiry limits are 1s for unclaimed and 2s for unpaid
+    # For testing, the expiry limits are 2s for unclaimed and 4s for unpaid
 
 
   Scenario: Expire unclaimed orders
@@ -9,7 +9,7 @@ Feature: Expire old orders
     When Customer #1 ["Alex"] places order "order1" for 1 XTR, with memo
     Then order "order1" is in state Unclaimed
     And account for 1 has current orders worth 1 XTR
-    Then pause for 2000 ms
+    Then pause for 3000 ms
     When I expire old orders
     Then order "order1" is in state Expired
     And account for 1 has current orders worth 0 XTR
@@ -21,14 +21,14 @@ Feature: Expire old orders
     When Customer #1 ["Alex"] places order "order1" for 1 XTR, with memo
     Then order "order1" is in state Unclaimed
     Then order "1" is in state New
-    Then pause for 500 ms
+    Then pause for 1600 ms
     When Customer #2 ["Barb"] places order "order2" for 1 XTR, with memo
-    Then pause for 550 ms
+    Then pause for 1000 ms
     When I expire old orders
     Then order "order1" is in state Expired
     Then order "order2" is in state Unclaimed
     Then order "1" is in state New
-    Then pause for 1100 ms
+    Then pause for 2000 ms
     When I expire old orders
     Then order "order2" is in state Expired
     Then order "1" is in state Expired
