@@ -26,7 +26,7 @@ use std::{marker::PhantomData, str::FromStr};
 use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
 use log::*;
 use paste::paste;
-use shopify_tools::{ShopifyApi, ShopifyOrder};
+use shopify_tools::ShopifyOrder;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
     db_types::{CreditNote, OrderId, OrderStatusType, Role, SerializedTariAddress},
@@ -700,16 +700,21 @@ pub async fn reset_order<B: PaymentGatewayDatabase>(
 
 //----------------------------------------------   Checkout  ----------------------------------------------------
 
-route!(shopify_webhook => Post "webhook/checkout_create" impl PaymentGatewayDatabase);
-pub async fn shopify_webhook<B: PaymentGatewayDatabase>(
+route!(shopify_webhook => Post "webhook/checkout_create" impl PaymentGatewayDatabase, ExchangeRates);
+pub async fn shopify_webhook<BPay, BFx>(
     req: HttpRequest,
     body: web::Json<ShopifyOrder>,
-    api: web::Data<OrderFlowApi<B>>,
-) -> HttpResponse {
+    api: web::Data<OrderFlowApi<BPay>>,
+    fx: web::Data<ExchangeRateApi<BFx>>,
+) -> HttpResponse
+where
+    BPay: PaymentGatewayDatabase,
+    BFx: ExchangeRates,
+{
     trace!("💻️ Received webhook request: {}", req.uri());
     let order = body.into_inner();
     // Webhook responses must always be in 200 range, otherwise Shopify will retry
-    let result = match new_order_from_shopify_order(order) {
+    let result = match new_order_from_shopify_order(order, &fx).await {
         Err(OrderConversionError::FormatError(s)) => {
             warn!("💻️ Could not convert order. {s}");
             JsonResponse::failure(s)
@@ -908,13 +913,6 @@ pub async fn get_exchange_rate<B: ExchangeRates>(
     })?;
     let rate = ExchangeRateResult::from(rate);
     Ok(HttpResponse::Ok().json(rate))
-}
-
-async fn update_shopify_exchange_rate_for<B: ExchangeRates>(
-    _update: &ExchangeRateUpdate,
-    _api: &ShopifyApi,
-) -> Result<(), ServerError> {
-    todo!()
 }
 
 async fn update_local_exchange_rate<B: ExchangeRates>(

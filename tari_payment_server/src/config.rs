@@ -31,6 +31,7 @@ pub struct ServerConfig {
     pub port: u16,
     pub shopify_api_key: String,
     pub shopify_api_secret: Secret<String>,
+    pub shopify_hmac_secret: Secret<String>,
     pub shopify_hmac_checks: bool,
     pub database_url: String,
     pub auth: AuthConfig,
@@ -56,6 +57,7 @@ impl Default for ServerConfig {
             port: DEFAULT_TPG_PORT,
             shopify_api_key: String::default(),
             shopify_api_secret: Secret::default(),
+            shopify_hmac_secret: Secret::default(),
             shopify_hmac_checks: true,
             database_url: String::default(),
             auth: AuthConfig::default(),
@@ -97,7 +99,8 @@ impl ServerConfig {
             );
             AuthConfig::default()
         });
-        let (shopify_api_key, shopify_api_secret, shopify_hmac_checks, shopify_whitelist) = configure_shopify();
+        let (shopify_api_key, shopify_api_secret, shopify_hmac_secret, shopify_hmac_checks, shopify_whitelist) =
+            configure_shopify();
         let use_x_forwarded_for = env::var("TPG_USE_X_FORWARDED_FOR").map(|s| &s == "1" || &s == "true").is_ok();
         let use_forwarded = env::var("TPG_USE_FORWARDED").map(|s| &s == "1" || &s == "true").is_ok();
         let (unclaimed_order_timeout, unpaid_order_timeout) = configure_order_timeouts();
@@ -106,6 +109,7 @@ impl ServerConfig {
             port,
             shopify_api_key,
             shopify_api_secret,
+            shopify_hmac_secret,
             shopify_hmac_checks,
             auth,
             database_url,
@@ -118,7 +122,7 @@ impl ServerConfig {
     }
 }
 
-fn configure_shopify() -> (String, Secret<String>, bool, Option<Vec<IpAddr>>) {
+fn configure_shopify() -> (String, Secret<String>, Secret<String>, bool, Option<Vec<IpAddr>>) {
     let shopify_api_key = env::var("TPG_SHOPIFY_API_KEY").ok().unwrap_or_else(|| {
         error!("🪛️ TPG_SHOPIFY_API_KEY is not set. Please set it to the API key for your Shopify app.");
         String::default()
@@ -128,6 +132,11 @@ fn configure_shopify() -> (String, Secret<String>, bool, Option<Vec<IpAddr>>) {
         String::default()
     });
     let shopify_api_secret = Secret::new(shopify_api_secret);
+    let shopify_hmac_secret = env::var("TPG_SHOPIFY_HMAC_SECRET").ok().unwrap_or_else(|| {
+        error!("🪛️ TPG_SHOPIFY_HMAC_SECRET is not set. Please set it to the HMAC signing key for your Shopify app.");
+        String::default()
+    });
+    let shopify_hmac_secret = Secret::new(shopify_hmac_secret);
     let shopify_hmac_checks = env::var("TPG_SHOPIFY_HMAC_CHECKS").map(|s| &s == "1" || &s == "true").unwrap_or(true);
 
     let shopify_whitelist = env::var("TPG_SHOPIFY_IP_WHITELIST").ok().and_then(|s| {
@@ -166,7 +175,7 @@ fn configure_shopify() -> (String, Secret<String>, bool, Option<Vec<IpAddr>>) {
             info!("🪛️ Shopify IP whitelist: {addrs}");
         },
     }
-    (shopify_api_key, shopify_api_secret, shopify_hmac_checks, shopify_whitelist)
+    (shopify_api_key, shopify_api_secret, shopify_hmac_secret, shopify_hmac_checks, shopify_whitelist)
 }
 
 fn configure_order_timeouts() -> (Duration, Duration) {

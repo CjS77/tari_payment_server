@@ -39,7 +39,7 @@ async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<i6
     .bind(order.order_id)
     .bind(order.customer_id)
     .bind(order.memo)
-    .bind(order.total_price)
+    .bind(order.total_price.value())
     .bind(order.currency)
     .bind(order.created_at)
     .fetch_one(conn)
