@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ShopifyOrder {
+    #[serde(deserialize_with = "into_string")]
     pub id: String,
     pub token: String,
     pub cart_token: Option<String>, // marked as deprecated in shopify API
@@ -30,6 +31,17 @@ pub struct ShopifyOrder {
     pub total_tax: String,
     pub subtotal_price: String,
     pub customer: Customer,
+}
+
+fn into_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+where D: serde::Deserializer<'de> {
+    let deserialized_value: serde_json::Value = serde::Deserialize::deserialize(deserializer)?;
+
+    match deserialized_value {
+        serde_json::Value::String(s) => Ok(s),
+        serde_json::Value::Number(num) => Ok(num.to_string()),
+        _ => Err(serde::de::Error::custom("expected a string or number")),
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
