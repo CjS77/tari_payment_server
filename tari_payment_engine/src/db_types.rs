@@ -319,11 +319,10 @@ impl Display for NewOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Order #{order_id} @ \"{customer_id}\". {total_price}{currency} ({created_at})",
+            "Order #{order_id} @ \"{customer_id}\". {total_price} ({created_at})",
             order_id = self.order_id,
             customer_id = self.customer_id,
             total_price = self.total_price,
-            currency = self.currency,
             created_at = self.created_at
         )
     }

@@ -4,9 +4,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ShopifyOrder {
-    pub id: i64,
+    pub id: String,
     pub token: String,
-    pub cart_token: String,
+    pub cart_token: Option<String>, // marked as deprecated in shopify API
     pub email: Option<String>,
     pub buyer_accepts_marketing: bool,
     pub created_at: String,
@@ -16,8 +16,8 @@ pub struct ShopifyOrder {
     pub presentment_currency: String,
     pub cancel_reason: Option<String>,
     pub cancelled_at: Option<String>,
-    pub checkout_id: i64,
-    pub checkout_token: String,
+    pub checkout_id: Option<i64>,
+    pub checkout_token: Option<String>, // marked as deprecated in shopify API
     pub closed_at: Option<String>,
     pub confirmed: bool,
     pub user_id: Option<i64>,
@@ -181,9 +181,9 @@ impl OrderBuilder {
         #[allow(clippy::cast_possible_wrap)]
         let id = (rng.next_u64() >> 1) as i64;
         ShopifyOrder {
-            id,
+            id: id.to_string(),
             token: self.token.unwrap_or_else(|| rng.next_u64().to_string()),
-            cart_token: self.cart_token.unwrap_or_else(|| format!("{:x}", rng.next_u64())),
+            cart_token: self.cart_token,
             email: Some(self.email.unwrap_or_else(|| format!("{}@example.com", rng.gen_range(0..1000)))),
             buyer_accepts_marketing: self.buyer_accepts_marketing.unwrap_or_default(),
             created_at: self.created_at.unwrap_or_else(|| Utc::now().to_rfc3339()),
@@ -199,14 +199,14 @@ impl OrderBuilder {
             presentment_currency: self.presentment_currency.unwrap_or_else(|| "XTR".to_string()),
             cancel_reason: None,
             cancelled_at: None,
-            checkout_id: 12345,
+            checkout_id: None,
             total_discounts: self.total_discounts.unwrap_or_default(),
             total_line_items_price: self.total_line_items_price.unwrap_or_default(),
             total_price: self.total_price.unwrap_or_else(|| format!("{}", rng.gen_range(1_000..250_000) * 1000)),
             total_tax: self.total_tax.unwrap_or_default(),
             subtotal_price: self.subtotal_price.unwrap_or_default(),
             customer: self.customer.unwrap_or_default(),
-            checkout_token: "checkouttoken12345".to_string(),
+            checkout_token: None,
         }
     }
 }
@@ -219,19 +219,19 @@ mod test {
     fn deserialize_new_order() {
         let order = include_str!("./test_assets/new_order.json");
         let order: ShopifyOrder = serde_json::from_str(order).unwrap();
-        assert_eq!(order.id, 5714720719169);
+        assert_eq!(order.id, "5714720719169");
         assert_eq!(order.token, "04eaa913ca3ccc9c99603a5921a1268d");
         assert_eq!(order.total_price, "190.00");
         assert_eq!(order.customer.id, 7806520164673);
 
         let order = include_str!("./test_assets/actual_order.json");
         let order: ShopifyOrder = serde_json::from_str(order).unwrap();
-        assert_eq!(order.id, 5621163655380);
+        assert_eq!(order.id, "5621163655380");
         assert_eq!(order.customer.id, 7345051926740);
 
         let order = include_str!("./test_assets/actual_order2.json");
         let order: ShopifyOrder = serde_json::from_str(order).unwrap();
-        assert_eq!(order.id, 5621189509332);
-        assert_eq!(order.customer.id, 7345180737748);
+        assert_eq!(order.id, "820982911946154508");
+        assert_eq!(order.customer.id, 115310627314723954);
     }
 }

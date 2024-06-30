@@ -1,7 +1,7 @@
 use std::{
     fmt::Display,
     iter::Sum,
-    ops::{Add, Neg, Sub, SubAssign},
+    ops::{Add, Mul, Neg, Sub, SubAssign},
 };
 
 use serde::{Deserialize, Serialize};
@@ -22,6 +22,14 @@ op!(binary MicroTari, Add, add);
 op!(binary MicroTari, Sub, sub);
 op!(inplace MicroTari, SubAssign, sub_assign);
 op!(unary MicroTari, Neg, neg);
+
+impl Mul<i64> for MicroTari {
+    type Output = Self;
+
+    fn mul(self, rhs: i64) -> Self::Output {
+        Self::from(self.value() * rhs)
+    }
+}
 
 impl Sum for MicroTari {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {

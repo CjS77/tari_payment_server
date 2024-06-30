@@ -91,13 +91,14 @@ pub struct AttachOrderParams {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExchangeRateUpdate {
     pub currency: String,
+    // The Tari price in MicroTari per 1c of base currency
     pub rate: u64,
 }
 
 impl From<ExchangeRateUpdate> for ExchangeRate {
     fn from(update: ExchangeRateUpdate) -> Self {
         #[allow(clippy::cast_possible_wrap)]
-        Self::new(update.currency, update.rate as i64, None)
+        Self::new(update.currency, MicroTari::from(update.rate as i64), None)
     }
 }
 
@@ -110,6 +111,6 @@ pub struct ExchangeRateResult {
 
 impl From<ExchangeRate> for ExchangeRateResult {
     fn from(rate: ExchangeRate) -> Self {
-        Self { currency: rate.base_currency, rate: rate.rate / 100, updated_at: rate.updated_at.to_rfc3339() }
+        Self { currency: rate.base_currency, rate: rate.rate.value(), updated_at: rate.updated_at.to_rfc3339() }
     }
 }

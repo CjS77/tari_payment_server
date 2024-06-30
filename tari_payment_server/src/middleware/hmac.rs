@@ -90,11 +90,11 @@ where
         Box::pin(async move {
             trace!("🔐️ Checking HMAC for request");
             if !enabled {
-                trace!("HMAC checks are disabled. Allowing request.");
+                trace!("🔐️ HMAC checks are disabled. Allowing request.");
                 return service.call(req).await;
             }
             let data = req.extract::<web::Bytes>().await.map_err(|e| {
-                warn!("Failed to extract request data: {:?}", e);
+                warn!("🔐️ Failed to extract request data: {:?}", e);
                 ErrorBadRequest("Failed to extract request data.")
             })?;
             let hmac_calc = calculate_hmac(&secret, data.as_ref());
@@ -104,10 +104,11 @@ where
             })?;
             let validated = hmac == hmac_calc.as_str();
             if validated {
+                trace!("🔐️ HMAC check for request ✅️");
                 req.set_payload(bytes_to_payload(data));
                 service.call(req).await
             } else {
-                warn!("Invalid HMAC signature found in request. denying access.");
+                warn!("🔐️ Invalid HMAC signature found in request. denying access.");
                 Err(ErrorForbidden("Invalid HMAC signature."))
             }
         })

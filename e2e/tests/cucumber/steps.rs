@@ -242,10 +242,10 @@ async fn place_order(
         .request(Method::POST, "/shopify/webhook/checkout_create", |req| {
             let mut order = ShopifyOrder::default();
             order.created_at = created_at;
-            order.name = order_id;
+            order.id = order_id;
             order.note = memo;
             order.currency = "XTR".to_string();
-            order.total_price = MicroTari::from_tari(amount).value().to_string();
+            order.total_price = format!("{amount}.00");
             order.user_id = Some(user);
             order.email = Some(email);
             order.customer.id = user;

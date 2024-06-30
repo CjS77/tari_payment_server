@@ -108,7 +108,7 @@ pub fn create_server_instance(
         let exchange_rates = ExchangeRateApi::new(db.clone());
         let hmac_middleware = HmacMiddlewareFactory::new(
             "X-Shopify-Hmac-Sha256",
-            config.shopify_api_secret.clone(),
+            config.shopify_hmac_secret.clone(),
             config.shopify_hmac_checks,
         );
 
@@ -159,7 +159,7 @@ pub fn create_server_instance(
                 }
             })
             .wrap(hmac_middleware)
-            .service(ShopifyWebhookRoute::<SqliteDatabase>::new())
+            .service(ShopifyWebhookRoute::<SqliteDatabase, SqliteDatabase>::new())
             .service(health);
         let wallet_scope = web::scope("/wallet")
             .service(IncomingPaymentNotificationRoute::<SqliteDatabase, SqliteDatabase>::new())

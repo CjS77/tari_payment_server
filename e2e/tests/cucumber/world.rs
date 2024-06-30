@@ -50,6 +50,7 @@ impl Default for TPGWorld {
             port: 20000 + rand::random::<u16>() % 10_000,
             shopify_api_key: String::default(),
             shopify_api_secret: Secret::default(),
+            shopify_hmac_secret: Secret::default(),
             shopify_hmac_checks: false,
             database_url: url.clone(),
             auth: AuthConfig::default(),
