@@ -56,8 +56,8 @@ impl Default for TPGWorld {
             shopify_whitelist: None,
             use_x_forwarded_for: false,
             use_forwarded: false,
-            unclaimed_order_timeout: Duration::seconds(1),
-            unpaid_order_timeout: Duration::seconds(2),
+            unclaimed_order_timeout: Duration::seconds(2),
+            unpaid_order_timeout: Duration::seconds(4),
         };
         Self {
             config,
