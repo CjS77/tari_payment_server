@@ -10,7 +10,7 @@ use reqwest::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{config::ShopifyConfig, ExchangeRate, ExchangeRates, ShopifyApiError, ShopifyOrder};
+use crate::{config::ShopifyConfig, ExchangeRate, ExchangeRates, ShopifyApiError, ShopifyOrder, ShopifyTransaction};
 
 pub struct ShopifyApi {
     config: ShopifyConfig,
@@ -108,6 +108,29 @@ impl ShopifyApi {
         let result = self.rest_query::<OrderResponse, ()>(Method::POST, &path, &[], None).await?;
         debug!("Cancelled order #{order_id}");
         Ok(result.order)
+    }
+
+    pub async fn mark_order_as_paid(
+        &self,
+        order_id: u64,
+        amount: String,
+        currency: String,
+    ) -> Result<ShopifyTransaction, ShopifyApiError> {
+        #[derive(Deserialize)]
+        struct TransactionResponse {
+            transaction: ShopifyTransaction,
+        }
+        let path = format!("/orders/{order_id}/transactions.json");
+        let body = serde_json::json!({
+            "transaction": {
+                "parent_id": null,
+                "amount": amount,
+                "kind": "capture",
+                "currency": currency,
+            },
+        });
+        let result = self.rest_query::<TransactionResponse, Value>(Method::POST, &path, &[], Some(body)).await?;
+        Ok(result.transaction)
     }
 
     pub async fn get_exchange_rates(&self) -> Result<ExchangeRates, ShopifyApiError> {

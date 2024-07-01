@@ -24,6 +24,16 @@ pub enum OrdersCommand {
         #[arg(required = true, index = 1)]
         id: u64,
     },
+    /// Mark the given order as paid on Shopify. This does not facilitate any transfer of funds; it only tells Shopify
+    /// that the order has been paid for.
+    Pay {
+        #[arg(required = true, index = 1)]
+        id: u64,
+        #[arg(required = true, index = 2)]
+        amount: String,
+        #[arg(required = true, index = 3)]
+        currency: String,
+    },
     /// Modify the order
     Modify,
 }
