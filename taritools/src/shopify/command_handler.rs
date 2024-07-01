@@ -8,6 +8,7 @@ pub async fn handle_shopify_command(command: ShopifyCommand) {
         Orders(orders_command) => match orders_command {
             OrdersCommand::Get { id } => fetch_shopify_order(id).await,
             OrdersCommand::Cancel { id } => cancel_shopify_order(id).await,
+            OrdersCommand::Pay { id, amount, currency } => mark_order_as_paid(id, amount, currency).await,
             OrdersCommand::Modify => {
                 println!("Modifying order");
             },
@@ -52,6 +53,19 @@ pub async fn cancel_shopify_order(id: u64) {
         },
         Err(e) => {
             eprintln!("Error cancelling order #{id}: {e}");
+        },
+    }
+}
+
+pub async fn mark_order_as_paid(id: u64, amount: String, currency: String) {
+    let api = new_shopify_api();
+    match api.mark_order_as_paid(id, amount, currency).await {
+        Ok(tx) => {
+            let json = serde_json::to_string_pretty(&tx).unwrap();
+            println!("Marked order #{id} as paid\n{json}");
+        },
+        Err(e) => {
+            eprintln!("Error marking order #{id} as paid: {e}");
         },
     }
 }
