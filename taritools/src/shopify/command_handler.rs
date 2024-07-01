@@ -7,6 +7,7 @@ pub async fn handle_shopify_command(command: ShopifyCommand) {
     match command {
         Orders(orders_command) => match orders_command {
             OrdersCommand::Get { id } => fetch_shopify_order(id).await,
+            OrdersCommand::Cancel { id } => cancel_shopify_order(id).await,
             OrdersCommand::Modify => {
                 println!("Modifying order");
             },
@@ -38,6 +39,19 @@ pub async fn fetch_shopify_order(id: u64) {
         },
         Err(e) => {
             eprintln!("Error fetching order #{id}: {e}");
+        },
+    }
+}
+
+pub async fn cancel_shopify_order(id: u64) {
+    let api = new_shopify_api();
+    match api.cancel_order(id).await {
+        Ok(order) => {
+            let json = serde_json::to_string_pretty(&order).unwrap();
+            println!("Cancelled order #{id}\n{json}");
+        },
+        Err(e) => {
+            eprintln!("Error cancelling order #{id}: {e}");
         },
     }
 }
