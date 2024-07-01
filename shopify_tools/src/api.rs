@@ -98,6 +98,18 @@ impl ShopifyApi {
         Ok(result.order)
     }
 
+    pub async fn cancel_order(&self, order_id: u64) -> Result<ShopifyOrder, ShopifyApiError> {
+        #[derive(Deserialize)]
+        struct OrderResponse {
+            order: ShopifyOrder,
+        }
+        let path = format!("/orders/{order_id}/cancel.json");
+        debug!("Cancelling order #{order_id}");
+        let result = self.rest_query::<OrderResponse, ()>(Method::POST, &path, &[], None).await?;
+        debug!("Cancelled order #{order_id}");
+        Ok(result.order)
+    }
+
     pub async fn get_exchange_rates(&self) -> Result<ExchangeRates, ShopifyApiError> {
         let query = r#"{
           metaobjectByHandle(handle: {type: "tari_price", handle: "tari-price-global"}) {
