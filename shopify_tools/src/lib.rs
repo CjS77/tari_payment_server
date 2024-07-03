@@ -4,7 +4,7 @@ mod error;
 mod shopify_order;
 mod shopify_transaction;
 
-mod data_objects;
+pub mod data_objects;
 
 pub use api::ShopifyApi;
 pub use config::ShopifyConfig;

@@ -10,6 +10,9 @@ pub enum ShopifyCommand {
     #[command(subcommand)]
     /// Retrieve or modify exchange rates
     Rates(RatesCommand),
+    #[command(subcommand)]
+    /// Retrieve or modify products
+    Products(ProductsCommand),
 }
 
 #[derive(Debug, Subcommand)]
@@ -36,6 +39,12 @@ pub enum OrdersCommand {
     },
     /// Modify the order
     Modify,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ProductsCommand {
+    /// Fetch all product variants with their Tari prices
+    All,
 }
 
 #[derive(Debug, Subcommand)]

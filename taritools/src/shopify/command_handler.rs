@@ -1,6 +1,10 @@
 use shopify_tools::{ExchangeRate, ShopifyApi, ShopifyConfig};
 
-use crate::shopify::{command_def::RatesCommand, OrdersCommand, ShopifyCommand};
+use crate::shopify::{
+    command_def::{ProductsCommand, RatesCommand},
+    OrdersCommand,
+    ShopifyCommand,
+};
 
 pub async fn handle_shopify_command(command: ShopifyCommand) {
     use ShopifyCommand::*;
@@ -16,6 +20,9 @@ pub async fn handle_shopify_command(command: ShopifyCommand) {
         Rates(rates_cmd) => match rates_cmd {
             RatesCommand::Get => fetch_exchange_rates().await,
             RatesCommand::Set { rates } => set_exchange_rates(rates).await,
+        },
+        Products(products_cmd) => match products_cmd {
+            ProductsCommand::All => fetch_all_variants().await,
         },
     }
 }
@@ -93,6 +100,19 @@ pub async fn set_exchange_rates(rates: Vec<ExchangeRate>) {
         },
         Err(e) => {
             eprintln!("Error updating exchange rates: {e}");
+        },
+    }
+}
+
+pub async fn fetch_all_variants() {
+    let api = new_shopify_api();
+    match api.fetch_all_variants().await {
+        Ok(variants) => {
+            let json = serde_json::to_string_pretty(&variants).unwrap();
+            println!("Variants\n{json}");
+        },
+        Err(e) => {
+            eprintln!("Error fetching variants: {e}");
         },
     }
 }
