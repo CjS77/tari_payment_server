@@ -10,7 +10,15 @@ use reqwest::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{config::ShopifyConfig, ExchangeRate, ExchangeRates, ShopifyApiError, ShopifyOrder, ShopifyTransaction};
+use crate::{
+    config::ShopifyConfig,
+    data_objects::{ProductVariant, ProductVariants},
+    ExchangeRate,
+    ExchangeRates,
+    ShopifyApiError,
+    ShopifyOrder,
+    ShopifyTransaction,
+};
 
 pub struct ShopifyApi {
     config: ShopifyConfig,
@@ -77,7 +85,9 @@ impl ShopifyApi {
             return Err(ShopifyApiError::GraphQLError(e));
         }
         let data = result["data"].clone();
+        let costs = result["extensions"]["cost"].clone();
         trace!("GraphQL response: {data}");
+        trace!("GraphQL costs: {costs}");
         let result = serde_json::from_value(data).map_err(|e| ShopifyApiError::JsonError(e.to_string()))?;
         Ok(result)
     }
@@ -173,5 +183,38 @@ impl ShopifyApi {
         let new_rates =
             ExchangeRates::from_metaobject(new_rates).map_err(|e| ShopifyApiError::JsonError(e.to_string()))?;
         Ok(new_rates)
+    }
+
+    pub async fn fetch_variants(&self, after: Option<String>, count: u64) -> Result<ProductVariants, ShopifyApiError> {
+        let after = after.map(|s| format!("\"{s}\"")).unwrap_or("null".to_string());
+        let query = format!(
+            "query {{productVariants(first: {count}, after: {after}) {{ pageInfo {{ endCursor hasNextPage }} nodes {{ \
+             id product {{ id title }} metafield(namespace: \"custom\" key: \"tari_price\") {{ id updatedAt value }} \
+             price }} }}}}"
+        );
+        let result = self.graphql_query::<ProductVariants>(&query, None).await?;
+        debug!(
+            "Fetched {} variants. PageInfo: {} HasNextPage: {}",
+            result.product_variants.nodes.len(),
+            result.product_variants.page_info.end_cursor,
+            result.product_variants.page_info.has_next_page
+        );
+        Ok(result)
+    }
+
+    pub async fn fetch_all_variants(&self) -> Result<Vec<ProductVariant>, ShopifyApiError> {
+        const FETCH_COUNT: u64 = 100;
+        let mut variants = vec![];
+        let mut after = None;
+        loop {
+            let result = self.fetch_variants(after, FETCH_COUNT).await?;
+            let page_info = result.product_variants.page_info;
+            variants.extend(result.product_variants.nodes);
+            if !page_info.has_next_page {
+                break;
+            }
+            after = Some(page_info.end_cursor);
+        }
+        Ok(variants)
     }
 }

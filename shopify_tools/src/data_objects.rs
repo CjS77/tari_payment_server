@@ -82,3 +82,78 @@ impl ExchangeRates {
         Ok(Self { id, updated_at, rates })
     }
 }
+
+/// A custom struct to represent the results of the fetch_product_variants method
+#[derive(Serialize, Deserialize)]
+pub struct ProductVariantResult {
+    pub data: ProductVariants,
+    pub extensions: Extensions,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ProductVariantData {
+    #[serde(rename = "pageInfo")]
+    pub page_info: PageInfo,
+    pub nodes: Vec<ProductVariant>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ProductVariants {
+    #[serde(rename = "productVariants")]
+    pub product_variants: ProductVariantData,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Product {
+    pub id: String,
+    pub title: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ProductVariant {
+    pub id: String,
+    pub product: Product,
+    pub metafield: Option<TariPriceMetafield>,
+    pub price: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TariPriceMetafield {
+    pub id: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+    pub value: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PageInfo {
+    #[serde(rename = "endCursor")]
+    pub end_cursor: String,
+    #[serde(rename = "hasNextPage")]
+    pub has_next_page: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Extensions {
+    pub cost: Cost,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ThrottleStatus {
+    #[serde(rename = "maximumAvailable")]
+    pub maximum_available: f64,
+    #[serde(rename = "currentlyAvailable")]
+    pub currently_available: i64,
+    #[serde(rename = "restoreRate")]
+    pub restore_rate: f64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Cost {
+    #[serde(rename = "requestedQueryCost")]
+    pub requested_query_cost: i64,
+    #[serde(rename = "actualQueryCost")]
+    pub actual_query_cost: i64,
+    #[serde(rename = "throttleStatus")]
+    pub throttle_status: ThrottleStatus,
+}
