@@ -9,10 +9,12 @@ use reqwest::{
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
+use tpg_common::MicroTari;
 
 use crate::{
     config::ShopifyConfig,
     data_objects::{ProductVariant, ProductVariants},
+    helpers::{parse_shopify_price, tari_shopify_price},
     ExchangeRate,
     ExchangeRates,
     ShopifyApiError,
@@ -24,6 +26,9 @@ pub struct ShopifyApi {
     config: ShopifyConfig,
     client: Arc<Client>,
 }
+
+const VARIANT_DEF: &str =
+    "{ id product { id title } metafield(namespace: \"custom\" key: \"tari_price\") { id updatedAt value } price }";
 
 impl ShopifyApi {
     pub fn new(config: ShopifyConfig) -> Result<Self, ShopifyApiError> {
@@ -47,7 +52,7 @@ impl ShopifyApi {
         body: Option<B>,
     ) -> Result<T, ShopifyApiError> {
         let url = self.url(path);
-        debug!("Sending REST query: {url}");
+        trace!("Sending REST query: {url}");
         let mut req = self.client.request(method, url);
         if !params.is_empty() {
             req = req.query(params);
@@ -104,7 +109,7 @@ impl ShopifyApi {
         let path = format!("/orders/{order_id}.json");
         debug!("Fetching order #{order_id}");
         let result = self.rest_query::<OrderResponse, ()>(Method::GET, &path, &[], None).await?;
-        debug!("Fetched order #{order_id}");
+        info!("Fetched order #{order_id}");
         Ok(result.order)
     }
 
@@ -116,7 +121,7 @@ impl ShopifyApi {
         let path = format!("/orders/{order_id}/cancel.json");
         debug!("Cancelling order #{order_id}");
         let result = self.rest_query::<OrderResponse, ()>(Method::POST, &path, &[], None).await?;
-        debug!("Cancelled order #{order_id}");
+        info!("Cancelled order #{order_id}");
         Ok(result.order)
     }
 
@@ -171,7 +176,7 @@ impl ShopifyApi {
             "handle": { "type": "tari_price", "handle": "tari-price-global" },
             "metaobject": { "fields": fields }
         });
-        trace!("Setting exchange rates: {variables}");
+        debug!("Setting exchange rates: {variables}");
         let response = self.graphql_query::<Value>(mutation, Some(variables)).await?;
         if let Some(errors) = response["metaobjectUpsert"]["userErrors"].as_array() {
             if !errors.is_empty() {
@@ -188,9 +193,8 @@ impl ShopifyApi {
     pub async fn fetch_variants(&self, after: Option<String>, count: u64) -> Result<ProductVariants, ShopifyApiError> {
         let after = after.map(|s| format!("\"{s}\"")).unwrap_or("null".to_string());
         let query = format!(
-            "query {{productVariants(first: {count}, after: {after}) {{ pageInfo {{ endCursor hasNextPage }} nodes {{ \
-             id product {{ id title }} metafield(namespace: \"custom\" key: \"tari_price\") {{ id updatedAt value }} \
-             price }} }}}}"
+            "query {{productVariants(first: {count}, after: {after}) {{ pageInfo {{ endCursor hasNextPage }} nodes \
+             {VARIANT_DEF} }}}}"
         );
         let result = self.graphql_query::<ProductVariants>(&query, None).await?;
         debug!(
@@ -216,5 +220,59 @@ impl ShopifyApi {
             after = Some(page_info.end_cursor);
         }
         Ok(variants)
+    }
+
+    /// Updates the price of the given product variants based on the given rate. Only those products that have in
+    /// incorrect Tari price are updated.
+    ///
+    /// The list of variants is typically retrieved via a call to `fetch_all_variants`.
+    ///
+    /// The `metafield_id` is the ID of the metafield that contains the Tari price.
+    /// The value of this id can be retrieved from the `ProductVariant` object.
+    pub async fn update_tari_price(
+        &self,
+        products: Vec<ProductVariant>,
+        rate: ExchangeRate,
+    ) -> Result<Vec<ProductVariant>, ShopifyApiError> {
+        let mutation = format!(
+            "mutation updateProductVariantMetafields($input: ProductVariantInput!) {{ productVariantUpdate(input: \
+             $input) {{ productVariant {VARIANT_DEF} userErrors {{ message field }}  }} }}"
+        );
+        let rate = rate.rate.value();
+        let mut result = vec![];
+        debug!("Updating prices for {} product variants", products.len());
+        for product in products {
+            let shop_price = parse_shopify_price(&product.price)?;
+            let tari_price = tari_shopify_price(MicroTari::from(rate * shop_price));
+            if let Some(mf) = &product.metafield {
+                if mf.value == tari_price {
+                    info!(
+                        "Product variant {} ({}) has an up-to-date-price, so skipping its update",
+                        product.id, product.product.title
+                    );
+                    continue;
+                }
+            }
+            let metafield = match product.metafield {
+                Some(mf) => serde_json::json!({"id": mf.id,"value": tari_price}),
+                None => {
+                    serde_json::json!({"namespace": "custom","key": "tari_price","type": "number_integer","value": tari_price})
+                },
+            };
+            let variables = serde_json::json!({ "input": {"id": product.id,"metafields": [metafield]}});
+            debug!("Modifying product variant: {}", product.id);
+            let response = self.graphql_query::<Value>(&mutation, Some(variables)).await?;
+            if let Some(errors) = response["productVariantUpdate"]["userErrors"].as_array() {
+                if !errors.is_empty() {
+                    let e = errors.iter().map(|e| e.to_string()).collect::<Vec<String>>().join(", ");
+                    return Err(ShopifyApiError::GraphQLError(e));
+                }
+            }
+            info!("Successfully updated price for {} ({})", product.id, product.product.title);
+            let variant = serde_json::from_value(response["productVariantUpdate"]["productVariant"].clone())
+                .map_err(|e| ShopifyApiError::JsonError(e.to_string()))?;
+            result.push(variant);
+        }
+        Ok(result)
     }
 }

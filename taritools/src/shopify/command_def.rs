@@ -45,6 +45,13 @@ pub enum OrdersCommand {
 pub enum ProductsCommand {
     /// Fetch all product variants with their Tari prices
     All,
+    #[command(name = "update-price")]
+    /// Updates prices for all products using the given exchange rates
+    UpdatePrice {
+        #[arg(required = true, index = 1)]
+        /// The exchange rates to use for updating the prices in microTari per cent of the base currency
+        microtari_per_cent: i64,
+    },
 }
 
 #[derive(Debug, Subcommand)]
