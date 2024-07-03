@@ -6,6 +6,8 @@ mod shopify_transaction;
 
 pub mod data_objects;
 
+pub mod helpers;
+
 pub use api::ShopifyApi;
 pub use config::ShopifyConfig;
 pub use data_objects::{ExchangeRate, ExchangeRates};

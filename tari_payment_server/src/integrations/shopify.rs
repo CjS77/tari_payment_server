@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use log::{info, trace};
-use shopify_tools::ShopifyOrder;
+use shopify_tools::{helpers::parse_shopify_price, ShopifyOrder};
 use tari_payment_engine::{
     db_types::{NewOrder, OrderId},
     helpers::MemoSignatureError,
@@ -38,7 +38,8 @@ pub async fn new_order_from_shopify_order<B: ExchangeRates>(
         ExchangeRate::default()
     };
     // Net price in cents.
-    let total_price = parse_shopify_price(&value.total_price)?;
+    let total_price =
+        parse_shopify_price(&value.total_price).map_err(|e| OrderConversionError::FormatError(e.to_string()))?;
     let total_price = rate.convert_to_tari_from_cents(total_price);
     let timestamp =
         value.created_at.parse::<DateTime<Utc>>().map_err(|e| OrderConversionError::FormatError(e.to_string()))?;
@@ -60,20 +61,4 @@ pub async fn new_order_from_shopify_order<B: ExchangeRates>(
         );
     }
     Ok(order)
-}
-
-/// Shopify uses floating point number expressed as strings.
-fn parse_shopify_price(price: &str) -> Result<i64, OrderConversionError> {
-    let mut parts = price.split('.');
-    let whole_units = parts
-        .next()
-        .ok_or_else(|| OrderConversionError::FormatError(format!("Empty price in shopify order: {price}")))?
-        .parse::<i64>()
-        .map_err(|e| OrderConversionError::FormatError(e.to_string()))?;
-    let cents = parts
-        .next()
-        .map(|s| s.parse::<i64>())
-        .unwrap_or(Ok(0))
-        .map_err(|e| OrderConversionError::FormatError(e.to_string()))?;
-    Ok(100 * whole_units + cents)
 }

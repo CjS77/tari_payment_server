@@ -16,4 +16,6 @@ pub enum ShopifyApiError {
     InvalidGraphQL(String),
     #[error("GraphQL query failed: {0}")]
     GraphQLError(String),
+    #[error("Invalid currency amount: {0}")]
+    InvalidCurrencyAmount(String),
 }
