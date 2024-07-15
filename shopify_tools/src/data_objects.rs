@@ -157,3 +157,24 @@ pub struct Cost {
     #[serde(rename = "throttleStatus")]
     pub throttle_status: ThrottleStatus,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct Webhook {
+    pub id: i64,
+    pub address: String,
+    pub topic: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub format: String,
+    pub fields: Option<Vec<String>>,
+    pub metafield_namespaces: Option<Vec<String>>,
+    pub api_version: String,
+    pub private_metafield_namespaces: Option<Vec<String>>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct NewWebhook {
+    pub address: String,
+    pub topic: String,
+    pub format: String,
+}

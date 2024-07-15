@@ -13,6 +13,22 @@ pub enum ShopifyCommand {
     #[command(subcommand)]
     /// Retrieve or modify products
     Products(ProductsCommand),
+    #[command(subcommand)]
+    /// Configure or list webhooks
+    Webhooks(WebhooksCommand),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum WebhooksCommand {
+    /// Installs all necessary webhooks required for the Tari Payment server. If they already exist, they will be
+    /// overwritten. The only parameter this command accepts is the URL of the server that will receive the webhook.
+    /// If it is not provided, the TPG_HOST and TPG_PORT environment variables will be used to construct the URL.
+    Install {
+        #[arg(required = false, index = 1)]
+        server_url: String,
+    },
+    /// List all webhooks installed on the Shopify store
+    List,
 }
 
 #[derive(Debug, Subcommand)]

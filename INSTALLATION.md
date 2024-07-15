@@ -114,7 +114,8 @@ and configure the webhooks for you. The CLI utility makes use of your Admin API 
 (See [`shopify` command configuration](#configuring-taritools)). You must also have assigned the correct permissions 
 as described in the [Enable custom App development](#enable-custom-app-development) section. 
 
-1. Run `taritools shopify webhooks install` to install the required webhooks into your store.
+1. Run `taritools shopify webhooks install "https://{my.tari-payment-server.com}"` to install the required webhooks 
+   into your store.
 2. Run `taritools shopify webhooks list` to verify that the webhooks have been installed.
 
 #### Manually configuring webhooks
