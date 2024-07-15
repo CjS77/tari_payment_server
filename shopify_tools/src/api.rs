@@ -13,7 +13,7 @@ use tpg_common::MicroTari;
 
 use crate::{
     config::ShopifyConfig,
-    data_objects::{ProductVariant, ProductVariants},
+    data_objects::{NewWebhook, ProductVariant, ProductVariants, Webhook},
     helpers::{parse_shopify_price, tari_shopify_price},
     ExchangeRate,
     ExchangeRates,
@@ -274,5 +274,56 @@ impl ShopifyApi {
             result.push(variant);
         }
         Ok(result)
+    }
+
+    pub async fn fetch_webhooks(&self) -> Result<Vec<Webhook>, ShopifyApiError> {
+        #[derive(Deserialize)]
+        struct WebhookResponse {
+            webhooks: Vec<Webhook>,
+        }
+        debug!("Fetching webhooks");
+        let result = self.rest_query::<WebhookResponse, ()>(Method::GET, "/webhooks.json", &[], None).await?;
+        info!("Fetched webhooks");
+        Ok(result.webhooks)
+    }
+
+    pub async fn install_webhook(&self, address: &str, topic: &str) -> Result<Webhook, ShopifyApiError> {
+        #[derive(Serialize)]
+        struct WebhookInput {
+            webhook: NewWebhook,
+        }
+        #[derive(Deserialize)]
+        struct WebhookResponse {
+            webhook: Webhook,
+        }
+        let webhook = NewWebhook { topic: topic.to_string(), address: address.to_string(), format: "json".to_string() };
+        let input = WebhookInput { webhook };
+        debug!("Installing webhook: {}", serde_json::to_string(&input).unwrap_or_default());
+        let result =
+            self.rest_query::<WebhookResponse, WebhookInput>(Method::POST, "/webhooks.json", &[], Some(input)).await?;
+        info!("Installed webhook: {:?}", result.webhook.id);
+        Ok(result.webhook)
+    }
+
+    pub async fn update_webhook(&self, id: i64, new_address: &str) -> Result<Webhook, ShopifyApiError> {
+        #[derive(Serialize)]
+        struct UpdateWebhook {
+            id: String,
+            address: String,
+        }
+        #[derive(Serialize)]
+        struct WebhookInput {
+            webhook: UpdateWebhook,
+        }
+        #[derive(Deserialize)]
+        struct WebhookResponse {
+            webhook: Webhook,
+        }
+        let input = WebhookInput { webhook: UpdateWebhook { id: id.to_string(), address: new_address.to_string() } };
+        let path = format!("/webhooks/{id}.json");
+        debug!("Updating webhook: {}", serde_json::to_string(&input).unwrap_or_default());
+        let result = self.rest_query::<WebhookResponse, WebhookInput>(Method::PUT, &path, &[], Some(input)).await?;
+        info!("Updated webhook: {:?}", result.webhook.id);
+        Ok(result.webhook)
     }
 }
