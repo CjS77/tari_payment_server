@@ -23,7 +23,7 @@ jobs:
           components: rustfmt, clippy
       - name: Install sqlx
         run: |
-          cargo install sqlx-cli --no-default-features --features sqlite
+          cargo +stable install sqlx-cli --no-default-features --features sqlite
           sqlx --version
       - name: Run migrations
         run: |
