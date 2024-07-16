@@ -11,6 +11,7 @@ use actix_web::{
 };
 use futures::{future::ok, FutureExt};
 use log::*;
+use shopify_tools::ShopifyApi;
 use tari_payment_engine::{
     events::{EventHandlers, EventHooks, EventProducers},
     tpe_api::exchange_rate_api::ExchangeRateApi,
@@ -98,24 +99,27 @@ pub fn create_server_instance(
     producers: EventProducers,
 ) -> Result<Server, ServerError> {
     let proxy_config = ProxyConfig::from_config(&config);
+    let shopify_config = config.shopify_config.shopify_api_config();
     let srv = HttpServer::new(move || {
         let orders_api = OrderFlowApi::new(db.clone(), producers.clone());
         let auth_api = AuthApi::new(db.clone());
         let jwt_signer = TokenIssuer::new(&config.auth);
         let authority = build_tps_authority(config.auth.clone());
         let accounts_api = AccountApi::new(db.clone());
+        let shopify_api = ShopifyApi::new(shopify_config.clone());
         let wallet_auth = WalletAuthApi::new(db.clone());
         let exchange_rates = ExchangeRateApi::new(db.clone());
         let hmac_middleware = HmacMiddlewareFactory::new(
             "X-Shopify-Hmac-Sha256",
-            config.shopify_hmac_secret.clone(),
-            config.shopify_hmac_checks,
+            config.shopify_config.hmac_secret.clone(),
+            config.shopify_config.hmac_checks,
         );
 
         let mut app = App::new()
             .wrap(Logger::new(LOG_FORMAT).log_target("access_log"))
             .app_data(web::Data::new(orders_api))
             .app_data(web::Data::new(accounts_api))
+            .app_data(web::Data::new(shopify_api))
             .app_data(web::Data::new(auth_api))
             .app_data(web::Data::new(jwt_signer))
             .app_data(web::Data::new(wallet_auth))
@@ -148,7 +152,7 @@ pub fn create_server_instance(
             .service(CheckTokenRoute::new());
         let use_x_forwarded_for = config.use_x_forwarded_for;
         let use_forwarded = config.use_forwarded;
-        let shopify_whitelist = config.shopify_whitelist.clone();
+        let shopify_whitelist = config.shopify_config.whitelist.clone();
         let shopify_scope = web::scope("/shopify")
             .wrap_fn(move |req, srv| {
                 let whitelisted = is_whitelisted(use_x_forwarded_for, use_forwarded, &shopify_whitelist, &req);

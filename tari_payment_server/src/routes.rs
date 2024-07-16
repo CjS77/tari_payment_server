@@ -26,7 +26,7 @@ use std::{marker::PhantomData, str::FromStr};
 use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
 use log::*;
 use paste::paste;
-use shopify_tools::ShopifyOrder;
+use shopify_tools::{data_objects::ExchangeRate as ShopifyExchangeRate, ShopifyApi, ShopifyOrder};
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
     db_types::{CreditNote, OrderId, OrderStatusType, Role, SerializedTariAddress},
@@ -46,6 +46,7 @@ use tari_payment_engine::{
     OrderFlowApi,
     WalletAuthApi,
 };
+use tpg_common::MicroTari;
 
 use crate::{
     auth::{check_login_token_signature, JwtClaims, TokenIssuer},
@@ -894,10 +895,11 @@ route!(update_shopify_exchange_rate => Post "/exchange_rate" impl ExchangeRates 
 pub async fn update_shopify_exchange_rate<B: ExchangeRates>(
     body: web::Json<ExchangeRateUpdate>,
     api: web::Data<ExchangeRateApi<B>>,
+    shopify_api: web::Data<ShopifyApi>,
 ) -> Result<HttpResponse, ServerError> {
     let update = body.into_inner();
-    update_local_exchange_rate(update, api.as_ref()).await?;
-    // update_shopify_exchange_rate_for(&update, shopify_api.as_ref()).await?;
+    update_local_exchange_rate(update.clone(), api.as_ref()).await?;
+    update_shopify_exchange_rate_for(&update, shopify_api.as_ref()).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
@@ -925,4 +927,22 @@ async fn update_local_exchange_rate<B: ExchangeRates>(
         debug!("💻️ Could not update exchange rate. {e}");
         ServerError::BackendError(e.to_string())
     })
+}
+
+async fn update_shopify_exchange_rate_for(
+    update: &ExchangeRateUpdate,
+    shopify_api: &ShopifyApi,
+) -> Result<(), ServerError> {
+    let rate = ShopifyExchangeRate::new(update.currency.to_string(), MicroTari::from(update.rate as i64));
+    debug!("💻️ Updating prices on Shopify storefront 1 {} = {}", rate.base_currency, rate.rate);
+    match shopify_api.update_all_prices(rate).await {
+        Ok(v) => {
+            info!("💻️ {} variant prices updated on shopify storefront.", v.len());
+            Ok(())
+        },
+        Err(e) => {
+            error!("💻️ Could not update variant prices on Shopify. {e}");
+            Err(ServerError::BackendError(e.to_string()))
+        },
+    }
 }

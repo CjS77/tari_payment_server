@@ -5,6 +5,7 @@ use chrono::Duration;
 use log::*;
 use rand::thread_rng;
 use serde_json::json;
+use shopify_tools::ShopifyConfig as ShopifyApiConfig;
 use tari_jwt::{
     tari_crypto::{
         keys::PublicKey,
@@ -21,7 +22,6 @@ use crate::errors::ServerError;
 
 const DEFAULT_TPG_HOST: &str = "127.0.0.1";
 const DEFAULT_TPG_PORT: u16 = 8360;
-
 const DEFAULT_UNCLAIMED_ORDER_TIMEOUT: Duration = Duration::hours(2);
 const DEFAULT_UNPAID_ORDER_TIMEOUT: Duration = Duration::hours(48);
 
@@ -29,15 +29,8 @@ const DEFAULT_UNPAID_ORDER_TIMEOUT: Duration = Duration::hours(48);
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
-    pub shopify_api_key: String,
-    pub shopify_api_secret: Secret<String>,
-    pub shopify_hmac_secret: Secret<String>,
-    pub shopify_hmac_checks: bool,
     pub database_url: String,
     pub auth: AuthConfig,
-    /// If supplied, requests against /shopify endpoints will be checked against a whitelist of Shopify IP addresses.
-    /// To explicitly disable the whitelist, set this to "false", "none", or "0".
-    pub shopify_whitelist: Option<Vec<IpAddr>>,
     /// If true, the X-Forwarded-For header will be used to determine the client's IP address, rather than the
     /// connection's remote address.
     pub use_x_forwarded_for: bool,
@@ -48,6 +41,24 @@ pub struct ServerConfig {
     pub unclaimed_order_timeout: Duration,
     /// The time before an unpaid order is considered expired and marked as such.
     pub unpaid_order_timeout: Duration,
+    /// Shopify storefront configuration
+    pub shopify_config: ShopifyConfig,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ShopifyConfig {
+    /// The url for the shopify storefront to use. e.g. "my-shop.myshopify.com"
+    pub shop: String,
+    pub api_key: String,
+    pub api_secret: Secret<String>,
+    pub hmac_secret: Secret<String>,
+    pub api_version: String,
+    pub hmac_checks: bool,
+    /// If supplied, requests against /shopify endpoints will be checked against a whitelist of Shopify IP addresses.
+    /// To explicitly disable the whitelist, set this to "false", "none", or "0".
+    pub whitelist: Option<Vec<IpAddr>>,
+    pub admin_access_token: Secret<String>,
+    pub storefront_access_token: Secret<String>,
 }
 
 impl Default for ServerConfig {
@@ -55,17 +66,13 @@ impl Default for ServerConfig {
         Self {
             host: DEFAULT_TPG_HOST.to_string(),
             port: DEFAULT_TPG_PORT,
-            shopify_api_key: String::default(),
-            shopify_api_secret: Secret::default(),
-            shopify_hmac_secret: Secret::default(),
-            shopify_hmac_checks: true,
             database_url: String::default(),
             auth: AuthConfig::default(),
-            shopify_whitelist: None,
             use_x_forwarded_for: false,
             use_forwarded: false,
             unclaimed_order_timeout: DEFAULT_UNCLAIMED_ORDER_TIMEOUT,
             unpaid_order_timeout: DEFAULT_UNPAID_ORDER_TIMEOUT,
+            shopify_config: ShopifyConfig::default(),
         }
     }
 }
@@ -99,21 +106,16 @@ impl ServerConfig {
             );
             AuthConfig::default()
         });
-        let (shopify_api_key, shopify_api_secret, shopify_hmac_secret, shopify_hmac_checks, shopify_whitelist) =
-            configure_shopify();
+        let shopify_config = ShopifyConfig::from_env_or_defaults();
         let use_x_forwarded_for = env::var("TPG_USE_X_FORWARDED_FOR").map(|s| &s == "1" || &s == "true").is_ok();
         let use_forwarded = env::var("TPG_USE_FORWARDED").map(|s| &s == "1" || &s == "true").is_ok();
         let (unclaimed_order_timeout, unpaid_order_timeout) = configure_order_timeouts();
         Self {
             host,
             port,
-            shopify_api_key,
-            shopify_api_secret,
-            shopify_hmac_secret,
-            shopify_hmac_checks,
+            shopify_config,
             auth,
             database_url,
-            shopify_whitelist,
             use_forwarded,
             use_x_forwarded_for,
             unclaimed_order_timeout,
@@ -122,60 +124,79 @@ impl ServerConfig {
     }
 }
 
-fn configure_shopify() -> (String, Secret<String>, Secret<String>, bool, Option<Vec<IpAddr>>) {
-    let shopify_api_key = env::var("TPG_SHOPIFY_API_KEY").ok().unwrap_or_else(|| {
-        error!("🪛️ TPG_SHOPIFY_API_KEY is not set. Please set it to the API key for your Shopify app.");
-        String::default()
-    });
-    let shopify_api_secret = env::var("TPG_SHOPIFY_API_SECRET").ok().unwrap_or_else(|| {
-        error!("🪛️ TPG_SHOPIFY_API_SECRET is not set. Please set it to the client APP secret for your Shopify app.");
-        String::default()
-    });
-    let shopify_api_secret = Secret::new(shopify_api_secret);
-    let shopify_hmac_secret = env::var("TPG_SHOPIFY_HMAC_SECRET").ok().unwrap_or_else(|| {
-        error!("🪛️ TPG_SHOPIFY_HMAC_SECRET is not set. Please set it to the HMAC signing key for your Shopify app.");
-        String::default()
-    });
-    let shopify_hmac_secret = Secret::new(shopify_hmac_secret);
-    let shopify_hmac_checks = env::var("TPG_SHOPIFY_HMAC_CHECKS").map(|s| &s == "1" || &s == "true").unwrap_or(true);
-
-    let shopify_whitelist = env::var("TPG_SHOPIFY_IP_WHITELIST").ok().and_then(|s| {
-        if ["none", "false", "0"].contains(&s.to_lowercase().as_str()) {
-            info!(
-                "🪛️ Shopify IP whitelist is disabled. If this is not what you want, set TPG_SHOPIFY_IP_WHITELIST to a \
-                 comma-separated list of IP addresses to enable it."
+impl ShopifyConfig {
+    pub fn from_env_or_defaults() -> Self {
+        let api_config = ShopifyApiConfig::new_from_env_or_default();
+        let api_key = env::var("TPG_SHOPIFY_API_KEY").ok().unwrap_or_else(|| {
+            error!("🪛️ TPG_SHOPIFY_API_KEY is not set. Please set it to the API key for your Shopify app.");
+            String::default()
+        });
+        let hmac_secret = env::var("TPG_SHOPIFY_HMAC_SECRET").ok().unwrap_or_else(|| {
+            error!(
+                "🪛️ TPG_SHOPIFY_HMAC_SECRET is not set. Please set it to the HMAC signing key for your Shopify app."
             );
-            return None;
+            String::default()
+        });
+        let hmac_secret = Secret::new(hmac_secret);
+        let hmac_checks = env::var("TPG_SHOPIFY_HMAC_CHECKS").map(|s| &s == "1" || &s == "true").unwrap_or(true);
+        let whitelist = env::var("TPG_SHOPIFY_IP_WHITELIST").ok().and_then(|s| {
+            if ["none", "false", "0"].contains(&s.to_lowercase().as_str()) {
+                info!(
+                    "🪛️ Shopify IP whitelist is disabled. If this is not what you want, set TPG_SHOPIFY_IP_WHITELIST \
+                     to a comma-separated list of IP addresses to enable it."
+                );
+                return None;
+            }
+            let ip_addrs = s
+                .split(',')
+                .filter_map(|s| {
+                    s.parse()
+                        .map_err(|e| {
+                            warn!("🪛️ Ignoring invalid IP address ({s}) in TPG_SHOPIFY_IP_WHITELIST: {e}");
+                            None::<IpAddr>
+                        })
+                        .ok()
+                })
+                .collect::<Vec<IpAddr>>();
+            Some(ip_addrs)
+        });
+        match &whitelist {
+            Some(whitelist) if whitelist.is_empty() => {
+                warn!(
+                    "🚨️ The Shopify IP whitelist was configured, but is empty.  The server will run, but won't \
+                     authorise any Shopify incoming requests."
+                );
+            },
+            None => {
+                info!("🪛️ No Shopify IP whitelist is set. Only HMAC validation will be used.");
+            },
+            Some(v) => {
+                let addrs = v.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", ");
+                info!("🪛️ Shopify IP whitelist: {addrs}");
+            },
         }
-        let ip_addrs = s
-            .split(',')
-            .filter_map(|s| {
-                s.parse()
-                    .map_err(|e| {
-                        warn!("🪛️ Ignoring invalid IP address ({s}) in TPG_SHOPIFY_IP_WHITELIST: {e}");
-                        None::<IpAddr>
-                    })
-                    .ok()
-            })
-            .collect::<Vec<IpAddr>>();
-        Some(ip_addrs)
-    });
-    match &shopify_whitelist {
-        Some(whitelist) if whitelist.is_empty() => {
-            warn!(
-                "🚨️ The Shopify IP whitelist was configured, but is empty.  The server will run, but won't authorise \
-                 any Shopify incoming requests."
-            );
-        },
-        None => {
-            info!("🪛️ No Shopify IP whitelist is set. Only HMAC validation will be used.");
-        },
-        Some(v) => {
-            let addrs = v.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", ");
-            info!("🪛️ Shopify IP whitelist: {addrs}");
-        },
+        Self {
+            shop: api_config.shop,
+            api_version: api_config.api_version,
+            api_key,
+            api_secret: api_config.shared_secret,
+            hmac_secret,
+            hmac_checks,
+            whitelist,
+            admin_access_token: api_config.admin_access_token,
+            storefront_access_token: api_config.storefront_access_token,
+        }
     }
-    (shopify_api_key, shopify_api_secret, shopify_hmac_secret, shopify_hmac_checks, shopify_whitelist)
+
+    pub fn shopify_api_config(&self) -> ShopifyApiConfig {
+        ShopifyApiConfig {
+            shop: self.shop.clone(),
+            api_version: self.api_version.clone(),
+            shared_secret: self.api_secret.clone(),
+            admin_access_token: self.admin_access_token.clone(),
+            storefront_access_token: self.storefront_access_token.clone(),
+        }
+    }
 }
 
 fn configure_order_timeouts() -> (Duration, Duration) {

@@ -125,22 +125,15 @@ pub async fn fetch_all_variants() {
 
 pub async fn update_prices(rate: i64) {
     let api = new_shopify_api();
-    match api.fetch_all_variants().await {
+    let rate = ExchangeRate::new("USD".to_string(), rate.into());
+    match api.update_all_prices(rate).await {
         Ok(variants) => {
-            let rate = ExchangeRate::new("USD".to_string(), rate.into());
-            match api.update_tari_price(variants, rate).await {
-                Ok(products) => {
-                    println!("Prices updated");
-                    let json = serde_json::to_string_pretty(&products).unwrap();
-                    println!("Updated products:\n{json}");
-                },
-                Err(e) => {
-                    eprintln!("Error updating prices: {e}");
-                },
-            }
+            println!("Prices updated");
+            let json = serde_json::to_string_pretty(&variants).unwrap();
+            println!("Variants:\n{json}");
         },
         Err(e) => {
-            eprintln!("Error fetching variants: {e}");
+            eprintln!("Error updating prices: {e}");
         },
     }
 }
