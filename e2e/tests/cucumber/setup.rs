@@ -259,11 +259,11 @@ async fn server_configuration(world: &mut TPGWorld, step: &Step) {
         match key {
             "host" => world.config.host = value.into(),
             "port" => world.config.port = value.parse().expect("Invalid port number"),
-            "shopify_api_key" => world.config.shopify_api_key = value.into(),
+            "shopify_api_key" => world.config.shopify_config.api_key = value.into(),
             "database_url" => world.config.database_url = value.into(),
             "shopify_whitelist" => {
                 let ip = value.parse::<IpAddr>().expect("Invalid IP address");
-                world.config.shopify_whitelist = Some(vec![ip])
+                world.config.shopify_config.whitelist = Some(vec![ip])
             },
             "use_x_forwarded_for" => world.config.use_x_forwarded_for = value == "true",
             "use_forwarded" => world.config.use_forwarded = value == "true",

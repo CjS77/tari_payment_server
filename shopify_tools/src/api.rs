@@ -276,6 +276,11 @@ impl ShopifyApi {
         Ok(result)
     }
 
+    pub async fn update_all_prices(&self, rate: ExchangeRate) -> Result<Vec<ProductVariant>, ShopifyApiError> {
+        let variants = self.fetch_all_variants().await?;
+        self.update_tari_price(variants, rate).await
+    }
+
     pub async fn fetch_webhooks(&self) -> Result<Vec<Webhook>, ShopifyApiError> {
         #[derive(Deserialize)]
         struct WebhookResponse {
