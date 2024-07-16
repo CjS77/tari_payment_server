@@ -95,7 +95,7 @@ pub async fn upsert_nonce_for_address(
     #[allow(clippy::cast_possible_wrap)]
     let nonce = nonce as i64;
     let res = sqlx::query!(
-        r#"INSERT INTO auth_log (address, last_nonce) VALUES (?, ?) ON CONFLICT(address) DO
+        r#"INSERT INTO auth_log (last_nonce, address) VALUES (?, ?) ON CONFLICT(address) DO
     UPDATE SET last_nonce = excluded.last_nonce"#,
         nonce,
         address

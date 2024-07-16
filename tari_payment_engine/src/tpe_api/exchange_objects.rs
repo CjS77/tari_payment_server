@@ -23,29 +23,29 @@ impl ExchangeRate {
 
     /// Create a new ExchangeRate object with a rate of 1 base unit per Tari
     pub fn parity(currency: String) -> Self {
-        Self::new(currency, MicroTari::from(10_000), None)
+        Self::new(currency, MicroTari::from_tari(1), None)
     }
 
     /// Convert an amount in the base currency to Tari
     pub fn convert_to_tari(&self, amount: i64) -> MicroTari {
-        self.rate * amount * 100
+        self.rate * amount
     }
 
     /// Convert an amount in base currency cents to Tari
     pub fn convert_to_tari_from_cents(&self, cents: i64) -> MicroTari {
-        self.rate * cents
+        MicroTari::from(self.rate.value() * cents / 100)
     }
 }
 
 impl Display for ExchangeRate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "1 {} => {}", self.base_currency, self.rate * 100)
+        write!(f, "1 {} => {}", self.base_currency, self.rate)
     }
 }
 
 impl Default for ExchangeRate {
     fn default() -> Self {
-        Self { base_currency: "XTR".to_string(), rate: MicroTari::from(10_000), updated_at: Utc::now() }
+        Self { base_currency: "XTR".to_string(), rate: MicroTari::from_tari(1), updated_at: Utc::now() }
     }
 }
 
@@ -63,14 +63,14 @@ mod test {
 
         // 5000 XTR/$
         let rate = ExchangeRate::new("USD".to_string(), MicroTari::from_tari(50), None);
-        assert_eq!(rate.convert_to_tari(5), MicroTari::from_tari(25_000));
-        assert_eq!(rate.convert_to_tari_from_cents(2), MicroTari::from_tari(100));
-        assert_eq!(format!("{rate}"), "1 USD => 5000.000τ");
+        assert_eq!(rate.convert_to_tari(5), MicroTari::from_tari(250));
+        assert_eq!(rate.convert_to_tari_from_cents(2), MicroTari::from_tari(1));
+        assert_eq!(format!("{rate}"), "1 USD => 50.000τ");
 
         // 1 XTR : 2c (1c => 500,000 microTari)
         let rate = ExchangeRate::new("USD".to_string(), MicroTari::from(500_000), None);
-        assert_eq!(rate.convert_to_tari(1), MicroTari::from_tari(50));
-        assert_eq!(format!("{rate}"), "1 USD => 50.000τ");
+        assert_eq!(rate.convert_to_tari(1), MicroTari::from(500_000));
+        assert_eq!(format!("{rate}"), "1 USD => 0.500τ");
 
         // 1 XTR = $1
         let rate = ExchangeRate::parity("USD".to_string());

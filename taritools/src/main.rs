@@ -1,15 +1,20 @@
-use clap::{Args, Parser, Subcommand};
+use clap::{error::ErrorKind, Args, Parser, Subcommand};
 use dotenvy::dotenv;
 use tari_common::configuration::Network;
 
+mod interactive;
 mod jwt_token;
 mod keys;
+mod profile_manager;
 
 mod memo;
 mod payments;
 mod shopify;
 
+mod tari_payment_server;
+
 use jwt_token::print_jwt_token;
+use log::*;
 use tari_payment_engine::db_types::OrderId;
 
 use crate::{
@@ -18,6 +23,7 @@ use crate::{
     shopify::{handle_shopify_command, ShopifyCommand},
 };
 
+pub const APP_NAME: &str = env!("CARGO_PKG_NAME");
 #[derive(Parser, Debug)]
 #[command(version = "1.0.0", author = "CjS77")]
 pub struct Arguments {
@@ -114,7 +120,16 @@ pub struct TxConfirmParams {
 async fn main() {
     env_logger::init();
     dotenv().ok();
-    let cli = Arguments::parse();
+    match Arguments::try_parse() {
+        Ok(cli) => run_command(cli).await,
+        Err(e) => match e.kind() {
+            ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => run_interactive().await,
+            _ => println!("{e}"),
+        },
+    }
+}
+
+async fn run_command(cli: Arguments) {
     match cli.command {
         Command::NewAddress => print_new_address(cli.network),
         Command::AccessToken { secret, network, roles } => print_jwt_token(secret, network, roles),
@@ -122,6 +137,17 @@ async fn main() {
         Command::PaymentAuth(params) => print_payment_auth(params),
         Command::TxConfirm(params) => print_tx_confirm(params),
         Command::Shopify(shopify_command) => handle_shopify_command(shopify_command).await,
+    }
+}
+
+async fn run_interactive() {
+    println!(
+        "No command given. If this was unintended, enter `CTRL-C` to exit and run `{APP_NAME} --help` to see a full \
+         list of commands."
+    );
+    match interactive::run().await {
+        Ok(_) => println!("Bye!"),
+        Err(e) => error!("Session ended with error: {}", e),
     }
 }
 

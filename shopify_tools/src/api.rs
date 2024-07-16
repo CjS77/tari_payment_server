@@ -22,6 +22,7 @@ use crate::{
     ShopifyTransaction,
 };
 
+#[derive(Clone)]
 pub struct ShopifyApi {
     config: ShopifyConfig,
     client: Arc<Client>,
@@ -242,8 +243,8 @@ impl ShopifyApi {
         let mut result = vec![];
         debug!("Updating prices for {} product variants", products.len());
         for product in products {
-            let shop_price = parse_shopify_price(&product.price)?;
-            let tari_price = tari_shopify_price(MicroTari::from(rate * shop_price));
+            let shop_price_in_cents = parse_shopify_price(&product.price)?;
+            let tari_price = tari_shopify_price(MicroTari::from(rate * shop_price_in_cents / 100));
             if let Some(mf) = &product.metafield {
                 if mf.value == tari_price {
                     info!(

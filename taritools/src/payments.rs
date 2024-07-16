@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use serde::Serialize;
 use tari_common::configuration::Network;
 use tari_crypto::{ristretto::RistrettoSecretKey, tari_utilities::hex::Hex};
@@ -10,14 +11,10 @@ use tpg_common::MicroTari;
 
 use crate::{keys::KeyInfo, PaymentAuthParams, TxConfirmParams};
 
-pub fn create_wallet_signature<T: Serialize>(
-    info: &KeyInfo,
-    nonce: i64,
-    payload: &T,
-) -> Result<WalletSignature, String> {
+pub fn create_wallet_signature<T: Serialize>(info: &KeyInfo, nonce: i64, payload: &T) -> Result<WalletSignature> {
     let address = SerializedTariAddress::from(info.address().clone());
     // Create a wallet signature
-    let wallet_signature = WalletSignature::create(address, nonce, &info.sk, payload).map_err(|e| e.to_string())?;
+    let wallet_signature = WalletSignature::create(address, nonce, &info.sk, payload)?;
     Ok(wallet_signature)
 }
 
@@ -48,8 +45,8 @@ pub fn print_payment_auth(params: PaymentAuthParams) {
     }
 }
 
-fn build_payment(params: &PaymentAuthParams) -> Result<NewPayment, String> {
-    let sender = params.sender.parse::<SerializedTariAddress>().map_err(|e| format!("Invalid sender address: {e}"))?;
+fn build_payment(params: &PaymentAuthParams) -> Result<NewPayment> {
+    let sender = params.sender.parse::<SerializedTariAddress>()?;
     let amount = MicroTari::from_tari(params.amount);
     let memo = params.memo.clone();
     let order_id = params.order_id.clone();
@@ -63,11 +60,11 @@ fn build_auth<T: Serialize>(
     network: Network,
     nonce: i64,
     payment: &T,
-) -> Result<(WalletSignature, KeyInfo), String> {
+) -> Result<(WalletSignature, KeyInfo)> {
     let secret = match RistrettoSecretKey::from_hex(secret) {
         Ok(sk) => sk,
         Err(e) => {
-            return Err(format!("Invalid secret key: {e}"));
+            return Err(anyhow!("Invalid secret key: {e}"));
         },
     };
     let key_info = KeyInfo::from_secret_key(secret, network);
