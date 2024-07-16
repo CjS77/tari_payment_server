@@ -91,7 +91,7 @@ pub struct AttachOrderParams {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExchangeRateUpdate {
     pub currency: String,
-    // The Tari price in MicroTari per 1c of base currency
+    // The price of 1 unit of the currency in MicroTari
     pub rate: u64,
 }
 

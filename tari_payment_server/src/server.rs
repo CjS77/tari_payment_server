@@ -38,6 +38,7 @@ use crate::{
         ClaimOrderRoute,
         CreditorsRoute,
         FulfilOrderRoute,
+        GetExchangeRateRoute,
         HistoryForAddressRoute,
         HistoryForIdRoute,
         IncomingPaymentNotificationRoute,
@@ -59,6 +60,7 @@ use crate::{
         UpdateOrderMemoRoute,
         UpdatePriceRoute,
         UpdateRolesRoute,
+        UpdateShopifyExchangeRateRoute,
     },
 };
 
@@ -100,13 +102,17 @@ pub fn create_server_instance(
 ) -> Result<Server, ServerError> {
     let proxy_config = ProxyConfig::from_config(&config);
     let shopify_config = config.shopify_config.shopify_api_config();
+    let shopify_api = ShopifyApi::new(shopify_config).map_err(|e| {
+        let msg = format!("Failed to create Shopify API: {e}");
+        error!("{msg}");
+        ServerError::InitializeError(msg)
+    })?;
     let srv = HttpServer::new(move || {
         let orders_api = OrderFlowApi::new(db.clone(), producers.clone());
         let auth_api = AuthApi::new(db.clone());
         let jwt_signer = TokenIssuer::new(&config.auth);
         let authority = build_tps_authority(config.auth.clone());
         let accounts_api = AccountApi::new(db.clone());
-        let shopify_api = ShopifyApi::new(shopify_config.clone());
         let wallet_auth = WalletAuthApi::new(db.clone());
         let exchange_rates = ExchangeRateApi::new(db.clone());
         let hmac_middleware = HmacMiddlewareFactory::new(
@@ -119,7 +125,7 @@ pub fn create_server_instance(
             .wrap(Logger::new(LOG_FORMAT).log_target("access_log"))
             .app_data(web::Data::new(orders_api))
             .app_data(web::Data::new(accounts_api))
-            .app_data(web::Data::new(shopify_api))
+            .app_data(web::Data::new(shopify_api.clone()))
             .app_data(web::Data::new(auth_api))
             .app_data(web::Data::new(jwt_signer))
             .app_data(web::Data::new(wallet_auth))
@@ -149,6 +155,8 @@ pub fn create_server_instance(
             .service(UpdatePriceRoute::<SqliteDatabase>::new())
             .service(ReassignOrderRoute::<SqliteDatabase>::new())
             .service(ResetOrderRoute::<SqliteDatabase>::new())
+            .service(GetExchangeRateRoute::<SqliteDatabase>::new())
+            .service(UpdateShopifyExchangeRateRoute::<SqliteDatabase>::new())
             .service(CheckTokenRoute::new());
         let use_x_forwarded_for = config.use_x_forwarded_for;
         let use_forwarded = config.use_forwarded;

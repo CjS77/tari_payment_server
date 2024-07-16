@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use clap::Subcommand;
 use shopify_tools::ExchangeRate;
 use tpg_common::MicroTari;
@@ -81,13 +82,13 @@ pub enum RatesCommand {
     },
 }
 
-fn parse_exchange_rate(s: &str) -> Result<ExchangeRate, String> {
+fn parse_exchange_rate(s: &str) -> Result<ExchangeRate> {
     let parts: Vec<&str> = s.split('=').collect();
     if parts.len() != 2 {
-        return Err("Exchange rate must be in the form 'USD=10'".to_string());
+        return Err(anyhow!("Exchange rate must be in the form 'USD=10'"));
     }
     let base_currency = parts[0].to_string();
-    let rate = parts[1].parse::<i64>().map_err(|e| e.to_string())?;
+    let rate = parts[1].parse::<i64>()?;
     let rate = MicroTari::from_tari(rate);
     Ok(ExchangeRate::new(base_currency, rate))
 }
