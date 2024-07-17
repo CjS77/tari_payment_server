@@ -54,14 +54,13 @@ use crate::{
         PaymentsRoute,
         ReassignOrderRoute,
         ResetOrderRoute,
-        ShopifyWebhookRoute,
         TxConfirmationNotificationRoute,
         UnfulfilledOrdersRoute,
         UpdateOrderMemoRoute,
         UpdatePriceRoute,
         UpdateRolesRoute,
-        UpdateShopifyExchangeRateRoute,
     },
+    shopify_routes::{shopify_on_product_updated, ShopifyWebhookRoute, UpdateShopifyExchangeRateRoute},
 };
 
 /// Defines the log format for the access log middleware.
@@ -172,6 +171,7 @@ pub fn create_server_instance(
             })
             .wrap(hmac_middleware)
             .service(ShopifyWebhookRoute::<SqliteDatabase, SqliteDatabase>::new())
+            .service(shopify_on_product_updated)
             .service(health);
         let wallet_scope = web::scope("/wallet")
             .service(IncomingPaymentNotificationRoute::<SqliteDatabase, SqliteDatabase>::new())

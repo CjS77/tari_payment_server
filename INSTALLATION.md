@@ -117,6 +117,8 @@ as described in the [Enable custom App development](#enable-custom-app-developme
 1. Run `taritools shopify webhooks install "https://{my.tari-payment-server.com}"` to install the required webhooks 
    into your store.
 2. Run `taritools shopify webhooks list` to verify that the webhooks have been installed.
+3. Set the `TPG_SHOPIFY_HMAC_SECRET` environment variable in your server's environment to **the same value** as 
+   `TPG_SHOPIFY_API_SECRET`. Shopify uses _different_ secrets for webhooks defined in the Admin UI and the API.
 
 #### Manually configuring webhooks
 If you don't want to use the CLI utility, or you want to update a webhook configuration, or you broadly want to know 
@@ -127,8 +129,9 @@ what the CLI utility is doing under the hood, you can manually configure the web
 3. On the **Webhooks** page, take not of the signing secret. This is indicated by the text `Your webhooks will be 
    signed with xxxxxxxxxxxxxxxxxxxxx`. This secret must be assigned to the `TPG_SHOPIFY_HMAC_SECRET` environment 
    variable in your server's `.env` file.
-4. Click on the "Create webhook" button.
-5. Configure the following webhooks. For each webhook, the format is `JSON`, and the API version is `2024-04`:
+4. Note that Shopify uses _different_ secrets for webhooks defined in the Admin UI and the API.
+5. Click on the "Create webhook" button.
+6. Configure the following webhooks. For each webhook, the format is `JSON`, and the API version is `2024-04`:
 
 | Event          | URL                                                           |
 |----------------|---------------------------------------------------------------|
