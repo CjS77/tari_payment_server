@@ -18,4 +18,6 @@ pub enum ShopifyApiError {
     GraphQLError(String),
     #[error("Invalid currency amount: {0}")]
     InvalidCurrencyAmount(String),
+    #[error("The request was valid, but returned no data")]
+    EmptyResponse,
 }

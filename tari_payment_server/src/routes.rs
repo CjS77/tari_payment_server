@@ -81,7 +81,7 @@ macro_rules! route {
                         .name(stringify!($name))
                         .guard(actix_web::guard::$method())
                         .to($name)
-                        .wrap(crate::middleware::AclMiddlewareFactory::new(&[$($roles),+]));
+                        .wrap($crate::middleware::AclMiddlewareFactory::new(&[$($roles),+]));
                     actix_web::dev::HttpServiceFactory::register(res, config);
                 }
             }
@@ -127,7 +127,7 @@ macro_rules! route {
                     .name(stringify!($name))
                     .guard(actix_web::guard::$method())
                     .to($name::<A>)
-                    .wrap(crate::middleware::AclMiddlewareFactory::new(&[$($roles),+]));
+                    .wrap($crate::middleware::AclMiddlewareFactory::new(&[$($roles),+]));
                 actix_web::dev::HttpServiceFactory::register(res, config);
             }
         }}

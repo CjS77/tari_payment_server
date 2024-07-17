@@ -27,15 +27,15 @@ pub async fn new_order_from_shopify_order<B: ExchangeRates>(
 ) -> Result<NewOrder, OrderConversionError> {
     trace!("Converting ShopifyOrder to NewOrder: {:?}", value);
     let currency = value.currency.as_str().to_uppercase();
-    let rate = if currency != TARI_CURRENCY_CODE {
+    let rate = if currency == TARI_CURRENCY_CODE {
+        ExchangeRate::default()
+    } else {
         let rate = fx
             .fetch_last_rate(&currency)
             .await
             .map_err(|e| OrderConversionError::UnsupportedCurrency(e.to_string()))?;
         info!("Shopify order is not in Tari. Using a conversion rate of {rate}");
         rate
-    } else {
-        ExchangeRate::default()
     };
     // Net price in cents.
     let total_price =

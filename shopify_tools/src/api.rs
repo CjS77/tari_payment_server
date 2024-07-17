@@ -94,6 +94,9 @@ impl ShopifyApi {
         let costs = result["extensions"]["cost"].clone();
         trace!("GraphQL response: {data}");
         trace!("GraphQL costs: {costs}");
+        if data.is_null() {
+            return Err(ShopifyApiError::EmptyResponse);
+        }
         let result = serde_json::from_value(data).map_err(|e| ShopifyApiError::JsonError(e.to_string()))?;
         Ok(result)
     }
@@ -207,6 +210,24 @@ impl ShopifyApi {
         Ok(result)
     }
 
+    pub async fn fetch_variant(&self, id: u64) -> Result<ProductVariant, ShopifyApiError> {
+        #[derive(Deserialize)]
+        struct ProductVariantResponse {
+            #[serde(rename = "productVariant")]
+            product_variant: Option<ProductVariant>,
+        }
+        let query = format!("query {{productVariant(id: \"gid://shopify/ProductVariant/{id}\") {VARIANT_DEF} }}");
+        let result = self.graphql_query::<ProductVariantResponse>(&query, None).await?;
+        let result = result.product_variant.ok_or(ShopifyApiError::EmptyResponse)?;
+        debug!(
+            "Fetched variant {id}: {} Price: {}. Tari price: {}",
+            result.product.title,
+            result.price,
+            result.metafield.as_ref().map(|p| p.value.as_str()).unwrap_or("None")
+        );
+        Ok(result)
+    }
+
     pub async fn fetch_all_variants(&self) -> Result<Vec<ProductVariant>, ShopifyApiError> {
         const FETCH_COUNT: u64 = 100;
         let mut variants = vec![];
@@ -232,7 +253,7 @@ impl ShopifyApi {
     /// The value of this id can be retrieved from the `ProductVariant` object.
     pub async fn update_tari_price(
         &self,
-        products: Vec<ProductVariant>,
+        products: &[ProductVariant],
         rate: ExchangeRate,
     ) -> Result<Vec<ProductVariant>, ShopifyApiError> {
         let mutation = format!(
@@ -254,7 +275,7 @@ impl ShopifyApi {
                     continue;
                 }
             }
-            let metafield = match product.metafield {
+            let metafield = match &product.metafield {
                 Some(mf) => serde_json::json!({"id": mf.id,"value": tari_price}),
                 None => {
                     serde_json::json!({"namespace": "custom","key": "tari_price","type": "number_integer","value": tari_price})
@@ -279,7 +300,7 @@ impl ShopifyApi {
 
     pub async fn update_all_prices(&self, rate: ExchangeRate) -> Result<Vec<ProductVariant>, ShopifyApiError> {
         let variants = self.fetch_all_variants().await?;
-        self.update_tari_price(variants, rate).await
+        self.update_tari_price(&variants, rate).await
     }
 
     pub async fn fetch_webhooks(&self) -> Result<Vec<Webhook>, ShopifyApiError> {

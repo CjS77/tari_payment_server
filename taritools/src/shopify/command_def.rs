@@ -39,7 +39,7 @@ pub enum OrdersCommand {
         #[arg(required = true, index = 1)]
         id: u64,
     },
-    /// Cacnel the order with the given ID
+    /// Cancel the order with the given ID
     Cancel {
         #[arg(required = true, index = 1)]
         id: u64,
@@ -68,6 +68,11 @@ pub enum ProductsCommand {
         #[arg(required = true, index = 1)]
         /// The exchange rates to use for updating the prices in microTari per cent of the base currency
         microtari_per_cent: i64,
+    },
+    /// Retrieves product information for the given product variant ID
+    Get {
+        #[arg(required = true, index = 1)]
+        id: u64,
     },
 }
 

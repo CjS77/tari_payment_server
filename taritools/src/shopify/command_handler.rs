@@ -1,5 +1,5 @@
 use log::info;
-use shopify_tools::{data_objects::Webhook, ExchangeRate, ShopifyApi, ShopifyConfig};
+use shopify_tools::{data_objects::Webhook, ExchangeRate, ShopifyApi, ShopifyApiError, ShopifyConfig};
 
 use crate::shopify::{
     command_def::{ProductsCommand, RatesCommand, WebhooksCommand},
@@ -25,6 +25,7 @@ pub async fn handle_shopify_command(command: ShopifyCommand) {
         Products(products_cmd) => match products_cmd {
             ProductsCommand::All => fetch_all_variants().await,
             ProductsCommand::UpdatePrice { microtari_per_cent } => update_prices(microtari_per_cent).await,
+            ProductsCommand::Get { id } => get_variant(id).await,
         },
         Webhooks(cmd) => match cmd {
             WebhooksCommand::Install { server_url } => install_webhooks(server_url).await,
@@ -119,6 +120,22 @@ pub async fn fetch_all_variants() {
         },
         Err(e) => {
             eprintln!("Error fetching variants: {e}");
+        },
+    }
+}
+
+pub async fn get_variant(id: u64) {
+    let api = new_shopify_api();
+    match api.fetch_variant(id).await {
+        Ok(variant) => {
+            let json = serde_json::to_string_pretty(&variant).unwrap();
+            println!("Variant #{id}\n{json}");
+        },
+        Err(ShopifyApiError::EmptyResponse) => {
+            println!("Variant #{id} not found");
+        },
+        Err(e) => {
+            eprintln!("Error fetching variant #{id}: {e}");
         },
     }
 }
