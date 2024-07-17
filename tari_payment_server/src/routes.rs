@@ -21,18 +21,16 @@
 //!         tokio::time::sleep(Duration::from_secs(5)).await; // <-- Ok. Worker thread will handle other requests here
 //!     }
 //! ```
-use std::{marker::PhantomData, str::FromStr};
+use std::str::FromStr;
 
 use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
 use log::*;
-use paste::paste;
-use shopify_tools::{data_objects::ExchangeRate as ShopifyExchangeRate, ShopifyApi, ShopifyOrder};
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
     db_types::{CreditNote, OrderId, OrderStatusType, Role, SerializedTariAddress},
     helpers::MemoSignature,
     order_objects::{OrderQueryFilter, OrderResult},
-    tpe_api::{account_objects::FullAccount, exchange_objects::ExchangeRate, exchange_rate_api::ExchangeRateApi},
+    tpe_api::{account_objects::FullAccount, exchange_rate_api::ExchangeRateApi},
     traits::{
         AccountManagement,
         AuthManagement,
@@ -46,14 +44,12 @@ use tari_payment_engine::{
     OrderFlowApi,
     WalletAuthApi,
 };
-use tpg_common::MicroTari;
 
 use crate::{
     auth::{check_login_token_signature, JwtClaims, TokenIssuer},
     config::ProxyConfig,
     data_objects::{
         ExchangeRateResult,
-        ExchangeRateUpdate,
         JsonResponse,
         ModifyOrderParams,
         MoveOrderParams,
@@ -65,20 +61,20 @@ use crate::{
     },
     errors::ServerError,
     helpers::get_remote_ip,
-    integrations::shopify::{new_order_from_shopify_order, OrderConversionError},
 };
 
 // Web-actix cannot handle generics in handlers, so it's implemented manually using the `route!` macro
+#[macro_export]
 macro_rules! route {
     ($name:ident => $method:ident $path:literal requires [$($roles:ty),*]) => {
-        paste! { pub struct [<$name:camel Route>];}
-        paste! {
+        paste::paste! { pub struct [<$name:camel Route>];}
+        paste::paste! {
                 impl [<$name:camel Route>] {
                 #[allow(clippy::new_without_default)]
                 pub fn new() -> Self { Self }
             }
         }
-        paste! {
+        paste::paste! {
             impl actix_web::dev::HttpServiceFactory for [<$name:camel Route>] {
                 fn register(self, config: &mut actix_web::dev::AppService) {
                     let res = actix_web::Resource::new($path)
@@ -93,14 +89,14 @@ macro_rules! route {
     };
 
     ($name:ident => $method:ident $path:literal impl $($bounds:ty),+) => {
-        paste! { pub struct [<$name:camel Route>]< $( [< T $bounds:camel> ],)+ >( $( PhantomData<fn() -> [< T $bounds:camel> ] >,)+ );}
-        paste! { impl< $( [< T $bounds:camel> ],)+ > [<$name:camel Route>]< $( [< T $bounds:camel> ],)+ > {
+        paste::paste! { pub struct [<$name:camel Route>]< $( [< T $bounds:camel> ],)+ >( $( core::marker::PhantomData<fn() -> [< T $bounds:camel> ] >,)+ );}
+        paste::paste! { impl< $( [< T $bounds:camel> ],)+ > [<$name:camel Route>]< $( [< T $bounds:camel> ],)+ > {
             #[allow(clippy::new_without_default)]
             pub fn new() -> Self {
-                Self($( PhantomData::<fn() -> [< T $bounds:camel> ] >,)+)
+                Self($( core::marker::PhantomData::<fn() -> [< T $bounds:camel> ] >,)+)
             }
         }}
-        paste! { impl<$( [< T $bounds:camel >] , )+> actix_web::dev::HttpServiceFactory for [<$name:camel Route>]<$([<T $bounds:camel>],)+>
+        paste::paste! { impl<$( [< T $bounds:camel >] , )+> actix_web::dev::HttpServiceFactory for [<$name:camel Route>]<$([<T $bounds:camel>],)+>
         where
             $([<T $bounds:camel>]: $bounds + 'static,)+
         {
@@ -115,14 +111,14 @@ macro_rules! route {
     };
 
     ($name:ident => $method:ident $path:literal impl $($bounds:ty),+ where requires [$($roles:ty),*])  => {
-        paste! { pub struct [<$name:camel Route>]<A>(PhantomData<fn() -> A>);}
-        paste! { impl<A> [<$name:camel Route>]<A> {
+        paste::paste! { pub struct [<$name:camel Route>]<A>(core::marker::PhantomData<fn() -> A>);}
+        paste::paste! { impl<A> [<$name:camel Route>]<A> {
             #[allow(clippy::new_without_default)]
             pub fn new() -> Self {
-                Self(PhantomData::<fn() -> A>)
+                Self(core::marker::PhantomData::<fn() -> A>)
             }
         }}
-        paste! { impl<A> actix_web::dev::HttpServiceFactory for [<$name:camel Route>]<A>
+        paste::paste! { impl<A> actix_web::dev::HttpServiceFactory for [<$name:camel Route>]<A>
         where
             A: $($bounds)++ 'static,
         {
@@ -699,60 +695,6 @@ pub async fn reset_order<B: PaymentGatewayDatabase>(
     Ok(HttpResponse::Ok().json(updated_order))
 }
 
-//----------------------------------------------   Checkout  ----------------------------------------------------
-
-route!(shopify_webhook => Post "webhook/checkout_create" impl PaymentGatewayDatabase, ExchangeRates);
-pub async fn shopify_webhook<BPay, BFx>(
-    req: HttpRequest,
-    body: web::Json<ShopifyOrder>,
-    api: web::Data<OrderFlowApi<BPay>>,
-    fx: web::Data<ExchangeRateApi<BFx>>,
-) -> HttpResponse
-where
-    BPay: PaymentGatewayDatabase,
-    BFx: ExchangeRates,
-{
-    trace!("💻️ Received webhook request: {}", req.uri());
-    let order = body.into_inner();
-    // Webhook responses must always be in 200 range, otherwise Shopify will retry
-    let result = match new_order_from_shopify_order(order, &fx).await {
-        Err(OrderConversionError::FormatError(s)) => {
-            warn!("💻️ Could not convert order. {s}");
-            JsonResponse::failure(s)
-        },
-        Err(OrderConversionError::InvalidMemoSignature(e)) => {
-            warn!("💻️ Could not verify memo signature. {e}");
-            JsonResponse::failure(e)
-        },
-        Err(OrderConversionError::UnsupportedCurrency(cur)) => {
-            info!("💻️ Unsupported currency in incoming order. {cur}");
-            JsonResponse::failure(format!("Unsupported currency: {cur}"))
-        },
-        Ok(new_order) => match api.process_new_order(new_order.clone()).await {
-            Ok(orders) => {
-                info!("💻️ Order {} processed successfully.", new_order.order_id);
-                let ids = orders.iter().map(|o| o.order_id.as_str()).collect::<Vec<_>>().join(", ");
-                info!("💻️ {} orders were paid. {}", orders.len(), ids);
-                JsonResponse::success("Order processed successfully.")
-            },
-            Err(PaymentGatewayError::DatabaseError(e)) => {
-                warn!("💻️ Could not process order {}. {e}", new_order.order_id);
-                debug!("💻️ Failed order: {new_order}");
-                JsonResponse::failure(e)
-            },
-            Err(PaymentGatewayError::OrderAlreadyExists(id)) => {
-                info!("💻️ Order {} already exists with id {id}.", new_order.order_id);
-                JsonResponse::success("Order already exists.")
-            },
-            Err(e) => {
-                warn!("💻️ Unexpected error while handling incoming order notification. {e}");
-                JsonResponse::failure("Unexpected error handling order.")
-            },
-        },
-    };
-    HttpResponse::Ok().json(result)
-}
-
 //------------------------------------------   Incoming payments  ---------------------------------------------
 route!(incoming_payment_notification => Post "/incoming_payment" impl PaymentGatewayDatabase, WalletAuth );
 pub async fn incoming_payment_notification<BOrder, BAuth>(
@@ -891,20 +833,6 @@ pub async fn check_token(claims: JwtClaims) -> Result<HttpResponse, ServerError>
 }
 
 //----------------------------------------------   Exchange rates  ----------------------------------------------------
-route!(update_shopify_exchange_rate => Post "/exchange_rate" impl ExchangeRates where requires [Role::Write]);
-pub async fn update_shopify_exchange_rate<B: ExchangeRates>(
-    body: web::Json<ExchangeRateUpdate>,
-    api: web::Data<ExchangeRateApi<B>>,
-    shopify_api: web::Data<ShopifyApi>,
-) -> Result<HttpResponse, ServerError> {
-    let update = body.into_inner();
-    debug!("💻️ POST update exchange rate for {} to {}", update.currency, MicroTari::from(update.rate as i64));
-    update_local_exchange_rate(update.clone(), api.as_ref()).await?;
-    debug!("💻️ Tari price has been updated in the database.");
-    update_shopify_exchange_rate_for(&update, shopify_api.as_ref()).await?;
-    Ok(HttpResponse::Ok().finish())
-}
-
 route!(get_exchange_rate => Get "/exchange_rate/{currency}" impl ExchangeRates where requires [Role::ReadAll]);
 pub async fn get_exchange_rate<B: ExchangeRates>(
     currency: web::Path<String>,
@@ -917,34 +845,4 @@ pub async fn get_exchange_rate<B: ExchangeRates>(
     })?;
     let rate = ExchangeRateResult::from(rate);
     Ok(HttpResponse::Ok().json(rate))
-}
-
-async fn update_local_exchange_rate<B: ExchangeRates>(
-    update: ExchangeRateUpdate,
-    api: &ExchangeRateApi<B>,
-) -> Result<(), ServerError> {
-    let rate = ExchangeRate::from(update);
-    debug!("💻️ POST update exchange rate for {rate}");
-    api.set_exchange_rate(&rate).await.map_err(|e| {
-        debug!("💻️ Could not update exchange rate. {e}");
-        ServerError::BackendError(e.to_string())
-    })
-}
-
-async fn update_shopify_exchange_rate_for(
-    update: &ExchangeRateUpdate,
-    shopify_api: &ShopifyApi,
-) -> Result<(), ServerError> {
-    let rate = ShopifyExchangeRate::new(update.currency.to_string(), MicroTari::from(update.rate as i64));
-    debug!("💻️ Updating prices on Shopify storefront 1 {} = {}", rate.base_currency, rate.rate);
-    match shopify_api.update_all_prices(rate).await {
-        Ok(v) => {
-            info!("💻️ {} variant prices updated on shopify storefront.", v.len());
-            Ok(())
-        },
-        Err(e) => {
-            error!("💻️ Could not update variant prices on Shopify. {e}");
-            Err(ServerError::BackendError(e.to_string()))
-        },
-    }
 }

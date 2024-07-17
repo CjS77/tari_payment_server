@@ -61,6 +61,7 @@ pub mod middleware;
 
 pub mod routes;
 pub mod server;
+pub mod shopify_routes;
 
 pub mod integrations;
 
