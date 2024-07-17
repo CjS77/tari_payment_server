@@ -72,8 +72,6 @@ const LOG_FORMAT: &str = concat!(
     "\"%r\" ",                               // First line of request
     "%s ",                                   // Response status code
     "ua:\"%{User-Agent}i\" ",                // User agent
-    "auth:\"%{tpg_auth_token}i\" ",          // Authentication token
-    "access:\"%{tpg_access_token}i\" ",      // Access token
     "%D ms",                                 // Time taken to serve the request in milliseconds
 );
 
