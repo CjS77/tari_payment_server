@@ -71,7 +71,7 @@ impl TryFrom<u64> for MicroTari {
 impl Display for MicroTari {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.0 < 10_000 {
-            return write!(f, "{}μτ", self.0);
+            write!(f, "{}μτ", self.0)
         } else {
             let tari = self.0 as f64 / 1_000_000.0;
             write!(f, "{tari:0.3}τ")
