@@ -4,6 +4,7 @@
 -- total_price = 8
 -- currency = 16
 -- status = 32
+-- original_price = 64
 
 CREATE TABLE orders_log
 (
@@ -18,6 +19,8 @@ CREATE TABLE orders_log
     new_memo        TEXT,
     old_total_price INTEGER,
     new_total_price INTEGER,
+    old_original_price TEXT,
+    new_original_price TEXT,
     old_currency    TEXT,
     new_currency    TEXT,
     old_status      TEXT,
@@ -44,6 +47,8 @@ BEGIN
                             new_memo,
                             old_total_price,
                             new_total_price,
+                            old_original_price,
+                            new_original_price,
                             old_currency,
                             new_currency,
                             old_status,
@@ -55,7 +60,8 @@ BEGIN
             iif(OLD.memo != NEW.memo, 4, 0) +
             iif(OLD.total_price != NEW.total_price, 8, 0) +
             iif(OLD.currency != NEW.currency, 16, 0) +
-            iif(OLD.status != NEW.status, 32, 0),
+            iif(OLD.status != NEW.status, 32, 0) +
+            iif(OLD.original_price != NEW.original_price, 64, 0),
             nullif(OLD.order_id, NEW.order_id),
             nullif(NEW.order_id, OLD.order_id),
             nullif(OLD.customer_id, NEW.customer_id),
@@ -64,6 +70,8 @@ BEGIN
             nullif(NEW.memo, OLD.memo),
             nullif(OLD.total_price, NEW.total_price),
             nullif(NEW.total_price, OLD.total_price),
+            nullif(OLD.original_price, NEW.original_price),
+            nullif(NEW.original_price, OLD.original_price),
             nullif(OLD.currency, NEW.currency),
             nullif(NEW.currency, OLD.currency),
             nullif(OLD.status, NEW.status),
