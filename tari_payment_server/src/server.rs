@@ -28,6 +28,7 @@ use crate::{
     errors::{AuthError, ServerError, ServerError::AuthenticationError},
     expiry_worker::start_expiry_worker,
     helpers::get_remote_ip,
+    integrations::shopify::create_shopify_event_handlers,
     middleware::HmacMiddlewareFactory,
     routes::{
         health,
@@ -81,7 +82,13 @@ pub async fn run_server(config: ServerConfig) -> Result<(), ServerError> {
         .map_err(|e| ServerError::InitializeError(e.to_string()))?;
     let hooks = EventHooks::default();
     let handlers = EventHandlers::new(128, hooks);
-    let producers = handlers.producers();
+    let mut producers = handlers.producers();
+    // Shopify is the only supported integration at the moment. In future, this would be conditional code based on a
+    // configuration file.
+    let shopify_config = config.shopify_config.shopify_api_config();
+    let shopify_handlers = create_shopify_event_handlers(shopify_config)
+        .map_err(|e| ServerError::InitializeError(format!("Failed to create Shopify event handlers: {e}")))?;
+    shopify_handlers.subscribe_to_producers(&mut producers);
     let srv = create_server_instance(config.clone(), db.clone(), producers.clone())?;
     // Start the event handlers
     tokio::spawn(async move {

@@ -83,7 +83,7 @@ pub const SHOPIFY_EVENT_BUFFER_SIZE: usize = 25;
 /// 2. OrderAnnulledEvent - If an order is cancelled or expires, we send a REST request to the Shopify API to mark the
 /// order as cancelled. If an order is expired from the Shopify Admin UI, then this REST call will be spurious, but no
 /// harm will be done.
-pub fn assign_event_handlers(config: ShopifyApiConfig) -> Result<EventHandlers, ShopifyApiError> {
+pub fn create_shopify_event_handlers(config: ShopifyApiConfig) -> Result<EventHandlers, ShopifyApiError> {
     let mut hooks = EventHooks::default();
     let api = ShopifyApi::new(config)?;
     let api_clone = api.clone();
