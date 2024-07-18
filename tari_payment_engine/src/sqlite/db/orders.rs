@@ -30,6 +30,7 @@ async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<i6
                 customer_id,
                 memo,
                 total_price,
+                original_price,
                 currency,
                 created_at
             ) VALUES ($1, $2, $3, $4, $5, $6)
@@ -40,6 +41,7 @@ async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<i6
     .bind(order.customer_id)
     .bind(order.memo)
     .bind(order.total_price.value())
+    .bind(order.original_price)
     .bind(order.currency)
     .bind(order.created_at)
     .fetch_one(conn)
@@ -63,6 +65,7 @@ pub async fn fetch_order_by_order_id(
                 customer_id,
                 memo,
                 total_price,
+                original_price,
                 currency,
                 created_at as "created_at: chrono::DateTime<chrono::Utc>",
                 updated_at as "updated_at: chrono::DateTime<chrono::Utc>",

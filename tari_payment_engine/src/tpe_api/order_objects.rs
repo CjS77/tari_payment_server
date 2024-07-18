@@ -151,6 +151,7 @@ pub struct ModifyOrderRequest {
     pub new_customer_id: Option<String>,
     pub new_memo: Option<String>,
     pub new_total_price: Option<MicroTari>,
+    pub new_original_price: Option<String>,
     pub new_currency: Option<String>,
     pub new_status: Option<OrderStatusType>,
 }
@@ -171,6 +172,11 @@ impl ModifyOrderRequest {
         self
     }
 
+    pub fn with_new_original_price<S: Into<String>>(mut self, new_original_price: S) -> Self {
+        self.new_original_price = Some(new_original_price.into());
+        self
+    }
+
     pub fn with_new_currency<S: Into<String>>(mut self, new_currency: S) -> Self {
         self.new_currency = Some(new_currency.into());
         self
@@ -184,6 +190,7 @@ impl ModifyOrderRequest {
     pub fn is_empty(&self) -> bool {
         self.new_customer_id.is_none() &&
             self.new_total_price.is_none() &&
+            self.new_original_price.is_none() &&
             self.new_currency.is_none() &&
             self.new_status.is_none() &&
             self.new_memo.is_none()

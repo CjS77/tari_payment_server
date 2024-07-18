@@ -59,8 +59,9 @@ impl EventHandlers {
         }
     }
 
-    pub fn producers(&self) -> EventProducers {
-        let mut producers = EventProducers::default();
+    /// Adds the event handlers to an existing [`EventProducers`] instance. This is useful when you want to add
+    /// different subscriber types (e.g. email subscribers, and storefront subscribers) to the same server.
+    pub fn subscribe_to_producers(&self, producers: &mut EventProducers) {
         if let Some(handler) = &self.on_order_paid {
             producers.order_paid_producer.push(handler.subscribe());
         }
@@ -82,6 +83,11 @@ impl EventHandlers {
         if let Some(handler) = &self.on_payment_confirmed {
             producers.payment_confirmed_producer.push(handler.subscribe());
         }
+    }
+
+    pub fn producers(&self) -> EventProducers {
+        let mut producers = EventProducers::default();
+        self.subscribe_to_producers(&mut producers);
         producers
     }
 
