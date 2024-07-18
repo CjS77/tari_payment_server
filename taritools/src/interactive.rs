@@ -44,6 +44,7 @@ fn handle_response<T: Display>(res: Result<T>) {
 
 async fn set_tari_price(client: &mut PaymentServerClient) -> Result<()> {
     let rate = dialoguer::Input::<f64>::new().with_prompt("Enter Tari price (per USD)").interact()?;
+    #[allow(clippy::cast_possible_truncation)]
     let price = MicroTari::from((rate * 1e6) as i64);
     if !Confirm::new().with_prompt(format!("Set Tari price to {price}?")).interact()? {
         return Err(anyhow::anyhow!("Cancelled"));
@@ -78,11 +79,10 @@ async fn set_tari_price(client: &mut PaymentServerClient) -> Result<()> {
 fn select_profile(theme: &ColorfulTheme) -> Result<Profile> {
     let user_data = read_config()?;
     let options = user_data.profiles.iter().map(|p| format!("{} ({})", p.name, p.server)).collect::<Vec<String>>();
-    let profile =
-        FuzzySelect::with_theme(theme).with_prompt("Select profile").items(&options).interact().and_then(|i| {
-            let profile = &user_data.profiles[i];
-            Ok(profile.clone())
-        })?;
+    let profile = FuzzySelect::with_theme(theme).with_prompt("Select profile").items(&options).interact().map(|i| {
+        let profile = &user_data.profiles[i];
+        profile.clone()
+    })?;
     Ok(profile)
 }
 

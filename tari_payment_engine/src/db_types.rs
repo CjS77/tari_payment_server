@@ -238,6 +238,7 @@ pub struct Order {
     pub customer_id: String,
     pub memo: Option<String>,
     pub total_price: MicroTari,
+    pub original_price: Option<String>,
     pub currency: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -278,6 +279,8 @@ pub struct NewOrder {
     pub address: Option<TariAddress>,
     /// The total price of the order
     pub total_price: MicroTari,
+    /// The original price of the order, in `currency` units
+    pub original_price: Option<String>,
     /// The currency of the order
     pub currency: String,
     /// The time the order was created on Shopify
@@ -291,6 +294,7 @@ impl NewOrder {
             customer_id,
             memo: None,
             total_price,
+            original_price: None,
             currency: "XTR".to_string(),
             created_at: Utc::now(),
             address: None,

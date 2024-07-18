@@ -4,6 +4,9 @@ CREATE TABLE orders (
     customer_id TEXT NOT NULL,
     memo TEXT,
     total_price INTEGER NOT NULL,
+    -- The price of the order in the storefront currency. Optional.
+    original_price TEXT,
+    -- The currency of the order in the store
     currency TEXT NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at   DATETIME NOT NULL  DEFAULT CURRENT_TIMESTAMP,

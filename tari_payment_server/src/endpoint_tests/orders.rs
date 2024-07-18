@@ -100,6 +100,7 @@ fn orders_response() -> Vec<Order> {
             customer_id: "1".to_string(),
             memo: None,
             total_price: MicroTari::from(100),
+            original_price: None,
             currency: "XTR".to_string(),
             created_at: Utc.with_ymd_and_hms(2024, 2, 29, 13, 30, 0).unwrap(),
             updated_at: Utc.with_ymd_and_hms(2024, 2, 29, 13, 30, 0).unwrap(),
@@ -111,6 +112,7 @@ fn orders_response() -> Vec<Order> {
             customer_id: "1".to_string(),
             memo: None,
             total_price: MicroTari::from(150),
+            original_price: None,
             currency: "XTR".to_string(),
             created_at: Utc.with_ymd_and_hms(2024, 3, 15, 18, 30, 0).unwrap(),
             updated_at: Utc.with_ymd_and_hms(2024, 3, 16, 11, 20, 0).unwrap(),
@@ -119,4 +121,4 @@ fn orders_response() -> Vec<Order> {
     ]
 }
 
-const ORDERS_JSON: &str = r#"{"address":"b4db54f75421a02b0d0056fb7203df23c742b25e41283976bdaa7fe63de1ad234d","total_orders":0,"orders":[{"id":0,"order_id":"0000001","customer_id":"1","memo":null,"total_price":100,"currency":"XTR","created_at":"2024-02-29T13:30:00Z","updated_at":"2024-02-29T13:30:00Z","status":"Paid"},{"id":1,"order_id":"0000002","customer_id":"1","memo":null,"total_price":150,"currency":"XTR","created_at":"2024-03-15T18:30:00Z","updated_at":"2024-03-16T11:20:00Z","status":"Cancelled"}]}"#;
+const ORDERS_JSON: &str = r#"{"address":"b4db54f75421a02b0d0056fb7203df23c742b25e41283976bdaa7fe63de1ad234d","total_orders":0,"orders":[{"id":0,"order_id":"0000001","customer_id":"1","memo":null,"total_price":100,"original_price":null,"currency":"XTR","created_at":"2024-02-29T13:30:00Z","updated_at":"2024-02-29T13:30:00Z","status":"Paid"},{"id":1,"order_id":"0000002","customer_id":"1","memo":null,"total_price":150,"original_price":null,"currency":"XTR","created_at":"2024-03-15T18:30:00Z","updated_at":"2024-03-16T11:20:00Z","status":"Cancelled"}]}"#;

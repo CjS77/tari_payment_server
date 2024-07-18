@@ -151,7 +151,9 @@ pub async fn update_shopify_exchange_rate<B: ExchangeRates>(
     shopify_api: web::Data<ShopifyApi>,
 ) -> Result<HttpResponse, ServerError> {
     let update = body.into_inner();
-    debug!("🛍️️  POST update exchange rate for {} to {}", update.currency, MicroTari::from(update.rate as i64));
+    #[allow(clippy::cast_possible_wrap)]
+    let amt = MicroTari::from(update.rate as i64);
+    debug!("🛍️️  POST update exchange rate for {} to {amt}", update.currency);
     update_local_exchange_rate(update.clone(), api.as_ref()).await?;
     debug!("🛍️️  Tari price has been updated in the database.");
     update_shopify_exchange_rate_for(&update, shopify_api.as_ref()).await?;

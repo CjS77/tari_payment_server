@@ -27,6 +27,7 @@ fn seed_orders() -> [NewOrder; 5] {
             memo: Some("Manually inserted by Keith".into()),
             address: "b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d".parse().ok(),
             total_price: MicroTari::from_tari(100),
+            original_price: None,
             created_at: Utc.with_ymd_and_hms(2024, 3, 10, 15, 0, 0).unwrap(),
         },
         NewOrder {
@@ -36,6 +37,7 @@ fn seed_orders() -> [NewOrder; 5] {
             memo: Some("Manually inserted by Charlie".into()),
             address: "680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b".parse().ok(),
             total_price: MicroTari::from_tari(200),
+            original_price: None,
             created_at: Utc.with_ymd_and_hms(2024, 3, 10, 15, 30, 0).unwrap(),
         },
         NewOrder {
@@ -45,6 +47,7 @@ fn seed_orders() -> [NewOrder; 5] {
             memo: Some("Manually inserted by Sam".into()),
             address: "b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d".parse().ok(),
             total_price: MicroTari::from_tari(65),
+            original_price: None,
             created_at: Utc.with_ymd_and_hms(2024, 3, 11, 16, 0, 0).unwrap(),
         },
         NewOrder {
@@ -54,6 +57,7 @@ fn seed_orders() -> [NewOrder; 5] {
             memo: Some("Manually inserted by Ray".into()),
             address: "680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b".parse().ok(),
             total_price: MicroTari::from_tari(350),
+            original_price: None,
             created_at: Utc.with_ymd_and_hms(2024, 3, 11, 17, 0, 0).unwrap(),
         },
         NewOrder {
@@ -63,6 +67,7 @@ fn seed_orders() -> [NewOrder; 5] {
             memo: Some("Manually inserted by Charlie".into()),
             address: "aa3c076152c1ae44ae86585eeba1d348badb845d1cab5ef12db98fafb4fea55d6c".parse().ok(),
             total_price: MicroTari::from_tari(25),
+            original_price: None,
             created_at: Utc.with_ymd_and_hms(2024, 3, 12, 18, 0, 0).unwrap(),
         },
     ]

@@ -41,7 +41,7 @@ pub fn get_config_path() -> io::Result<PathBuf> {
     let home = home_dir().ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Home directory not found"))?;
     let config_dir = home.join(".taritools");
     if !config_dir.exists() {
-        fs::create_dir(&config_dir)?;
+        fs::create_dir_all(&config_dir)?;
         set_permissions(&config_dir, 0o700)?;
     }
     let config_file = config_dir.join("config.toml");
@@ -60,10 +60,10 @@ fn set_permissions(config_dir: &PathBuf, perms: u32) -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let metadata = fs::metadata(&config_dir)?;
+        let metadata = fs::metadata(config_dir)?;
         let mut permissions = metadata.permissions();
         permissions.set_mode(perms); // Sets directory to only be accessible by the owner
-        fs::set_permissions(&config_dir, permissions)?;
+        fs::set_permissions(config_dir, permissions)?;
     }
     Ok(())
 }
@@ -74,12 +74,4 @@ pub fn read_config() -> io::Result<UserData> {
     let config: UserData =
         toml::from_str(&config_str).map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))?;
     Ok(config)
-}
-
-pub fn write_config(config: &Profile) -> io::Result<()> {
-    let config_path = get_config_path()?;
-    let config_str = toml::to_string(config).map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))?;
-    fs::write(&config_path, config_str)?;
-    set_permissions(&config_path, 0o600)?;
-    Ok(())
 }

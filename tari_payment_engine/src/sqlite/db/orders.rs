@@ -30,9 +30,10 @@ async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<i6
                 customer_id,
                 memo,
                 total_price,
+                original_price,
                 currency,
                 created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING id;
         "#,
     )
@@ -40,6 +41,7 @@ async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<i6
     .bind(order.customer_id)
     .bind(order.memo)
     .bind(order.total_price.value())
+    .bind(order.original_price)
     .bind(order.currency)
     .bind(order.created_at)
     .fetch_one(conn)
@@ -63,6 +65,7 @@ pub async fn fetch_order_by_order_id(
                 customer_id,
                 memo,
                 total_price,
+                original_price,
                 currency,
                 created_at as "created_at: chrono::DateTime<chrono::Utc>",
                 updated_at as "updated_at: chrono::DateTime<chrono::Utc>",
@@ -96,7 +99,8 @@ pub async fn order_exists(order_id: &OrderId, conn: &mut SqliteConnection) -> Re
 pub async fn search_orders(query: OrderQueryFilter, conn: &mut SqliteConnection) -> Result<Vec<Order>, sqlx::Error> {
     let mut builder = QueryBuilder::new(
         r#"
-    SELECT id, order_id, customer_id, memo, total_price, currency, created_at, updated_at, status FROM orders
+    SELECT id, order_id, customer_id, memo, total_price, original_price, currency, created_at, updated_at, status
+    FROM orders
     "#,
     );
     if !query.is_empty() {
@@ -186,6 +190,10 @@ pub(crate) async fn update_order(
     if let Some(total_price) = update.new_total_price {
         set_clause.push("total_price = ");
         set_clause.push_bind_unseparated(total_price);
+    }
+    if let Some(original_price) = update.new_original_price {
+        set_clause.push("original_price = ");
+        set_clause.push_bind_unseparated(original_price);
     }
     if let Some(currency) = update.new_currency {
         set_clause.push("currency = ");

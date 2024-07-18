@@ -13,7 +13,7 @@ use futures::{future::ok, FutureExt};
 use log::*;
 use shopify_tools::ShopifyApi;
 use tari_payment_engine::{
-    events::{EventHandlers, EventHooks, EventProducers},
+    events::EventProducers,
     tpe_api::exchange_rate_api::ExchangeRateApi,
     AccountApi,
     AuthApi,
@@ -28,6 +28,7 @@ use crate::{
     errors::{AuthError, ServerError, ServerError::AuthenticationError},
     expiry_worker::start_expiry_worker,
     helpers::get_remote_ip,
+    integrations::shopify::create_shopify_event_handlers,
     middleware::HmacMiddlewareFactory,
     routes::{
         health,
@@ -79,13 +80,18 @@ pub async fn run_server(config: ServerConfig) -> Result<(), ServerError> {
     let db = SqliteDatabase::new_with_url(&config.database_url, 25)
         .await
         .map_err(|e| ServerError::InitializeError(e.to_string()))?;
-    let hooks = EventHooks::default();
-    let handlers = EventHandlers::new(128, hooks);
-    let producers = handlers.producers();
+    // Shopify is the only supported integration at the moment. In future, this would be conditional code based on a
+    // configuration file.
+    info!("🚦️ Configuring Shopify event handlers...");
+    let shopify_config = config.shopify_config.shopify_api_config();
+    let shopify_handlers = create_shopify_event_handlers(shopify_config)
+        .map_err(|e| ServerError::InitializeError(format!("Failed to create Shopify event handlers: {e}")))?;
+    let producers = shopify_handlers.producers();
     let srv = create_server_instance(config.clone(), db.clone(), producers.clone())?;
     // Start the event handlers
     tokio::spawn(async move {
-        handlers.start_handlers().await;
+        info!("🚦️ Starting shopify event handlers...");
+        shopify_handlers.start_handlers().await;
     });
     let _never_ends =
         start_expiry_worker(db.clone(), producers.clone(), config.unclaimed_order_timeout, config.unpaid_order_timeout);

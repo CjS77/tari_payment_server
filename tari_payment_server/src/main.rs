@@ -62,14 +62,14 @@ fn preflight_check(config: &ServerConfig) -> bool {
         error!("🚦️ TPG_DATABASE_URL is not set. Please set it to the URL for the TPG database.");
         return false;
     }
-    if !result {
+    if result {
+        info!("🚦️ Preflight check PASSED.");
+    } else {
         error!("🚦️ Preflight check FAILED: Please fix the issues above before starting the server.");
         info!(
             "🚦️ If you really know what you're doing and want to skip the preflight check, set `TPG_SKIP_PREFLIGHT` \
              to `Yes` in your environment variables"
         );
-    } else {
-        info!("🚦️ Preflight check PASSED.");
     }
     result
 }
