@@ -1,0 +1,140 @@
+{% assign grid_results = true %}
+
+<div data-section-id="{{ section.id }}" data-section-type="search-template">
+  <div class="grid">
+    <div class="grid-item">
+
+      <hr class="hr--clear hr--small">
+
+      {% if search.performed %}
+
+        {% paginate search.results by 20 %}
+
+          {% if search.results_count == 0 %}
+
+            <h1 class="h2 text-center">{{ 'general.search.no_results_html' | t: terms: search.terms }}</h1>
+            {% include 'search-bar' %}
+
+          {% else %}
+
+            <h1 class="h2 text-center">{{ 'general.search.results_for_html' | t: terms: search.terms }}</h1>
+            {% include 'search-bar' %}
+            <hr class="hr--clear">
+
+            {% if grid_results == false %}
+
+              {% for item in search.results %}
+                {% include 'search-result' %}
+              {% endfor %}
+
+            {% else %}
+
+              <div class="grid-uniform">
+                {% for item in search.results %}
+                  {% assign grid_item_width = 'large--one-fifth medium--one-third small--one-half' %}
+                  {% include 'search-result-grid' %}
+                {% endfor %}
+              </div>
+
+            {% endif %}
+
+          {% endif %}
+
+          {% if paginate.pages > 1 %}
+            <div class="text-center">
+              {% include 'pagination-custom' %}
+            </div>
+          {% endif %}
+
+        {% endpaginate %}
+
+      {% else %}
+
+        {% comment %}
+          If search.performed is false, someone either accessed the page without the q parameter, or it was blank.
+        {% endcomment %}
+        <h1 class="text-center h2">{{ 'general.search.title' | t }}</h1>
+        {% include 'search-bar' %}
+
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": {
+    "da": "Søg",
+    "de": "Suchen",
+    "en": "Search",
+    "es": "Buscar",
+    "fi": "Hae",
+    "fr": "Rechercher",
+    "hi": "खोजें",
+    "it": "Cerca",
+    "ja": "検索",
+    "ko": "검색",
+    "nb": "Søk",
+    "nl": "Zoeken",
+    "pt-BR": "Pesquisar",
+    "pt-PT": "Pesquisar",
+    "sv": "Sök",
+    "th": "ค้นหา",
+    "zh-CN": "搜索",
+    "zh-TW": "搜尋"
+  },
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "product_show_compare_at_price",
+      "label": {
+        "da": "Vis sammenligningspris",
+        "de": "Vergleichspreis anzeigen",
+        "en": "Show compare at price",
+        "es": "Mostrar precio de comparación",
+        "fi": "Näytä hintavertailu",
+        "fr": "Afficher le prix de comparaison",
+        "hi": "मूल्य पर तुलना दिखाएं",
+        "it": "Mostra Prezzo di confronto",
+        "ja": "割引前価格を表示する",
+        "ko": "비교가 표시",
+        "nb": "Vis prissammenligning",
+        "nl": "Prijsvergelijking weergeven",
+        "pt-BR": "Exibir Comparação de preços",
+        "pt-PT": "Mostrar preço comparado",
+        "sv": "Visa ursprungspris",
+        "th": "แสดงราคาเปรียบเทียบ",
+        "zh-CN": "显示原价",
+        "zh-TW": "顯示售價"
+      },
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "product_show_saved_amount",
+      "label": {
+        "da": "Vis besparelse",
+        "de": "Gesparten Betrag anzeigen",
+        "en": "Show saved amount",
+        "es": "Mostrar monto ahorrado",
+        "fi": "Näytä säästetty summa",
+        "fr": "Afficher le montant économisé",
+        "hi": "सहेजी गई राशि दिखाएं",
+        "it": "Mostra importo risparmiato",
+        "ja": "保存された金額を表示",
+        "ko": "저장 금액 표시",
+        "nb": "Vis spart beløp",
+        "nl": "Bespaard bedrag weergeven",
+        "pt-BR": "Exibir valor salvo",
+        "pt-PT": "Mostrar valor poupado",
+        "sv": "Visa sparade belopp",
+        "th": "แสดงจำนวนที่บันทึกไว้",
+        "zh-CN": "显示已保存的金额",
+        "zh-TW": "顯示省下金額"
+      },
+      "default": true
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,29 @@
+{% if shop.currency == 'USD' %}
+  {% assign global_rate = shop.metaobjects["tari_price"]["tari-price-global"].usd  | divided_by: 1000000 %}
+{% elsif shop.currency == 'EUR' %}
+  {% assign global_rate = shop.metaobjects["tari_price"]["tari-price-global"].eur | divided_by: 1000000 %}
+{% else %}
+  {% assign global_rate = shop.metaobjects["tari_price"]["tari-price-global"].usd | divided_by: 1000000 %}   <!-- Default value -->
+{% endif %}
+
+{% assign saved_amount = compare_price | minus: product_price | times: global_rate %}
+
+{% comment %}
+  Unless this store uses multiple currencies,
+  we will remove the decimals when they are equal to 00,
+  or when the amount is > 10 (dollars, pounds, etc.).
+{% endcomment %}
+
+{% if shop.money_format contains 'money' %}
+  {% assign saved_amount = saved_amount | money %}
+{% else %}
+  {% assign saved_amount = saved_amount | money_without_trailing_zeros %}
+{% endif %}
+
+{{ 'products.general.save_html' | t: saved_amount: saved_amount }}
+
+{% comment %}
+{% if compare_price > product_price %}
+  Save {{ compare_price | minus: product_price | times: 100 | divided_by: compare_price | round }}%
+{% endif %}
+{% endcomment %}

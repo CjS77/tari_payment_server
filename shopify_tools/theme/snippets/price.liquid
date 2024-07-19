@@ -1,0 +1,34 @@
+{%  if use_global_rate %}
+  {% if shop.currency == 'USD' %}
+      {% assign rate = shop.metaobjects["tari_price"]["tari-price-global"].usd  %}
+  {% elsif shop.currency == 'EUR' %}
+    {% assign rate = shop.metaobjects["tari_price"]["tari-price-global"].eur  %}
+  {% else %}
+    {% assign rate = shop.metaobjects["tari_price"]["tari-price-global"].usd  %}   <!-- Default value -->
+  {% endif %}
+{%  else %}
+  {%  assign rate = 1 %}
+{%  endif %}
+
+{% assign formatted_price = price | times: rate | divided_by: 1000000 %}
+
+{% comment %}
+  Unless this store uses multiple currencies,
+  if we apply a special style to cents,
+  we will wrap them in a sup (superscript) element.
+{% endcomment %}
+
+{% unless shop.money_format contains 'money' or shop.money_format contains '.' %}
+  {% if settings.superscript_decimals %}
+    {% if shop.money_format contains '{{amount}}' or shop.money_format contains '{{ amount }}' %}
+      {% capture formatted_price %}{{ formatted_price | replace: '.','<sup>' }}</sup>{% endcapture %}
+    {% elsif shop.money_format contains '{{amount_with_comma_separator}}' or shop.money_format contains '{{ amount_with_comma_separator }}' %}
+      {% capture formatted_price %}{{ formatted_price | replace: ',','<sup>' }}</sup>{% endcapture %}
+    {% endif %}
+  {% endif %}
+{% endunless %}
+
+<!-- Trevan Price Change -->
+<img class="small-price-gem" src="https://cdn.shopify.com/s/files/1/0337/0922/8076/t/3/assets/tariGem.svg?v=1584232388" alt="Tari"/>
+<small aria-hidden="true" class="lower-case">{{ formatted_price }}</small>
+<span class="visually-hidden">{{ price | money }}</span>

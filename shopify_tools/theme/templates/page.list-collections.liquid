@@ -1,0 +1,60 @@
+{% comment %}
+  Featuring collections on a page using a menu
+  https://docs.shopify.com/support/your-store/collections/featuring-collections-using-link-lists
+{% endcomment %}
+
+{% assign featured_collection_width = 'small--one-half medium--one-third large--one-quarter' %}
+
+{% include 'breadcrumb' %}
+
+<div class="grid">
+
+  <div class="grid-item large--two-thirds push--large--one-sixth text-center">
+
+    <h1>{{ page.title }}</h1>
+
+    <div class="rte">
+      {{ page.content }}
+    </div>
+
+  </div>
+</div>
+
+<div class="grid text-center row-negative-bottom" data-section-type="list-collections-template">
+
+  {%- case linklists[page.handle].links.size -%}
+    {%- when 2 -%}
+      {%- assign featured_collection_width = 'one-half' -%}
+      {%- assign featured_collection_size = '485x' -%}
+      {%- assign width = '480' -%}
+      {%- assign height = '480' -%}
+    {%- when 3 -%}
+      {%- assign featured_collection_width = 'small--one-half one-third' %}
+      {%- assign featured_collection_size = '315x' %}
+      {%- assign width = '310' -%}
+      {%- assign height = '310' -%}
+    {%- when 4 -%}
+      {%- assign featured_collection_width = 'small--one-half one-quarter' %}
+      {%- assign featured_collection_size = '225x' %}
+      {%- assign width = '225' -%}
+      {%- assign height = '225' -%}
+    {%- when 5 -%}
+      {%- assign featured_collection_width = 'small--one-half medium--one-third large--one-fifth' %}
+      {%- assign featured_collection_size = '175x' %}
+      {%- assign width = '175' -%}
+      {%- assign height = '175' -%}
+    {%- else -%}
+      {%- assign featured_collection_width = 'small--one-half one-third' %}
+      {%- assign featured_collection_size = '315x' %}
+      {%- assign width = '310' -%}
+      {%- assign height = '310' -%}
+  {%- endcase -%}
+
+  {%- for link in linklists[page.handle].links -%}
+    {%- if link.type == 'collection_link' -%}
+      {%- assign featured = link.object.handle -%}
+    {%- endif -%}
+    {%- include 'featured-collection' -%}
+  {%- endfor -%}
+
+</div>
