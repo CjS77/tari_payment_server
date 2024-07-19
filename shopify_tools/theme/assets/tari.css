@@ -1,0 +1,413 @@
+/* Custom Fonts */
+
+
+@font-face {
+    font-family: 'Avenir LT Std';
+    src: url('AvenirLTStd-Book.woff2') format('woff2'),
+        url('AvenirLTStd-Book.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Avenir LT Std';
+    src: url('AvenirLTStd-Roman.woff2') format('woff2'),
+        url('AvenirLTStd-Roman.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Avenir LT Std';
+    src: url('AvenirLTStd-Medium.woff2') format('woff2'),
+        url('AvenirLTStd-Medium.woff') format('woff');
+    font-weight: 500;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Avenir LT Std';
+    src: url('AvenirLTStd-BlackOblique.woff2') format('woff2'),
+        url('AvenirLTStd-BlackOblique.woff') format('woff');
+    font-weight: 900;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'Avenir LT Std';
+    src: url('AvenirLTStd-MediumOblique.woff2') format('woff2'),
+        url('AvenirLTStd-MediumOblique.woff') format('woff');
+    font-weight: 500;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'Avenir LT Std';
+    src: url('AvenirLTStd-HeavyOblique.woff2') format('woff2'),
+        url('AvenirLTStd-HeavyOblique.woff') format('woff');
+    font-weight: 900;
+    font-style: italic;
+}
+
+
+@font-face {
+    font-family: 'Avenir LT Std';
+    src: url('AvenirLTStd-LightOblique.woff2') format('woff2'),
+        url('AvenirLTStd-LightOblique.woff') format('woff');
+    font-weight: 300;
+    font-style: italic;
+}
+
+
+@font-face {
+    font-family: 'Avenir LT Std';
+    src: url('AvenirLTStd-Oblique.woff2') format('woff2'),
+        url('AvenirLTStd-Oblique.woff') format('woff');
+    font-weight: normal;
+    font-style: italic;
+}
+
+
+
+@font-face {
+    font-family: 'Avenir LT Std';
+    src: url('AvenirLTStd-BookOblique.woff2') format('woff2'),
+        url('AvenirLTStd-BookOblique.woff') format('woff');
+    font-weight: normal;
+    font-style: italic;
+}
+
+
+@font-face {
+    font-family: 'Avenir LT Std';
+    src: url('AvenirLTStd-Black.woff2') format('woff2'),
+        url('AvenirLTStd-Black.woff') format('woff');
+    font-weight: 900;
+    font-style: normal;
+}
+
+
+@font-face {
+    font-family: 'Avenir LT Std';
+    src: url('AvenirLTStd-Heavy.woff2') format('woff2'),
+        url('AvenirLTStd-Heavy.woff') format('woff');
+    font-weight: 900;
+    font-style: normal;
+}
+
+
+
+@font-face {
+    font-family: 'Avenir LT Std';
+    src: url('AvenirLTStd-Light.woff2') format('woff2'),
+        url('AvenirLTStd-Light.woff') format('woff');
+    font-weight: 300;
+    font-style: normal;
+}
+
+
+
+
+
+/* General Style */
+
+.breadcrumb { display:none; }
+
+.search-bar input[type="submit"], .search-bar .search-bar--submit{
+  
+ top:-5px !important; 
+}
+
+
+#more-items .section-header--right{
+ display:none; 
+}
+
+
+
+.h2{
+  
+ text-transform:none; 
+  font-size: 2em;
+}
+
+body{
+ /*font-family: 'Avenir LT Std';*/
+  font-family: 'Avenir Next', sans-serif;
+  font-weight: normal;
+  font-style:normal;
+}
+
+em{
+  font-family: 'Avenir LT Std';
+  font-weight: normal;
+    font-style: italic;
+}
+
+
+button{
+ background: rgb(137,49,255);
+background: linear-gradient(90deg, rgba(137,49,255,1) 0%, rgba(163,45,241,1) 100%); 
+  border-radius:4px !important;
+  font-weight:700 !important;
+  min-height:53px !important;
+}
+
+.cart-count{
+  
+  color:#222 !important;
+  background-color:white !important;
+  position:relative;
+  top:-2px;
+  font-size:10px;
+}
+
+
+
+/* Header  */
+
+
+.site-header, .nav-bar{
+/*   background-image: url('HeaderBackground.jpg') !important;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center; */
+  background: #7C34FF;
+}
+
+#mobileNavBar{
+ background: #0e051b !important; 
+  background: #7C34FF !important;
+}
+
+
+@media only screen and (max-width: 480px){
+  
+ .show-nav #mobileNavBar{
+  background:#0b051b;
+   background: #7C34FF;
+   
+ }
+  
+  .site-header{
+   width:100%;
+    position:fixed;
+    margin-top: -10px;
+    padding-bottom:100px;
+  }
+  
+  .header-logo__image{
+   max-width:140px !important; 
+    margin-top:-10px !important;
+    
+  }
+  
+  .show-nav .nav-bar{
+    background:#7C34FF;
+    z-index: 10000000;
+  }
+  
+  button:focus, a:focus{
+   outline:none;
+    border:none;
+  }
+  
+ 
+
+}
+
+
+.badge-label{
+  
+}
+
+.sold-out .product-grid-image--centered .lazyload__image-wrapper{
+  
+ background: #7C34FF;
+  border-radius: 5px;
+  opacity: .4;
+  
+}
+
+.disabled{
+  background:#f6f6f6 !important;
+}
+
+
+
+
+/* Products Page */
+
+
+.rich-text{
+  text-align:center;
+  max-width:600px;
+  padding: 0px 20px 0px 20px !important;
+  margin: 0 auto;
+}
+
+.template-index main .grid-item p{
+	font-size: 16px;
+  font-weight:700;
+  text-align:center;
+}
+
+.product-item--price span small{
+	font-size: 14px !important; 
+  text-align:center;
+}
+
+.medium--left{
+ text-align:center; 
+}
+
+.product-item--price small{
+ white-space: pre-wrap; 
+}
+
+.product-grid-image img, #ProductSection .product__image-wrapper img{
+ 	border-radius:5px; 
+	box-shadow: 5px 5px 20px 0 rgba(78,19,126,0.07);
+
+}
+
+.template-index main .grid-item p{
+  
+ margin-bottom:0px; 
+}
+
+
+
+.template-product .main-content{
+  
+  padding-top:80px;
+}
+
+#ProductSection .h2{
+/*   font-weight:700 !important; */
+}
+
+
+#testnet-tari-limited .grid-item p{
+ margin-bottom:0px !important; 
+}
+
+.price-gem{
+  max-width:20px !important;
+  margin-bottom:-2px;
+}
+
+.small-price-gem{
+  max-width:15px !important;
+  margin-bottom:-3px;
+}
+
+a.product-grid-item, .product-grid-item{
+ margin-bottom:30px !important; 
+}
+
+
+em{
+ font-weight: normal !important;
+   font-style: italic;
+}
+
+@media only screen and (max-width: 767px){
+  
+   .template-product .main-content{
+  
+  padding-top:30px;
+
+} 
+}
+
+
+@media only screen and (max-width:480px){
+.template-product .site-header{
+display:none;
+}
+  
+
+  
+  
+  
+.template-product .breadcrumb{
+  display:none;
+}
+  
+  
+  .template-product .main-content{
+    
+   margin-top: 0px !important; 
+  }
+  
+.main-content{
+ margin-top: 110px !important;
+  z-index: 100000;
+  border-radius: 10px 10px 0px 0px;
+  background:white;
+  position:relative;
+}
+  
+  #mobileNavBar{
+   z-index: 999999999 !important;
+  }
+
+}
+
+
+
+/* How to */
+
+.mobile-how-to{
+  
+ display:none; 
+}
+
+@media only screen and (max-width:480px){
+  .mobile-how-to{
+  
+   display:block; 
+  }
+    .desktop-how-to{
+
+   display:none; 
+  }
+  
+}
+
+
+
+
+/* Footer */
+
+@media only screen and (max-width:480px){
+	.site-footer{
+		font-size:.8em;
+      	font-style:normal !important;
+    }
+  
+  .site-footer em{
+	
+      	font-style:normal !important;
+    }
+}
+
+.site-footer{
+  text-align:center;
+  background: #232329;
+  color:eee;
+}
+
+.site-footer hr{
+  display:none;
+}
+
+.site-footer a:hover{
+  color:#9330ff !important;
+}
+
+
+.footer-image{
+ 	max-width:150px !important; 
+}

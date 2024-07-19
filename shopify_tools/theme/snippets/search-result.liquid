@@ -1,0 +1,69 @@
+<div class="grid">
+
+  {% if item.featured_image %}
+    {%- assign image = item.featured_image -%}
+    {%- assign max_width = 350  -%}
+    {%- assign max_height = 500 -%}
+
+    {%- include 'image-logic' with width: max_width, height: max_height -%}
+
+
+    {% comment %}
+      We have a featured_image, so it's likely a product
+    {% endcomment %}
+    <div class="grid-item one-third">
+      <a href="{{ item.url }}" title="{{ item.title | escape }}">
+        {%- assign img_url = image | img_url: '1x1' | replace: '_1x1.', '_{width}x.' -%}
+          <div class="lazyload__image-wrapper no-js" style="max-width: {{ max_width }}px">
+            <div style="padding-top:{{ 1 | divided_by: image.aspect_ratio | times: 100}}%;">
+              <img class="lazyload no-js"
+                data-src="{{ img_url }}"
+                data-widths="[125, 180, 360, 540, 720, 900, 1080, 1296, 1512, 1728, 2048]"
+                data-aspectratio="{{ image.aspect_ratio }}"
+                data-sizes="auto"
+                alt="{{ image.alt | escape }}">
+            </div>
+          </div>
+          <noscript>
+            <img src="{{ image | img_url: '580x' }}"
+              srcset="{{ image | img_url: '580x' }} 1x, {{ image | img_url: '580x', scale: 2 }} 2x"
+              alt="{{ image.alt }}" style="opacity:1;">
+          </noscript>
+      </a>
+    </div>
+
+  {% endif %}
+
+  {% comment %}
+    If we don't have a featured_image, add a push-- class to keep the alignment the same
+  {% endcomment %}
+  <div class="grid-item two-thirds {% unless item.featured_image %}push--one-third{% endunless %}">
+    <h1 class="h2" itemprop="name">{{ item.title | link_to: item.url }}</h1>
+
+    {% if item.compare_at_price > item.price %}
+      <li>
+        <span id="productPrice" class="h1">
+          {% include 'price' with item.price %}
+        </span>
+      </li>
+      <li>
+        <span id="comparePrice" class="sale-tag large">
+          {% assign compare_price = item.compare_at_price %}
+          {% assign product_price = item.price %}
+          {% include 'price-sale' %}
+        </span>
+      </li>
+    {% else %}
+      <li>
+        <span id="productPrice" class="h1">
+          {% include 'price' with item.price %}
+        </span>
+      </li>
+    {% endif %}
+
+    <p>{{ item.content | strip_html | truncatewords: 50 }}</p>
+  </div>
+
+</div>
+
+<hr>

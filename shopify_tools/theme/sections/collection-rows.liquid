@@ -1,0 +1,322 @@
+<hr>
+<div id="collection-rows--{{ section.id }}" data-section-id="{{ section.id }}" data-section-type="collection-row-section">
+{% assign featured_row = section.settings.home_featured_row %}
+{% assign row_limit_setting = section.settings.grid %}
+{% case section.settings.grid %}
+  {% when 2 %}
+    {%- assign grid_item_width = 'medium--one-half large--one-half' -%}
+    {%- assign image_size = '540x' -%}
+    {% assign width = '540' %}
+    {% assign height = '600' %}
+  {% when 3 %}
+    {%- assign grid_item_width = 'small--one-half medium--one-third large--one-third' -%}
+     {%- assign image_size = '345x' -%}
+     {% assign width = '345' %}
+    {% assign height = '550' %}
+  {% when 4 %}
+    {%- assign grid_item_width = 'small--one-half medium--one-quarter large--one-quarter' -%}
+    {%- assign image_size = '250x' -%}
+    {% assign width = '250' %}
+    {% assign height = '225' %}
+  {% when 5 %}
+    {%- assign grid_item_width = 'small--one-half medium--one-fifth large--one-fifth' -%}
+    {%- assign image_size = '195x' -%}
+    {% assign width = '195' %}
+    {% assign height = '175' %}
+{% endcase %}
+
+{%- assign product_limit = section.settings.grid | times: section.settings.rows -%}
+{% assign header_title = collections[featured_row].title %}
+{%- assign more_link = collections[featured_row].url -%}
+
+{% if collections[featured_row].all_products_count != 0 and section.settings.home_featured_row != blank %}
+
+  {% if section.settings.title != blank %}
+    <div class="section-header">
+      <p class="h1{% if more_link %} section-header--left{% endif %}">{{ section.settings.title | escape }}</p>
+      {% if more_link %}
+        <div class="section-header--right">
+          {% assign header_title = header_title | downcase %}
+          <a href="{{ more_link }}">{{ 'homepage.featured_collection_rows.more_in_collection' | t: collection_title: header_title }} &rsaquo;</a>
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <div class="grid-uniform row-negative-bottom">
+    {% for product in collections[featured_row].products limit: product_limit %}
+      {% assign current_collection = collections[featured_row] %}
+        {% include 'product-grid-item' %}
+    {% endfor %}
+  </div>
+
+{% else %}
+  <div class="section-header">
+    <p class="h1 section-header--left">{{ section.settings.title | escape }}</p>
+    <div class="section-header--right">
+      <a href="{{ collections[featured_row].url }}">{{ 'homepage.featured_collection_rows.more' | t }} &rsaquo;</a>
+    </div>
+  </div>
+
+  <div class="grid text-center row-negative-bottom">
+    <div class="grid-item">
+      <div class="grid-uniform">
+        {% for i in (1..product_limit) %}
+          <div class="grid-item {{ grid_item_width }} text-center">
+            {% capture current %}{% cycle 1, 2, 3, 4 %}{% endcapture %}
+              {{ 'product-' | append: current | placeholder_svg_tag: 'placeholder-svg' }}
+            <p><a href="/admin/products">{{ 'homepage.onboarding.product_title' | t }}</a> $19.99</p>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% endif %}
+</div>
+
+
+{% schema %}
+{
+  "name": {
+    "da": "Udvalgt kollektion",
+    "de": "Vorgestellte Kategorie",
+    "en": "Featured collection",
+    "es": "Colección destacada",
+    "fi": "Esittelyssä oleva kokoelma",
+    "fr": "Collection en vedette",
+    "hi": "फ़ीचर्ड कलेक्शन",
+    "it": "Collezione in evidenza",
+    "ja": "特集コレクション",
+    "ko": "추천 컬렉션",
+    "nb": "Utvalgt samling",
+    "nl": "Uitgelichte collectie",
+    "pt-BR": "Coleção em destaque",
+    "pt-PT": "Coleção em destaque",
+    "sv": "Utvald kollektion",
+    "th": "คอลเลกชันแนะนำ",
+    "zh-CN": "特色产品系列",
+    "zh-TW": "精選商品系列"
+  },
+  "class": "clearfix",
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": {
+        "da": "Overskrift",
+        "de": "Titel",
+        "en": "Heading",
+        "es": "Título",
+        "fi": "Otsake",
+        "fr": "Titre",
+        "hi": "शीर्षक",
+        "it": "Heading",
+        "ja": "見出し",
+        "ko": "제목",
+        "nb": "Overskrift",
+        "nl": "Kop",
+        "pt-BR": "Título",
+        "pt-PT": "Título",
+        "sv": "Rubrik",
+        "th": "ส่วนหัว",
+        "zh-CN": "标题",
+        "zh-TW": "標題"
+      },
+      "default": {
+        "da": "Udvalgt kollektion",
+        "de": "Vorgestellte Kategorie",
+        "en": "Featured collection",
+        "es": "Colección destacada",
+        "fi": "Esittelyssä oleva kokoelma",
+        "fr": "Collection en vedette",
+        "hi": "फ़ीचर्ड कलेक्शन",
+        "it": "Collezione in evidenza",
+        "ja": "特集コレクション",
+        "ko": "추천 컬렉션",
+        "nb": "Fremhevet samling",
+        "nl": "Uitgelichte collectie",
+        "pt-BR": "Coleção em destaque",
+        "pt-PT": "Coleção em destaque",
+        "sv": "Utvald kollektion",
+        "th": "คอลเลกชันแนะนำ",
+        "zh-CN": "特色产品系列",
+        "zh-TW": "精選商品系列"
+      }
+    },
+    {
+      "type": "collection",
+      "id": "home_featured_row",
+      "label": {
+        "da": "Kollektion",
+        "de": "Kategorie",
+        "en": "Collection",
+        "es": "Colección",
+        "fi": "Kokoelma",
+        "fr": "Collection",
+        "hi": "कलेक्शन",
+        "it": "Collezione",
+        "ja": "コレクション",
+        "ko": "컬렉션",
+        "nb": "Samling",
+        "nl": "Collectie",
+        "pt-BR": "Coleção",
+        "pt-PT": "Coleção",
+        "sv": "Produktserie",
+        "th": "คอลเลกชัน",
+        "zh-CN": "收藏",
+        "zh-TW": "商品系列"
+      }
+    },
+    {
+      "type": "range",
+      "id": "grid",
+      "label": {
+        "da": "Produkter pr. række",
+        "de": "Produkte per Reihe",
+        "en": "Products per row",
+        "es": "Productos por fila",
+        "fi": "Tuotteita per rivi",
+        "fr": "Produits par rangée",
+        "hi": "प्रति पंक्ति उत्पाद",
+        "it": "Prodotti per riga",
+        "ja": "行あたりの商品数",
+        "ko": "열 별 제품",
+        "nb": "Produkter per rad",
+        "nl": "Producten per rij",
+        "pt-BR": "Produtos por linha",
+        "pt-PT": "Produtos por linha",
+        "sv": "Produkter per rad",
+        "th": "สินค้าต่อแถว",
+        "zh-CN": "每行产品数",
+        "zh-TW": "每列產品數"
+      },
+      "min": 2,
+      "max": 5,
+      "step": 1,
+      "default": 4
+    },
+    {
+      "type": "range",
+      "id": "rows",
+      "label": {
+        "da": "Rækker",
+        "de": "Reihen",
+        "en": "Rows",
+        "es": "Filas",
+        "fi": "Rivit",
+        "fr": "Rangées",
+        "hi": "पंक्ति",
+        "it": "Righe",
+        "ja": "行",
+        "ko": "열",
+        "nb": "Rader",
+        "nl": "Rijen",
+        "pt-BR": "Linhas",
+        "pt-PT": "Linhas",
+        "sv": "Rader",
+        "th": "แถว",
+        "zh-CN": "行数",
+        "zh-TW": "列"
+      },
+      "min": 1,
+      "max": 5,
+      "step": 1,
+      "default": 1
+    },
+    {
+      "type": "checkbox",
+      "id": "product_show_saved_amount",
+      "label": {
+        "da": "Vis besparelse",
+        "de": "Gesparten Betrag anzeigen",
+        "en": "Show saved amount",
+        "es": "Mostrar monto ahorrado",
+        "fi": "Näytä säästetty summa",
+        "fr": "Afficher le montant économisé",
+        "hi": "सहेजी गई राशि दिखाएं",
+        "it": "Mostra importo risparmiato",
+        "ja": "保存された金額を表示",
+        "ko": "저장 금액 표시",
+        "nb": "Vis spart beløp",
+        "nl": "Bespaard bedrag weergeven",
+        "pt-BR": "Exibir valor salvo",
+        "pt-PT": "Mostrar valor poupado",
+        "sv": "Visa sparade belopp",
+        "th": "แสดงจำนวนที่บันทึกไว้",
+        "zh-CN": "显示已保存的金额",
+        "zh-TW": "顯示省下金額"
+      },
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "product_show_compare_at_price",
+      "label": {
+        "da": "Vis sammenligningspris",
+        "de": "Vergleichspreis anzeigen",
+        "en": "Show compare at price",
+        "es": "Mostrar precio de comparación",
+        "fi": "Näytä hintavertailu",
+        "fr": "Afficher le prix de comparaison",
+        "hi": "मूल्य पर तुलना दिखाएं",
+        "it": "Mostra Prezzo di confronto",
+        "ja": "割引前価格を表示する",
+        "ko": "비교가 표시",
+        "nb": "Vis prissammenligning",
+        "nl": "Prijsvergelijking weergeven",
+        "pt-BR": "Exibir Comparação de preços",
+        "pt-PT": "Mostrar preço comparado",
+        "sv": "Visa ursprungspris",
+        "th": "แสดงราคาเปรียบเทียบ",
+        "zh-CN": "显示原价",
+        "zh-TW": "顯示售價"
+      },
+      "default": false
+    }
+  ],
+  "presets": [
+    {
+      "name": {
+        "da": "Udvalgt kollektion",
+        "de": "Vorgestellte Kategorie",
+        "en": "Featured collection",
+        "es": "Colección destacada",
+        "fi": "Esittelyssä oleva kokoelma",
+        "fr": "Collection en vedette",
+        "hi": "फ़ीचर्ड कलेक्शन",
+        "it": "Collezione in evidenza",
+        "ja": "特集コレクション",
+        "ko": "추천 컬렉션",
+        "nb": "Utvalgt samling",
+        "nl": "Uitgelichte collectie",
+        "pt-BR": "Coleção em destaque",
+        "pt-PT": "Coleção em destaque",
+        "sv": "Utvald kollektion",
+        "th": "คอลเลกชันแนะนำ",
+        "zh-CN": "特色产品系列",
+        "zh-TW": "精選商品系列"
+      },
+      "category": {
+        "da": "Kollektioner",
+        "de": "Kategorien",
+        "en": "Collections",
+        "es": "Colecciones",
+        "fi": "Kokoelmat",
+        "fr": "Collections",
+        "hi": "कलेक्शन",
+        "it": "Collezioni",
+        "ja": "コレクション",
+        "ko": "컬렉션",
+        "nb": "Samlinger",
+        "nl": "Collecties",
+        "pt-BR": "Coleções",
+        "pt-PT": "Coleções",
+        "sv": "Produktserier",
+        "th": "คอลเลกชัน",
+        "zh-CN": "产品系列",
+        "zh-TW": "商品系列"
+      }
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,369 @@
+<hr>
+<div class="flexslider" id="heroSlider--{{ section.id }}" data-section-id="{{ section.id }}" data-section-type="slideshow-section" data-slider-home-auto="{{ section.settings.slider_home_auto }}" data-slider-home-rate="{{ section.settings.slider_home_rate }}">
+  <ul class="slides">
+    {% for block in section.blocks %}
+      <li id="slide--{{ block.id }}" data-flexslider-index="{{ forloop.index0 }}" {{ block.shopify_attributes }}>
+        {% if block.settings.slide != blank %}
+          {% if block.settings.link %}
+            <a href="{{ block.settings.link }}" class="slide-link">
+          {% endif %}
+            {%- assign image = block.settings.slide -%}
+            {%- capture img_wrapper_id -%}slideShowImageWrapper-{{ section.id }}-{{ image.id }}{%- endcapture -%}
+            {%- assign max_width = 1000 -%}
+            {%- assign max_height = 1500 -%}
+
+            {%- include 'image-logic' with width: max_width, height: max_height -%}
+
+            {%- assign img_url = image | img_url: '1x1' | replace: '_1x1.', '_{width}x.' -%}
+            <div id="{{ img_wrapper_id }}" class="lazyload__image-wrapper" data-image-id="{{ image.id }}" style="max-width: {{ max_width }}px">
+              <div class="lazyload__image-wrapper no-js" style="padding-top:{{ 1 | divided_by: image.aspect_ratio | times: 100}}%;">
+                <img
+                  class="lazyload js {% if forloop.index > 1%}lazypreload{% endif %}"
+                  src="{{ image | img_url: '300x' }}"
+                  data-src="{{ img_url }}"
+                  data-widths="[180, 360, 540, 720, 900, 1080, 1296, 1512, 1728, 2048]"
+                  data-aspectratio="{{ image.aspect_ratio }}"
+                  data-sizes="auto"
+                  alt="{{ image.alt | escape }}">
+              </div>
+            </div>
+
+            <noscript>
+              <img src="{{ image | img_url: '580x' }}"
+                srcset="{{ image | img_url: '580x' }} 1x, {{ image | img_url: '580x', scale: 2 }} 2x"
+                alt="{{ image.alt }}" style="opacity:1;">
+            </noscript>
+            {% comment %}<img src="{{ image | img_url: '1024x' }}"
+            srcset="{{ image | img_url: '1024x' }} 1x, {{ image | img_url: '1024x', scale: 2 }} 2x" alt="{{ image.alt }}">{% endcomment %}
+
+          {% if block.settings.link %}
+            </a>
+          {% endif %}
+
+        {% else %}
+          {% capture current %}{% cycle 1, 2 %}{% endcapture %}
+          {% capture svg_tag_class %}placeholder-noblocks slide-link slide-link--{{ block.id }}{% endcapture %}
+          {%- assign placeholder = 'placeholder-lifestyle-' | append: current -%}
+          {{ 'lifestyle-' | append: current | placeholder_svg_tag: svg_tag_class }}
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+
+
+
+{% schema %}
+{
+  "name": {
+    "da": "Diasshow",
+    "de": "Slideshow",
+    "en": "Slideshow",
+    "es": "Diapositivas",
+    "fi": "Diaesitys",
+    "fr": "Diaporama",
+    "hi": "स्लाइडशो",
+    "it": "Presentazione",
+    "ja": "スライドショー",
+    "ko": "슬라이드 쇼",
+    "nb": "Lysbildefremvisning",
+    "nl": "Diavoorstelling",
+    "pt-BR": "Apresentação de slides",
+    "pt-PT": "Apresentação de diapositivos",
+    "sv": "Bildspel",
+    "th": "สไลด์โชว์",
+    "zh-CN": "幻灯片",
+    "zh-TW": "素材輪播"
+  },
+  "class": "slider-section",
+  "max_blocks": 6,
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "slider_home_auto",
+      "label": {
+        "da": "Roter automatisk slides",
+        "de": "Auto-rotieren der Slides",
+        "en": "Auto-rotate slides",
+        "es": "Rotar las diapositivas automáticamente",
+        "fi": "Käännä diat automaattisesti",
+        "fr": "Rotation automatique des diapositives",
+        "hi": "ऑटो-रोटेट स्लाइड",
+        "it": "Ruota slide automaticamente",
+        "ja": "スライドの自動切り替え",
+        "ko": "슬라이드 자동 회전",
+        "nb": "Autoroter lysbildene",
+        "nl": "Dia's automatisch draaien",
+        "pt-BR": "Rodar os slides automaticamente",
+        "pt-PT": "Reprodução automática de diapositivos",
+        "sv": "Auto-rotera bilder",
+        "th": "หมุนสไลด์อัตโนมัติ",
+        "zh-CN": "自动旋转幻灯片",
+        "zh-TW": "自動旋轉投影片"
+      }
+    },
+    {
+      "type": "select",
+      "id": "slider_home_rate",
+      "label": {
+        "da": "Overførselstid",
+        "de": "Übergangszeit",
+        "en": "Transition time",
+        "es": "Tiempo de transición",
+        "fi": "Siirtymäaika",
+        "fr": "Temps de transition",
+        "hi": "हस्तांतरण का समय",
+        "it": "Tempo transizione",
+        "ja": "トランジション時間",
+        "ko": "전환 시간",
+        "nb": "Overgangstid",
+        "nl": "Overgangstijd",
+        "pt-BR": "Tempo da transição",
+        "pt-PT": "Tempo da transição",
+        "sv": "Övergångstid",
+        "th": "เวลาเปลี่ยน",
+        "zh-CN": "过渡时间",
+        "zh-TW": "轉場時間"
+      },
+      "options": [
+        {
+          "value": "5000",
+          "label": {
+            "da": "5 sekunder",
+            "de": "5 Sekunden",
+            "en": "5 seconds",
+            "es": "5 segundos",
+            "fi": "5 sekuntia",
+            "fr": "5 secondes",
+            "hi": "5 सेकंड",
+            "it": "5 secondi",
+            "ja": "5秒",
+            "ko": "5초",
+            "nb": "5 sekunder",
+            "nl": "5 seconden",
+            "pt-BR": "5 segundos",
+            "pt-PT": "5 segundos",
+            "sv": "5 sekunder",
+            "th": "5 วินาที",
+            "zh-CN": "5 秒",
+            "zh-TW": "5 秒"
+          }
+        },
+        {
+          "value": "7000",
+          "label": {
+            "da": "7 sekunder",
+            "de": "7 Sekunden",
+            "en": "7 seconds",
+            "es": "7 segundos",
+            "fi": "7 sekuntia",
+            "fr": "7 secondes",
+            "hi": "7 सेकंड",
+            "it": "7 secondi",
+            "ja": "7秒",
+            "ko": "7초",
+            "nb": "7 sekunder",
+            "nl": "7 seconden",
+            "pt-BR": "7 segundos",
+            "pt-PT": "7 segundos",
+            "sv": "7 sekunder",
+            "th": "7 วินาที",
+            "zh-CN": "7 秒",
+            "zh-TW": "7 秒"
+          }
+        },
+        {
+          "value": "10000",
+          "label": {
+            "da": "10 sekunder",
+            "de": "10 Sekunden",
+            "en": "10 seconds",
+            "es": "10 segundos",
+            "fi": "10 sekuntia",
+            "fr": "10 secondes",
+            "hi": "10 सेकंड",
+            "it": "10 secondi",
+            "ja": "10秒",
+            "ko": "10초",
+            "nb": "10 sekunder",
+            "nl": "10 seconden",
+            "pt-BR": "10 segundos",
+            "pt-PT": "10 segundos",
+            "sv": "10 sekunder",
+            "th": "10 วินาที",
+            "zh-CN": "10 秒",
+            "zh-TW": "10 秒"
+          }
+        },
+        {
+          "value": "15000",
+          "label": {
+            "da": "15 sekunder",
+            "de": "15 Sekunden",
+            "en": "15 seconds",
+            "es": "15 segundos",
+            "fi": "15 sekuntia",
+            "fr": "15 secondes",
+            "hi": "15 सेकंड",
+            "it": "15 secondi",
+            "ja": "15秒",
+            "ko": "15초",
+            "nb": "15 sekunder",
+            "nl": "15 seconden",
+            "pt-BR": "15 segundos",
+            "pt-PT": "15 segundos",
+            "sv": "15 sekunder",
+            "th": "15 วินาที",
+            "zh-CN": "15 秒",
+            "zh-TW": "15 秒"
+          }
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": {
+        "da": "Diasshow",
+        "de": "Slideshow",
+        "en": "Slideshow",
+        "es": "Diapositivas",
+        "fi": "Diaesitys",
+        "fr": "Diaporama",
+        "hi": "स्लाइडशो",
+        "it": "Presentazione",
+        "ja": "スライドショー",
+        "ko": "슬라이드 쇼",
+        "nb": "Lysbildefremvisning",
+        "nl": "Diavoorstelling",
+        "pt-BR": "Apresentação de slides",
+        "pt-PT": "Apresentação de diapositivos",
+        "sv": "Bildspel",
+        "th": "สไลด์โชว์",
+        "zh-CN": "幻灯片",
+        "zh-TW": "素材輪播"
+      },
+      "category": {
+        "da": "Billede",
+        "de": "Foto",
+        "en": "Image",
+        "es": "Imagen",
+        "fi": "Kuva",
+        "fr": "Image",
+        "hi": "इमेज",
+        "it": "Immagine",
+        "ja": "画像",
+        "ko": "이미지",
+        "nb": "Bilde",
+        "nl": "Afbeelding",
+        "pt-BR": "Imagem",
+        "pt-PT": "Imagem",
+        "sv": "Bild",
+        "th": "รูปภาพ",
+        "zh-CN": "图片",
+        "zh-TW": "圖片"
+      },
+      "blocks": [
+        {
+          "type": "image"
+        }
+      ]
+    }
+  ],
+  "blocks": [
+    {
+      "type": "image",
+      "name": {
+        "da": "Billede",
+        "de": "Foto",
+        "en": "Image",
+        "es": "Imagen",
+        "fi": "Kuva",
+        "fr": "Image",
+        "hi": "इमेज",
+        "it": "Immagine",
+        "ja": "画像",
+        "ko": "이미지",
+        "nb": "Bilde",
+        "nl": "Afbeelding",
+        "pt-BR": "Imagem",
+        "pt-PT": "Imagem",
+        "sv": "Bild",
+        "th": "รูปภาพ",
+        "zh-CN": "图片",
+        "zh-TW": "圖片"
+      },
+      "settings": [
+        {
+          "type": "image_picker",
+          "id": "slide",
+          "label": {
+            "da": "Billede",
+            "de": "Foto",
+            "en": "Image",
+            "es": "Imagen",
+            "fi": "Kuva",
+            "fr": "Image",
+            "hi": "इमेज",
+            "it": "Immagine",
+            "ja": "画像",
+            "ko": "이미지",
+            "nb": "Bilde",
+            "nl": "Afbeelding",
+            "pt-BR": "Imagem",
+            "pt-PT": "Imagem",
+            "sv": "Bild",
+            "th": "รูปภาพ",
+            "zh-CN": "图片",
+            "zh-TW": "圖片"
+          },
+          "info": {
+            "da": "1.000 x 500 px anbefales",
+            "de": "1000 x 500px empfohlen",
+            "en": "1000 x 500px recommended",
+            "es": "1000 x 500px recomendado",
+            "fi": "Suositus 1000 x 500 px",
+            "fr": "1000 x 500 px recommandé",
+            "hi": "1000 x 500px की अनुशंसा की जाती है",
+            "it": "Dimensione consigliata: 1000 x 500 pixel",
+            "ja": "1000 x 500ピクセルを推奨",
+            "ko": "1280 x 800 픽셀 권장",
+            "nb": "1000 x 500 piksler anbefales",
+            "nl": "1000 x 500px aanbevolen",
+            "pt-BR": "1.000 x 500 px recomendado",
+            "pt-PT": "1000 x 500 px recomendado",
+            "sv": "1 280 x 800px rekommenderas",
+            "th": "แนะนำขนาด 1000 x 500px พิกเซล",
+            "zh-CN": "推荐使用 1000 x 500 px 大小",
+            "zh-TW": "建議使用 1000 x 500px"
+          }
+        },
+        {
+          "type": "url",
+          "id": "link",
+          "label": {
+            "da": "Link-webadresse",
+            "de": "Link URL",
+            "en": "Link URL",
+            "es": "URL del enlace",
+            "fi": "Linkin URL",
+            "fr": "Lien URL",
+            "hi": "URL लिंक करें",
+            "it": "Link URL",
+            "ja": "リンクURL",
+            "ko": "링크 URL",
+            "nb": "Nettadresse for kobling",
+            "nl": "URL van link",
+            "pt-BR": "URL do link",
+            "pt-PT": "URL da ligação",
+            "sv": "Länk-URL",
+            "th": "ลิงก์ URL",
+            "zh-CN": "链接 URL",
+            "zh-TW": "連結 URL"
+          }
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}

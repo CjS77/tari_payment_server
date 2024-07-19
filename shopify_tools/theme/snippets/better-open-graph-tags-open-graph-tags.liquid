@@ -1,0 +1,163 @@
+<!-- Use to be product.description, now it's robin_description -->
+{% assign robin_descript = "Get stuff for testing @Tari testnet - like this " | append: product.title | strip_html | escape %}
+
+
+<!-- Open Graph data -->
+<meta itemprop="name" content="{{ shop.name }}">
+
+{% if template == 'index' %}
+<meta itemprop="description" content="{{ page_description }}">
+
+{% elsif template contains 'product' %}
+<meta itemprop="description" content="{{ product.description | strip_html | escape }}">
+{% if product.featured_image %}
+<meta property="image" content="http:{{ product | img_url: '1024x1024' }}">
+
+{% endif %}
+
+{% elsif template contains 'article' %}
+<meta property="description" content="{{ article.excerpt_or_content | strip_html | escape }}">
+{% if product.featured_image %}
+<meta property="image" content="http:{{ article | img_url: '1024x1024' }}">
+{% endif %}
+
+{% elsif template == 'password' %}
+<meta property="description" content="{% unless shop.description == blank %}{{ shop.description | escape }}{% else %}{{ shop.name | escape }}{% endunless %}">
+{% if settings.logo_use_image %}
+<meta property="mage" content="http:{{ 'logo.png' | asset_url }}">
+{% endif %}
+
+{% endif %}
+
+
+
+<!-- Open Graph data -->
+
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:site_name" content="{{ shop.name }}">
+
+<!-- Open Graph data Index -->
+{% if template == 'index' %}
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{ page_title }}">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:description" content="{{ page_description }}">
+
+<!-- Open Graph data Product -->
+{% elsif template contains 'product' %}
+<meta property="og:type" content="product">
+<meta property="og:title" content="{{ product.title | strip_html | escape }}">
+<meta property="og:category" content="{{ product.type }}"/>
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:description" content="{{ product.description | strip_newlines | strip_html | truncate: 300 | escape }}">
+{% for image in product.images limit:3 %}
+<meta property="og:image" content="http:{{ image.src | img_url: 'grande' }}">
+<meta property="og:image:secure_url" content="https:{{ image.src | img_url: 'grande' }}">
+<meta property="og:image:alt" content="{{ product.title | strip_html | escape }}">
+{% endfor %}
+{% if shop.currency == 'USD' %}
+  {% assign rate = shop.metaobjects["tari_price"]["tari-price-global"].usd %}
+{% elsif shop.currency == 'EUR' %}
+  {% assign rate = shop.metaobjects["tari_price"]["tari-price-global"].eur %}
+{% else %}
+  {% assign rate = shop.metaobjects["tari_price"]["tari-price-global"].usd %}   <!-- Default value -->
+{% endif %}
+<meta property="og:price:amount" content="{{ product.price | times: rate | strip_html | escape }}">
+<meta property="og:price:currency" content="{{ "XTR" }}">
+<meta property="og:availability" content="{% if product.available %}instock{% else %}oos{% endif %}"/>
+
+
+<!-- Open Graph data Article -->
+{% elsif template contains 'article' %}
+<meta property="og:type" content="article">
+<meta property="og:title" content="{{ article.title | strip_html | escape }}">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:description" content="{{ article.excerpt_or_content | strip_html | escape }}">
+<meta property="article:published_time" content="{{ article.created_at }}"/>
+<meta property="article:modified_time" content="{{ article.published_at }}"/>
+<!--<meta property="article:section" content="Article Section"/>
+<meta property="article:tag" content="Article Tag"/>-->
+{% if article.image %}
+<meta property="og:image" content="http:{{ article | img_url: '1024x1024' }}">
+<meta property="og:image:secure_url" content="https:{{ article | img_url: '1024x1024' }}">
+<meta property="og:image:alt" content="{{ article.title | strip_html | escape }}">
+{% endif %}
+
+<!-- Open Graph data Password -->
+{% elsif template == 'password' %}
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{ shop.name | escape }}">
+<meta property="og:url" content="{{ shop.url }}">
+<meta property="og:description" content="{% unless shop.description == blank %}{{ shop.description | escape }}{% else %}{{ shop.name | escape }}{% endunless %}">
+{% if settings.logo_use_image %}
+<meta property="og:image" content="http:{{ 'logo.png' | asset_url }}">
+<meta property="og:image:secure_url" content="https:{{ 'logo.png' | asset_url }}">
+<meta property="og:image:alt" content="{{ shop.name | escape }}">
+{% endif %}
+{% else %}
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{ page_title | escape }}">
+<meta property="og:url" content="{{ canonical_url }}">
+{% if page_description %}
+<meta property="og:description" content="{{ page_description | escape }}">
+{% endif %}
+{% if settings.logo_use_image %}
+<meta property="og:image" content="http:{{ 'logo.png' | asset_url }}">
+<meta property="og:image:secure_url" content="https:{{ 'logo.png' | asset_url }}">
+<meta property="og:image:alt" content="{{ page.title | escape }}">
+{% endif %}
+{% endif %}
+
+
+<!-- Twitter Card data -->
+<meta name="twitter:site" content="@tari">
+
+<!-- Twitter Card data Article -->
+{% if template contains 'article' and article.image %}
+<meta name="twitter:card" content="summary_large_image">
+<!-- Twitter Card data Index -->
+{% elsif template == 'index' %}
+<meta name="twitter:card" content="summary_large_image">
+{% else %}
+<meta name="twitter:card" content="summary">
+{% endif %}
+
+<!-- Twitter Card data Index -->
+{% if template == 'index' %}
+<meta name="twitter:title" content="{{ page_title }}">
+<meta name="twitter:description" content="{{ page_description | escape }}">
+<meta name="twitter:text:description" content="{{ page_description | escape }}">
+
+
+<!-- Twitter Card data Product -->
+{% elsif template contains 'product' %}
+<meta name="twitter:card" content="product"/>
+<meta name="twitter:title" content="{{ product.title | escape }}"/>
+<meta name="twitter:description" content="{{ product.description | strip_html | strip_newlines | truncatewords: 60, '' | escape }}"/>
+<meta name="twitter:image" content="https:{{ product.featured_image | img_url: '480x480' }}"/>
+<meta name="twitter:label1" content="Price"/>
+<meta name="twitter:data1" content="{% if product.price_varies %}From {% endif %}{{ product.price | times: rate | strip_html | escape }}"/>
+{% if product.vendor == blank %}
+<meta name="twitter:label2" content="Availability"/>
+<meta name="twitter:data2" content="{% if product.available %}In stock{% else %}Out of stock{% endif %}"/>  
+{% else %}
+<meta name="twitter:label2" content="Brand"/>
+<meta name="twitter:data2" content="{{ product.vendor | escape }}"/>
+{% endif %}
+
+<!-- Twitter Card data Article -->
+{% elsif template contains 'article' %}
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="{{ article.title | escape }}"/>
+<meta name="twitter:description" content="{{ article.excerpt_or_content | strip_html | truncatewords: 60, '' | escape }}"/>
+{% assign img_tag = '<' | append: 'img' %}
+{% if article.content contains img_tag %}
+{% assign src = article.content | split: 'src="' %}
+{% assign src = src[1] | split: '"' | first | remove: 'https:' | remove: 'http:' %}
+{% if src %}
+<meta property="twitter:image" content="http:{{ src }}"/>
+{% endif %}
+{% endif %}
+{% endif %}
+
+
