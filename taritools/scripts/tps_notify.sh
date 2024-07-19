@@ -9,7 +9,11 @@ BIN=$BINPATH/taritools
 PROFILE="TPS Hot Wallet"
 
 register_received_payment() {
-  ${BIN} wallet --profile "$PROFILE" received --amount $2 --txid $3 --message "$4" --sender $5
+  ${BIN} wallet received --profile "$PROFILE" --amount $2 --txid $3 --message "$4" --sender $5
+}
+
+register_confirmation() {
+  ${BIN} wallet confirmation --profile "$PROFILE" --txid $3
 }
 
 # Log the event

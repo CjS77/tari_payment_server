@@ -12,6 +12,7 @@ mod payments;
 mod shopify;
 
 mod tari_payment_server;
+mod wallet;
 
 use jwt_token::print_jwt_token;
 use log::*;
@@ -19,8 +20,9 @@ use tari_payment_engine::db_types::OrderId;
 
 use crate::{
     memo::print_memo_signature,
-    payments::{print_payment_auth, print_tx_confirm},
+    payments::{print_payment_auth, print_tx_confirm, WalletCommand},
     shopify::{handle_shopify_command, ShopifyCommand},
+    wallet::handle_wallet_command,
 };
 
 pub const APP_NAME: &str = env!("CARGO_PKG_NAME");
@@ -57,6 +59,8 @@ pub enum Command {
     TxConfirm(TxConfirmParams),
     #[command(subcommand)]
     Shopify(ShopifyCommand),
+    #[command(subcommand)]
+    Wallet(WalletCommand),
 }
 
 #[derive(Debug, Args)]
@@ -137,6 +141,7 @@ async fn run_command(cli: Arguments) {
         Command::PaymentAuth(params) => print_payment_auth(params),
         Command::TxConfirm(params) => print_tx_confirm(params),
         Command::Shopify(shopify_command) => handle_shopify_command(shopify_command).await,
+        Command::Wallet(wallet_command) => handle_wallet_command(wallet_command).await,
     }
 }
 

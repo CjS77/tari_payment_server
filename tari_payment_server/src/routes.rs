@@ -712,12 +712,11 @@ where
     let PaymentNotification { payment, auth } = body.into_inner();
     let use_x_forwarded_for = config.use_x_forwarded_for;
     let use_forwarded = config.use_forwarded;
-    trace!("💻️ Extracting remote IP address. {req:?}. {:?}", req.connection_info());
+    // Log the payment
     let Some(peer_addr) = get_remote_ip(&req, use_x_forwarded_for, use_forwarded) else {
         warn!("💻️ Could not determine remote IP address for a wallet payment notification. The request is rejected");
         return HttpResponse::Unauthorized().finish();
     };
-    // Log the payment
     info!("💻️ New payment notification received from IP {peer_addr}.");
     info!("💻️ Payment: {}", serde_json::to_string(&payment).unwrap_or_else(|e| format!("{e}")));
     info!("💻️ Auth: {}", serde_json::to_string(&auth).unwrap_or_else(|e| format!("{e}")));
@@ -726,6 +725,7 @@ where
         warn!("💻️ Invalid wallet signature received from {peer_addr}. The request is rejected.");
         return HttpResponse::Unauthorized().finish();
     }
+    trace!("💻️ Extracting remote IP address. {req:?}. {:?}", req.connection_info());
     let auth_api = auth_api.as_ref();
     if let Err(e) = auth_api.authenticate_wallet(auth, &peer_addr, &payment).await {
         warn!("💻️ Unauthorized wallet signature received from {peer_addr}. Reason: {e}. The request is rejected.");
