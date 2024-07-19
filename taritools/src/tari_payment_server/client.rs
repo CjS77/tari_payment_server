@@ -12,7 +12,12 @@ use tari_jwt::{
     Ristretto256SigningKey,
 };
 use tari_payment_engine::db_types::{LoginToken, UserAccount};
-use tari_payment_server::data_objects::{ExchangeRateResult, ExchangeRateUpdate};
+use tari_payment_server::data_objects::{
+    ExchangeRateResult,
+    ExchangeRateUpdate,
+    PaymentNotification,
+    TransactionConfirmationNotification,
+};
 use tpg_common::MicroTari;
 
 use crate::profile_manager::Profile;
@@ -95,6 +100,28 @@ impl PaymentServerClient {
         if !res.status().is_success() {
             let msg = res.text().await?;
             return Err(anyhow!("Error setting exchange rates: {msg}"));
+        }
+        Ok(())
+    }
+
+    /// Send a payment notification to the payment server.
+    pub async fn payment_notification(&self, notification: PaymentNotification) -> Result<()> {
+        let url = self.url("/wallet/incoming_payment");
+        let res = self.client.post(url).json(&notification).send().await?;
+        if !res.status().is_success() {
+            let msg = res.text().await?;
+            return Err(anyhow!("Error sending payment notification: {msg}"));
+        }
+        Ok(())
+    }
+
+    /// Send a payment confirmation to the payment server.
+    pub async fn payment_confirmation(&self, confirmation: TransactionConfirmationNotification) -> Result<()> {
+        let url = self.url("/wallet/tx_confirmation");
+        let res = self.client.post(url).json(&confirmation).send().await?;
+        if !res.status().is_success() {
+            let msg = res.text().await?;
+            return Err(anyhow!("Error sending payment confirmation: {msg}"));
         }
         Ok(())
     }

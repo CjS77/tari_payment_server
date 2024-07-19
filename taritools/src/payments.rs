@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use clap::{Args, Subcommand};
 use serde::Serialize;
 use tari_common::configuration::Network;
 use tari_crypto::{ristretto::RistrettoSecretKey, tari_utilities::hex::Hex};
@@ -10,6 +11,44 @@ use tari_payment_server::data_objects::TransactionConfirmation;
 use tpg_common::MicroTari;
 
 use crate::{keys::KeyInfo, PaymentAuthParams, TxConfirmParams};
+
+#[derive(Debug, Subcommand)]
+pub enum WalletCommand {
+    Received(ReceivedPaymentParams),
+    Confirmed(ConfirmationParams),
+}
+
+#[derive(Debug, Args)]
+pub struct ReceivedPaymentParams {
+    #[arg(short, long)]
+    pub profile: String,
+    #[arg(short, long)]
+    pub amount: i64,
+    #[arg(short, long)]
+    pub txid: String,
+    #[arg(short, long)]
+    pub memo: Option<String>,
+    #[arg(short, long)]
+    pub sender: String,
+}
+
+impl From<ReceivedPaymentParams> for NewPayment {
+    fn from(params: ReceivedPaymentParams) -> Self {
+        let sender = params.sender.parse::<SerializedTariAddress>().unwrap();
+        let amount = MicroTari::from(params.amount);
+        let memo = params.memo;
+        let order_id = None;
+        let txid = params.txid;
+        NewPayment { sender, amount, memo, order_id, txid }
+    }
+}
+#[derive(Debug, Args)]
+pub struct ConfirmationParams {
+    #[arg(short, long)]
+    pub profile: String,
+    #[arg(short, long)]
+    pub txid: String,
+}
 
 pub fn create_wallet_signature<T: Serialize>(info: &KeyInfo, nonce: i64, payload: &T) -> Result<WalletSignature> {
     let address = SerializedTariAddress::from(info.address().clone());

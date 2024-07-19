@@ -4,11 +4,27 @@ This guide provides a walkthrough of installing and setting up the Tari Payment 
 * A Shopify storefront
 * A Tari console wallet.
 
-## Tari Payment Server
+The Tari Payment Server consists of the following parts:
 
-## Shopify Storefront
+* The **Tari Payment Server** (TPS), which is a REST API server in front of the Tari Payment Engine and a Database, 
+  that 
+  tracks orders, payments, and the links between them. It has support for automatic account tracking (for example, 
+  if a Tari wallet sends more Tari than is needed, TPS will remember which store accounts were used with that 
+  address and apply the excess as a credit in future orders).
+* A Storefront. As of today, only **Shopify Storefront**s are supported, but integrations for other popular 
+  storefronts can be added.
+* A **hot wallet**, which acts as the receiver for all payments for orders.
 
-### Initial setup
+The hot wallet, TPS and storefront communicate with each other via webhooks and REST APIs. We employ a stateless 
+communication protocol, which requires that all messages must be signedm and which accounts for the majority of the 
+complexity of setting up the system.
+
+This guide will walk you through everything you need to do to set up a Tari Payment Server. If anything is unclear, 
+or you have a suggestion for improving this document, please submit an issue or a pull request.
+
+# Shopify Storefront
+
+## Initial setup
 
 1. You need to have an existing Shopify store. If you don't have one, you can create one [here](https://www.shopify.com/).
 2. Set up your store with the products you want to sell, configure the theme, etc.
@@ -20,7 +36,7 @@ This guide provides a walkthrough of installing and setting up the Tari Payment 
    * Enter the name of the payment method as `Tari Payment Server`.
      * Click `Activate`.
 
-### Enable custom App development
+## Enable custom App development
 
 1. From your store's admin, go to `Settings` -> `Apps and sales channels`.
 2. Click on `Develop apps`.
@@ -42,7 +58,7 @@ This guide provides a walkthrough of installing and setting up the Tari Payment 
    * Save your Admin API token. **Warning**: You only get to see this once!
    * Save your Storefront API token.
 
-### Configure the store to display prices in Tari.
+## Configure the store to display prices in Tari.
 
 Shopify makes it difficult to display prices in a currency other than the store's base currency, or in a 
 'recognised' local currency. And in 2024, Shopify has been deprecating APIs that allows apps to alter the 
@@ -106,9 +122,9 @@ something like this, but YMMV:
 [metafield]: https://shopify.dev/docs/api/functions/reference/fulfillment-constraints/graphql/common-objects/metafield "Shopify product metafields"
 [variant]: https://shopify.dev/docs/api/liquid/objects#variant "Shopify product variants"
 
-### Configure webhooks to interact with your server.
+## Configure webhooks to interact with your server.
 
-#### Using the CLI utility (recommended)
+### Using the CLI utility (recommended)
 You can use the accompanying CLI utility to install the required webhooks into your store. This utility will set up 
 and configure the webhooks for you. The CLI utility makes use of your Admin API key 
 (See [`shopify` command configuration](#configuring-taritools)). You must also have assigned the correct permissions 
@@ -120,7 +136,7 @@ as described in the [Enable custom App development](#enable-custom-app-developme
 3. Set the `TPG_SHOPIFY_HMAC_SECRET` environment variable in your server's environment to **the same value** as 
    `TPG_SHOPIFY_API_SECRET`. Shopify uses _different_ secrets for webhooks defined in the Admin UI and the API.
 
-#### Manually configuring webhooks
+### Manually configuring webhooks
 If you don't want to use the CLI utility, or you want to update a webhook configuration, or you broadly want to know 
 what the CLI utility is doing under the hood, you can manually configure the webhooks in your store.
 
@@ -138,6 +154,44 @@ what the CLI utility is doing under the hood, you can manually configure the web
 | Order creation | `https://your-server-url.com/shopify/webhook/checkout-create` |
 | Product create | `https://your-server-url.com/shopify/webhook/product-create`  |
 | Product update | `https://your-server-url.com/shopify/webhook/product-update`  |
+
+# Tari console hot wallet
+
+You should use the Tari console wallet as you hot wallet for the payment server.
+
+## Install the Tari console wallet.
+
+Follow the instructions on the [Tari Website](https://tari.com/downloads) to install and configure the Tari console 
+wallet.
+
+Tari Payment Server takes advantage of the `notifier` script to let the server know when payments are received and 
+confirmed.
+
+## Configure the notifier script.
+
+1. Edit the Tari configuration file. This is usually located at `$HOME/.tari/{network}/config/config.toml`. Replace `
+   {nework}` with the network you are using, e.g. `mainnet`.
+2. Under the `[wallet]` section, add or edit the following line:
+   ```toml
+   notify_file = "{path_to_HOME}/.taritools/tps_notify.sh"
+   ```
+3. Add a wallet profile to your taritools configuration file.
+   1. Edit `$HOME/.taritools/config.toml`.
+   2. Add a profile with the name `TPS Hot Wallet`. Something like:
+      ```toml
+      [[profiles]]
+      name="TPS Hot Wallet"
+      address="b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d"
+      # For security reasons, we suggest you don't store the secret key in the config file.
+      secret_key=""
+      # The secret key will be loaded from the specified enviroment variable instead.
+      secret_key_env="TPG_HOT_WALLET_SECRET_KEY"
+      roles=["user"]
+      server="https://my_tps_server"
+      ```
+4. Restart your hot wallet, and you should be good to go. Watch the logs in the TPS to check that the wallet hits 
+   the `/wallet/incoming_payment` and `/wallet/tx_confirmation` endpoints.
+
 
 # Tari tools
 

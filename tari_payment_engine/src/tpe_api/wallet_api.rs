@@ -43,6 +43,7 @@ where B: WalletAuth
     ///
     /// In particular:
     /// - The signature is internally valid
+    /// - The address of the wallet sending the message matches the record in the database
     /// - The nonce is greater than the nonce stored in the database
     /// - The remote IP address matches the IP address stored in the database
     /// - Updating the nonce in the database is successful
@@ -58,6 +59,9 @@ where B: WalletAuth
         trace!("Wallet signature for {} is valid", sig.address.as_hex());
         let address = sig.address.as_address();
         let wallet_info = self.db.get_wallet_info(address).await?;
+        if wallet_info.address != sig.address {
+            return Err(WalletAuthApiError::WalletNotFound);
+        }
         // The DB will usually trigger a constraint violation if the nonce is not greater than the last nonce,
         // but we check here in case the backend does not
         if wallet_info.last_nonce >= sig.nonce {
