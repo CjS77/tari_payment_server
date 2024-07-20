@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use anyhow::{anyhow, Result};
 use chrono::Utc;
 use log::info;
@@ -11,7 +13,7 @@ use tari_jwt::{
     Ristretto256,
     Ristretto256SigningKey,
 };
-use tari_payment_engine::db_types::{LoginToken, UserAccount};
+use tari_payment_engine::db_types::{LoginToken, Role, UserAccount};
 use tari_payment_server::data_objects::{
     ExchangeRateResult,
     ExchangeRateUpdate,
@@ -39,6 +41,18 @@ impl PaymentServerClient {
             .build()
             .expect("Failed to create reqwest client");
         PaymentServerClient { client, profile, access_token: "".to_string() }
+    }
+
+    pub fn server(&self) -> &str {
+        &self.profile.server
+    }
+
+    pub fn profile_name(&self) -> &str {
+        &self.profile.name
+    }
+
+    pub fn roles(&self) -> Vec<Role> {
+        self.profile.roles.clone()
     }
 
     pub fn url(&self, path: &str) -> String {
@@ -124,6 +138,15 @@ impl PaymentServerClient {
             return Err(anyhow!("Error sending payment confirmation: {msg}"));
         }
         Ok(())
+    }
+}
+
+impl Display for PaymentServerClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.profile_name())?;
+        let roles = self.roles().iter().map(|r| format!("{}", r)).collect::<Vec<String>>().join(", ");
+        write!(f, " [{roles}]")?;
+        write!(f, " ({})", self.server())
     }
 }
 

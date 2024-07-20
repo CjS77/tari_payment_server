@@ -19,6 +19,7 @@ use log::*;
 use tari_payment_engine::db_types::OrderId;
 
 use crate::{
+    interactive::InteractiveApp,
     memo::print_memo_signature,
     payments::{print_payment_auth, print_tx_confirm, WalletCommand},
     shopify::{handle_shopify_command, ShopifyCommand},
@@ -150,7 +151,8 @@ async fn run_interactive() {
         "No command given. If this was unintended, enter `CTRL-C` to exit and run `{APP_NAME} --help` to see a full \
          list of commands."
     );
-    match interactive::run().await {
+    let mut app = InteractiveApp::new();
+    match app.run().await {
         Ok(_) => println!("Bye!"),
         Err(e) => error!("Session ended with error: {}", e),
     }
