@@ -6,9 +6,9 @@ use std::{
 };
 
 use dirs::home_dir;
-use log::info;
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
-use tari_crypto::ristretto::RistrettoSecretKey;
+use tari_crypto::{ristretto::RistrettoSecretKey, tari_utilities::hex::Hex};
 use tari_payment_engine::db_types::{Role, SerializedTariAddress};
 
 #[derive(Serialize, Deserialize, Default)]
@@ -20,9 +20,24 @@ pub struct UserData {
 pub struct Profile {
     pub name: String,
     pub address: SerializedTariAddress,
-    pub secret_key: RistrettoSecretKey,
+    pub secret_key: Option<RistrettoSecretKey>,
+    pub secret_key_envar: Option<String>,
     pub roles: Vec<Role>,
     pub server: String,
+}
+
+impl Profile {
+    pub fn secret_key(&self) -> Option<RistrettoSecretKey> {
+        self.secret_key.clone().or_else(|| {
+            self.secret_key_envar.as_ref().and_then(|envar| {
+                std::env::var(envar).ok().and_then(|s| {
+                    RistrettoSecretKey::from_hex(&s)
+                        .map_err(|e| warn!("Failed to parse secret key from envar {s} for profile {}. {e}", self.name))
+                        .ok()
+                })
+            })
+        })
+    }
 }
 
 impl Default for Profile {
@@ -30,7 +45,8 @@ impl Default for Profile {
         Profile {
             name: "default".to_string(),
             address: SerializedTariAddress::default(),
-            secret_key: RistrettoSecretKey::default(),
+            secret_key: None,
+            secret_key_envar: None,
             roles: vec![Role::User],
             server: "http://localhost:4444".to_string(),
         }

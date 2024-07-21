@@ -156,6 +156,7 @@ fn generate_auth_token(profile: &Profile) -> Result<String> {
     let claims = LoginToken { address, nonce, desired_roles: profile.roles.clone() };
     let claims = Claims::new(claims);
     let header = Header::empty().with_token_type("JWT");
-    let token = Ristretto256.token(&header, &claims, &Ristretto256SigningKey(profile.secret_key.clone()))?;
+    let key = profile.secret_key().ok_or_else(|| anyhow!("Profile {} is missing a secret key", profile.name))?;
+    let token = Ristretto256.token(&header, &claims, &Ristretto256SigningKey(key))?;
     Ok(token)
 }
