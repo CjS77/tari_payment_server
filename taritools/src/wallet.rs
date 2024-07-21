@@ -44,7 +44,8 @@ async fn notify_server_about_payment(params: ReceivedPaymentParams) -> Result<()
     let profile = load_profile(&params.profile)?;
     let client = PaymentServerClient::new(profile.clone());
     let payment = NewPayment::from(params);
-    let auth = WalletSignature::create(profile.address, new_nonce(), &profile.secret_key, &payment)?;
+    let key = profile.secret_key().ok_or_else(|| anyhow!("Profile {} is missing a secret key", profile.name))?;
+    let auth = WalletSignature::create(profile.address, new_nonce(), &key, &payment)?;
     let notification = PaymentNotification { payment, auth };
     client.payment_notification(notification).await
 }
@@ -53,7 +54,8 @@ async fn notify_server_about_confirmation(params: ConfirmationParams) -> Result<
     let profile = load_profile(&params.profile)?;
     let txid = TransactionConfirmation { txid: params.txid };
     let client = PaymentServerClient::new(profile.clone());
-    let auth = WalletSignature::create(profile.address, new_nonce(), &profile.secret_key, &txid)?;
+    let key = profile.secret_key().ok_or_else(|| anyhow!("Profile {} is missing a secret key", profile.name))?;
+    let auth = WalletSignature::create(profile.address, new_nonce(), &key, &txid)?;
     let confirmation = TransactionConfirmationNotification { confirmation: txid, auth };
     client.payment_confirmation(confirmation).await
 }
