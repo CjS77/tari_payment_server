@@ -13,7 +13,7 @@ use thiserror::Error;
 use tpg_common::MicroTari;
 
 use crate::{
-    helpers::{extract_and_verify_memo_signature, extract_order_number_from_memo, MemoSignatureError},
+    helpers::{extract_and_verify_memo_signature, MemoSignature, MemoSignatureError},
     tpe_api::order_objects::{address_to_hex, str_to_address},
 };
 
@@ -413,11 +413,22 @@ impl NewPayment {
 
     pub fn with_memo<S: Into<String>>(&mut self, memo: S) {
         self.memo = Some(memo.into());
-        self.order_id = self.extract_order_id();
     }
 
-    pub fn extract_order_id(&self) -> Option<OrderId> {
-        self.memo.as_ref().and_then(|s| extract_order_number_from_memo(s.as_str()))
+    /// Tries to extract the order number from the memo.
+    ///
+    /// For this to succeed,
+    /// 1. The memo bust be a valid JSON object.
+    /// 2. The `claim` field must be present.
+    /// 3. The `claim` field must be a valid JSON object containing a valid `MemoSignature`.
+    pub fn try_extract_order_id(&mut self) -> Option<bool> {
+        self.memo.as_ref().and_then(|m| serde_json::from_str::<MemoSignature>(m).ok()).map(|m| {
+            let result = m.is_valid();
+            if result {
+                self.order_id = Some(OrderId::new(m.order_id));
+            }
+            result
+        })
     }
 }
 
@@ -542,18 +553,24 @@ pub struct LoginToken {
 
 #[cfg(test)]
 mod test {
+    use serde_json::json;
+
     use super::*;
     #[test]
     fn extract_order_id() {
         let mut payment = NewPayment::new(
-            TariAddress::from_str("02f671c8294931a6395b51a1f32921f429d22c1e34def8f9f81892034fe2963cf7").unwrap(),
-            MicroTari::from(100),
-            "txid".to_string(),
+            TariAddress::from_str("a8d523755de41b9c14de709ca59d52bc1772658258962ef5bbefa8c59082e54733").unwrap(),
+            MicroTari::from_tari(100),
+            "txid111111".to_string(),
         );
-        payment.with_memo("Order id: [1234]".to_string());
-        assert_eq!(payment.order_id, Some(OrderId::new("1234")));
-
-        payment.with_memo("Hey boet".to_string());
-        assert_eq!(payment.order_id, None);
+        payment.with_memo(json!({
+            "address": "a8d523755de41b9c14de709ca59d52bc1772658258962ef5bbefa8c59082e54733",
+            "order_id": "oid554432",
+            "signature": "2421e3c98522d7c5518f55ddb39f759ee9051dde8060679d48f257994372fb214e9024917a5befacb132fc9979527ff92daa2c5d42062b8a507dc4e3b6954c05"
+            }).to_string()
+        );
+        let result = payment.try_extract_order_id();
+        assert!(matches!(result, Some(true)));
+        assert_eq!(payment.order_id.unwrap().as_str(), "oid554432");
     }
 }
