@@ -13,7 +13,7 @@ use thiserror::Error;
 use tpg_common::MicroTari;
 
 use crate::{
-    helpers::{extract_and_verify_memo_signature, extract_order_number_from_memo, MemoSignatureError},
+    helpers::{extract_and_verify_memo_signature, MemoSignature, MemoSignatureError},
     tpe_api::order_objects::{address_to_hex, str_to_address},
 };
 
@@ -413,11 +413,22 @@ impl NewPayment {
 
     pub fn with_memo<S: Into<String>>(&mut self, memo: S) {
         self.memo = Some(memo.into());
-        self.order_id = self.extract_order_id();
     }
 
-    pub fn extract_order_id(&self) -> Option<OrderId> {
-        self.memo.as_ref().and_then(|s| extract_order_number_from_memo(s.as_str()))
+    /// Tries to extract the order number from the memo.
+    ///
+    /// For this to succeed,
+    /// 1. The memo bust be a valid JSON object.
+    /// 2. The `claim` field must be present.
+    /// 3. The `claim` field must be a valid JSON object containing a valid `MemoSignature`.
+    pub fn try_extract_order_id(&mut self) -> Option<bool> {
+        self.memo.as_ref().and_then(|m| serde_json::from_str::<MemoSignature>(m).ok()).map(|m| {
+            let result = m.is_valid();
+            if result {
+                self.order_id = Some(OrderId::new(m.order_id));
+            }
+            result
+        })
     }
 }
 

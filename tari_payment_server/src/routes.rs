@@ -461,6 +461,7 @@ pub async fn claim_order<B: PaymentGatewayDatabase>(
     })?;
     Ok(HttpResponse::Ok().json(result))
 }
+
 pub async fn get_orders<B: AccountManagement>(
     address: &TariAddress,
     api: &AccountApi<B>,
@@ -709,7 +710,7 @@ where
     BOrder: PaymentGatewayDatabase,
 {
     trace!("💻️ Received incoming payment notification");
-    let PaymentNotification { payment, auth } = body.into_inner();
+    let PaymentNotification { mut payment, auth } = body.into_inner();
     let use_x_forwarded_for = config.use_x_forwarded_for;
     let use_forwarded = config.use_forwarded;
     // Log the payment
@@ -732,6 +733,15 @@ where
         return HttpResponse::Unauthorized().finish();
     }
     // -- from here on, we trust that the notification is legitimate.
+    // -- extract the order_id from the memo signature, if present
+    match payment.try_extract_order_id() {
+        Some(true) => {
+            let id = payment.order_id.as_ref().map(|o| o.as_str()).unwrap_or_else(|| "??");
+            info!("💻️ Payment memo contains a valid claim for order {id}");
+        },
+        Some(false) => debug!("💻️ Payment memo does not contain a valid claim for an order."),
+        None => debug!("💻️ Payment memo was empty and did thus did not contain a claim for an order"),
+    }
     let result = match order_api.process_new_payment(payment).await {
         Ok(orders) => {
             let ids = orders.iter().map(|o| o.order_id.as_str()).collect::<Vec<_>>().join(", ");
