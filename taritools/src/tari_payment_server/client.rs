@@ -8,12 +8,16 @@ use reqwest::{
     Client,
     StatusCode,
 };
+use serde::de::DeserializeOwned;
 use tari_jwt::{
     jwt_compact::{AlgorithmExt, Claims, Header},
     Ristretto256,
     Ristretto256SigningKey,
 };
-use tari_payment_engine::db_types::{LoginToken, Role, UserAccount};
+use tari_payment_engine::{
+    db_types::{LoginToken, Order, Role, UserAccount},
+    order_objects::OrderResult,
+};
 use tari_payment_server::data_objects::{
     ExchangeRateResult,
     ExchangeRateUpdate,
@@ -95,15 +99,7 @@ impl PaymentServerClient {
     }
 
     pub async fn fetch_exchange_rates(&self, currency: &str) -> Result<ExchangeRateResult> {
-        let url = self.url(format!("/api/exchange_rate/{currency}").as_str());
-        let res = self.client.get(url).header("tpg_access_token", self.access_token.clone()).send().await?;
-        match res.status() {
-            StatusCode::OK => Ok(res.json().await?),
-            code => {
-                let msg = res.text().await?;
-                Err(anyhow!("Error fetching exchange rate: {code}, {msg}."))
-            },
-        }
+        self.auth_get_request(&format!("/api/exchange_rate/{currency}")).await
     }
 
     pub async fn set_exchange_rate(&self, currency: &str, price_in_tari: MicroTari) -> Result<()> {
@@ -138,6 +134,31 @@ impl PaymentServerClient {
             return Err(anyhow!("Error sending payment confirmation: {msg}"));
         }
         Ok(())
+    }
+
+    pub async fn my_orders(&self) -> Result<OrderResult> {
+        self.auth_get_request("/api/orders").await
+    }
+
+    pub async fn my_unfulfilled_orders(&self) -> Result<Vec<Order>> {
+        self.auth_get_request("/api/unfulfilled_orders").await
+    }
+
+    async fn auth_get_request<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
+        let url = self.url(path);
+        let res = self.client.get(url).header("tpg_access_token", self.access_token.clone()).send().await?;
+        match res.status() {
+            StatusCode::OK => Ok({
+                res.json().await?
+                // let body: Value = res.json().await?;
+                // println!("body: {:?}", body);
+                // serde_json::from_value(body).unwrap()
+            }),
+            code => {
+                let msg = res.text().await?;
+                Err(anyhow!("Error fetching {path}: {code}, {msg}."))
+            },
+        }
     }
 }
 

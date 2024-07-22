@@ -1,10 +1,16 @@
-use std::{fmt::Display, time::Duration};
+use std::{
+    fmt::{Display, Write},
+    time::Duration,
+};
 
 use anyhow::{Error, Result};
 use dialoguer::{console::Style, theme::ColorfulTheme, Confirm, FuzzySelect};
 use indicatif::{ProgressBar, ProgressStyle};
 use prettytable::{row, Cell, Row, Table};
-use tari_payment_engine::db_types::UserAccount;
+use tari_payment_engine::{
+    db_types::{Order, UserAccount},
+    order_objects::OrderResult,
+};
 use tari_payment_server::data_objects::ExchangeRateResult;
 use tpg_common::MicroTari;
 
@@ -79,6 +85,8 @@ impl InteractiveApp {
             match self.current_menu.1[i] {
                 "Server health" => self.server_health().await,
                 "My Account" => self.my_account().await,
+                "My Orders" => self.my_orders().await,
+                "My Open Orders" => self.my_unfulfilled_orders().await,
                 "Admin Menu" => self.select_menu(menus::admin_menu()),
                 "User Menu" => self.select_menu(menus::user_menu()),
                 "Fetch Tari price" => self.fetch_tari_price().await,
@@ -106,6 +114,22 @@ impl InteractiveApp {
         let mut res = self.login().await;
         if res.is_ok() {
             res = self.client.as_mut().unwrap().my_account().await.map(format_user_account);
+        }
+        handle_response(res)
+    }
+
+    async fn my_orders(&mut self) {
+        let mut res = self.login().await;
+        if res.is_ok() {
+            res = self.client.as_mut().unwrap().my_orders().await.and_then(format_order_result);
+        }
+        handle_response(res)
+    }
+
+    async fn my_unfulfilled_orders(&mut self) {
+        let mut res = self.login().await;
+        if res.is_ok() {
+            res = self.client.as_mut().unwrap().my_unfulfilled_orders().await.and_then(format_orders);
         }
         handle_response(res)
     }
@@ -186,6 +210,54 @@ fn format_user_account(account: UserAccount) -> String {
 
     // Format the table to a string
     table.to_string()
+}
+
+fn format_order_result(orders: OrderResult) -> Result<String> {
+    let mut f = String::new();
+    writeln!(f, "===============================================================================")?;
+    writeln!(
+        f,
+        "Orders for {address}\n{count:>4} orders. Total value: {value}",
+        count = orders.orders.len(),
+        address = orders.address,
+        value = orders.total_orders
+    )?;
+    writeln!(f, "===============================================================================")?;
+    orders.orders.iter().try_for_each(|order| format_order(order, &mut f))?;
+    Ok(f)
+}
+
+fn format_orders(orders: Vec<Order>) -> Result<String> {
+    let mut f = String::new();
+    writeln!(f, "===============================================================================")?;
+    if orders.is_empty() {
+        writeln!(f, "No open orders")?;
+    } else {
+        orders.iter().try_for_each(|order| format_order(order, &mut f))?;
+    }
+    writeln!(f, "===============================================================================")?;
+    Ok(f)
+}
+
+fn format_order(order: &Order, f: &mut dyn Write) -> Result<()> {
+    writeln!(
+        f,
+        "Order id: {id:15}          Created {created}",
+        id = order.order_id.to_string(),
+        created = order.created_at,
+    )?;
+    writeln!(f, "[{:^15}]                  Updated {}", order.status.to_string(), order.updated_at)?;
+    writeln!(f, "-----------------------------------------------------------------------------")?;
+    writeln!(f, "Total Price:    {total}", total = order.total_price)?;
+    writeln!(
+        f,
+        "Original Price: {original} {currency}",
+        original = order.original_price.as_ref().map(|s| s.as_str()).unwrap_or("Not given"),
+        currency = order.currency
+    )?;
+    writeln!(f, "Memo: {memo}", memo = order.memo.as_ref().map(|s| s.as_str()).unwrap_or("No memo"))?;
+    writeln!(f, "-----------------------------------------------------------------------------\n")?;
+    Ok(())
 }
 
 fn format_exchange_rate(rate: ExchangeRateResult) -> String {

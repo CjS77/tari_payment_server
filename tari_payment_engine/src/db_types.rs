@@ -84,6 +84,18 @@ impl From<TariAddress> for SerializedTariAddress {
     }
 }
 
+impl From<&TariAddress> for SerializedTariAddress {
+    fn from(value: &TariAddress) -> Self {
+        Self(value.clone())
+    }
+}
+
+impl Display for SerializedTariAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_hex())
+    }
+}
+
 impl<'r, DB: Database> Decode<'r, DB> for SerializedTariAddress
 // we want to delegate some of the work to string
 // decoding so let's make sure strings are supported by
