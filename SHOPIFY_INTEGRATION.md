@@ -155,9 +155,97 @@ what the CLI utility is doing under the hood, you can manually configure the web
 | Product create | `https://your-server-url.com/shopify/webhook/product-create`  |
 | Product update | `https://your-server-url.com/shopify/webhook/product-update`  |
 
+## Editing customer notifications
+
+You can edit any of the Customer Notification templates to improve the user experience of your store, but at the 
+bare minimum, we suggest updating the `Order Confirmation Email` template to reflect the Tari prices in the order 
+and most importantly, communicating the order ID to the customer.
+
+The template is edited in the Admin console under `Settings` -> `Notifications` -> `Order Confirmation`.
+(https://admin.shopify.com/store/{store_id}/email_templates/order_confirmation)
+
+You can reflect prices in Tari using the following template:
+
+```liquid
+{% assign tari_subtotal_price = 0 %}              
+<table class="row">
+  {% for line in subtotal_line_items %}
+    <!-- The tari price is automatically set by Tari Payment Server if webhooks have been correctly configured -->
+    {% assign tari_price = line.variant.metafields["custom"]["tari_price"] %}
+    {% assign line_total = tari_price | times: line.quantity %}
+    {% assign tari_subtotal_price = tari_subtotal_price | plus: line_total %}
+    <!--- snip --->
+        <td class="subtotal-line__value">
+          <img class="price-gem" src="https://cdn.shopify.com/s/files/1/0337/0922/8076/files/TariGem.png?v=1584467930" alt="Tari" height="13"/>
+          <strong>{{ tari_subtotal_price | divided_by: 1000000 }}</strong>
+        </td>
+    <!--- snip --->
+    {% endfor %}
+    
+    <tr class="subtotal-line">
+      <td class="subtotal-line__title"><span>Subtotal</span></td>
+      <td class="subtotal-line__value">
+        <img class="price-gem" src="https://cdn.shopify.com/s/files/1/0337/0922/8076/files/TariGem.png?v=1584467930" height="13"/>
+        <strong>{{ tari_subtotal_price | divided_by: 1000000 }}</strong>
+      </td>
+    </tr>
+    
+    <!-- For taxes and shipping, there's no way to get the global rate, so calculate it manually -->
+    {% assign average_rate = tari_subtotal_price | divided_by: subtotal_price %} 
+    {% assign tari_shipping_price = shipping_price | times: average_rate %} 
+    
+    <tr class="subtotal-line">
+      <td class="subtotal-line__title"> <span>Shipping</span></td>
+      <td class="subtotal-line__value">
+        <img class="price-gem" src="https://cdn.shopify.com/s/files/1/0337/0922/8076/files/TariGem.png?v=1584467930" height="13"/>
+        <strong>{{ tari_shipping_price | divided_by: 1000000 }}</strong>
+      </td>
+    </tr>
+    
+    <!-- repeat this pattern for duties, shipping and discounts -->
+</table>
+{% assign tari_total_price = tari_subtotal_price | plus: tari_shipping_price | plus: tari_taxes | plus: tari_duties %}
+<table class="row subtotal-table subtotal-table--total">
+  <tr class="subtotal-line">
+    <td class="subtotal-line__title"><span>Total due</span></td>
+    <td class="subtotal-line__value">
+      <img class="price-gem" src="https://cdn.shopify.com/s/files/1/0337/0922/8076/files/TariGem.png?v=1584467930" alt="Tari" height="20"/>
+      <strong>{{ tari_total_price | divided_by: 1000000 }}</strong>
+    </td>
+  </tr>
+</table>
+```
+
+You can also access some useful metadata about the order in your template. Here is a simple example:
+
+```liquid
+<h1>Metadata</h1>
+{% assign tps_wallet_address = "0859fb3d6696579310c220d204cb21437d6658d0a05af1c8cd54fffd8725344352" %}
+{% capture tari_payment_link %}
+  tari://pay?shop={{shop.id}}&order_id={{id}}&amount={{tari_total_price}}&send_to={{ tps_wallet_address }}
+{% endcapture %}
+<ul>
+  <li> Order id: {{ id }} </li> 
+  <li> Order status: {{ order_status_url }} </li>
+  <li> Aurora link (if viewing this on your mobile phone): {{ tari_payment_link }}</li>
+</ul> 
+<div>
+  <h2>Autogenererated QR code</h2>
+  <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ tari_payment_link | url_encode }}"/>
+</div> 
+```
+
+You'll notice that you need to hard-code the hot wallet address into the template. This is because Shopify does not 
+provide access to global metaobject data in the email templates. 
+
+You might also want to replace `qrserver.com` with your own QR code generator.
+
+Shopify also scrubs links from anchor tags in the email templates (e.g. `<a href="tari://...">`), so clickable links 
+to trigger deep links will not work. (If there's a workaround, please let us know!)
+
 # Tari console hot wallet
 
-You should use the Tari console wallet as you hot wallet for the payment server.
+You should use the Tari console wallet as your hot wallet for the payment server.
 
 ## Install the Tari console wallet.
 

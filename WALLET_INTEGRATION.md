@@ -128,3 +128,20 @@ If successful, the response will be a `200 OK` with a JSON object containing the
 
 If unsuccessful, the response will be a `40x` (if a user error) or `50x` (if a backend error) code with a reason for 
 the failure.
+                
+# Obtaining the Order Id
+
+In general, the order id must be obtained at some point during the checkout flow on the supported storefront.
+
+For example, in Shopify, the Order Confirmation modal and email is configured to display a QR code that contains the 
+following schema information:
+
+```text
+tari://pay?shop={shopify_store_id}&order_id={order_id}&amount={total_amount_in_microtari}&send_to={hot_wallet_address} 
+```
+
+The order confirmation might also capture this information in a QR code for easy scanning by Aurora:
+
+![Aurora QR Code](assets/qr_code.png)
+
+This information is sufficient to complete both the payment and the claim steps as described above.
