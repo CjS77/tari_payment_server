@@ -6,15 +6,14 @@ use tari_common_types::tari_address::TariAddress;
 use tpg_common::MicroTari;
 
 use crate::{
-    db_types::{Order, OrderId, OrderStatusType},
+    db_types::{Order, OrderId, OrderStatusType, SerializedTariAddress},
     helpers,
     traits::AccountApiError,
 };
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct OrderResult {
-    #[serde(serialize_with = "address_to_hex")]
-    pub address: TariAddress,
+    pub address: SerializedTariAddress,
     pub total_orders: MicroTari,
     pub orders: Vec<Order>,
 }

@@ -47,7 +47,7 @@ where B: AccountManagement
     /// Fetches all orders associated with the given Tari address, and wraps them in an `OrderResult`, which includes
     /// the metadata of the address and the sum of the orders' values.
     pub async fn orders_for_address(&self, address: &TariAddress) -> Result<Option<OrderResult>, AccountApiError> {
-        let mut result = OrderResult { address: address.clone(), total_orders: 0.into(), orders: vec![] };
+        let mut result = OrderResult { address: address.into(), total_orders: 0.into(), orders: vec![] };
         match self.account_by_address(address).await {
             Ok(Some(acc)) => {
                 result.total_orders = acc.total_orders;

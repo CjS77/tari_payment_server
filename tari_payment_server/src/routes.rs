@@ -371,7 +371,8 @@ pub async fn unfulfilled_orders<B: AccountManagement>(
         debug!("💻️ Could not fetch unfulfilled orders. {e}");
         ServerError::BackendError(e.to_string())
     })?;
-    let result = OrderResult { address, total_orders: orders.iter().map(|o| o.total_price).sum(), orders };
+    let result =
+        OrderResult { address: address.into(), total_orders: orders.iter().map(|o| o.total_price).sum(), orders };
     Ok(HttpResponse::Ok().json(result))
 }
 
