@@ -17,6 +17,7 @@ use tari_jwt::{
 use tari_payment_engine::{
     db_types::{LoginToken, Order, Role, UserAccount},
     order_objects::OrderResult,
+    tpe_api::payment_objects::PaymentsResult,
 };
 use tari_payment_server::data_objects::{
     ExchangeRateResult,
@@ -142,6 +143,10 @@ impl PaymentServerClient {
 
     pub async fn my_unfulfilled_orders(&self) -> Result<Vec<Order>> {
         self.auth_get_request("/api/unfulfilled_orders").await
+    }
+
+    pub async fn my_payments(&self) -> Result<PaymentsResult> {
+        self.auth_get_request("/api/payments").await
     }
 
     async fn auth_get_request<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
