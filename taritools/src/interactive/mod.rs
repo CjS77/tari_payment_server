@@ -1,14 +1,16 @@
 use std::{fmt::Display, time::Duration};
 
-use anyhow::{Error, Result};
+use anyhow::Result;
 use dialoguer::{console::Style, theme::ColorfulTheme, Confirm, FuzzySelect};
 use indicatif::{ProgressBar, ProgressStyle};
+use tari_common_types::tari_address::TariAddress;
 use tpg_common::MicroTari;
 
 use crate::{
     interactive::{
         formatting::{format_exchange_rate, format_order_result, format_orders, format_payments, format_user_account},
         menus::{top_menu, Menu},
+        selector::{AddressSelector, CustomerSelector},
     },
     profile_manager::{read_config, Profile},
     tari_payment_server::client::PaymentServerClient,
@@ -17,10 +19,14 @@ use crate::{
 pub mod formatting;
 pub mod menus;
 
+pub mod selector;
+
 pub struct InteractiveApp {
     client: Option<PaymentServerClient>,
     current_menu: &'static Menu,
     breadcrumbs: Vec<&'static Menu>,
+    customer_ids: CustomerSelector,
+    addresses: AddressSelector,
 }
 
 impl InteractiveApp {
@@ -28,7 +34,9 @@ impl InteractiveApp {
         let client = None;
         let current_menu = top_menu();
         let breadcrumbs = vec![top_menu()];
-        Self { client, current_menu, breadcrumbs }
+        let customer_ids = CustomerSelector::default();
+        let addresses = AddressSelector::default();
+        Self { client, current_menu, breadcrumbs, customer_ids, addresses }
     }
 
     pub fn is_logged_in(&self) -> bool {
@@ -87,6 +95,9 @@ impl InteractiveApp {
                 "User Menu" => self.select_menu(menus::user_menu()),
                 "Fetch Tari price" => self.fetch_tari_price().await,
                 "Set Tari price" => self.set_tari_price().await,
+                "Issue Credit" => handle_response(self.issue_credit().await),
+                "Orders for Address" => handle_response(self.orders_for_address().await),
+                "Payments for Address" => handle_response(self.payments_for_address().await),
                 "Logout" => self.logout(),
                 "Back" => self.pop_menu(),
                 "Exit" => break,
@@ -153,6 +164,47 @@ impl InteractiveApp {
         }
         handle_response(res)
     }
+
+    async fn issue_credit(&mut self) -> Result<String> {
+        let _unused = self.login().await?;
+        let client = self.client.as_ref().unwrap();
+        self.customer_ids.update(client).await?;
+        let idx = FuzzySelect::new().with_prompt("Select customer ID").items(self.customer_ids.items()).interact()?;
+        let cust_id = &self.customer_ids.items()[idx];
+        let amount = input_tari_amount("Enter amount in Tari:")?;
+        let reason = dialoguer::Input::<String>::new().with_prompt("Enter reason").interact()?;
+        let orders = client.issue_credit(cust_id, amount, reason).await?;
+        if orders.is_empty() {
+            Ok("Credit issued successfully".into())
+        } else {
+            println!("Credit issued successfully.\nThe following {} orders have been paid as a result:", orders.len());
+            format_orders(orders)
+        }
+    }
+
+    async fn orders_for_address(&mut self) -> Result<String> {
+        let _unused = self.login().await;
+        let address = self.select_address().await?;
+        let client = self.client.as_ref().unwrap();
+        client.orders_for_address(address).await.and_then(format_order_result)
+    }
+
+    async fn payments_for_address(&mut self) -> Result<String> {
+        let _unused = self.login().await;
+        let address = self.select_address().await?;
+        let client = self.client.as_ref().unwrap();
+        let payments = client.payments_for_address(address).await?;
+        format_payments(payments)
+    }
+
+    async fn select_address(&mut self) -> Result<TariAddress> {
+        let _unused = self.login().await;
+        let client = self.client.as_ref().unwrap();
+        self.addresses.update(client).await?;
+        let idx = FuzzySelect::new().with_prompt("Select address").items(self.addresses.items()).interact()?;
+        let address = TariAddress::from_hex(&self.addresses.items()[idx])?;
+        Ok(address)
+    }
 }
 
 fn handle_response<T: Display>(res: Result<T>) {
@@ -162,31 +214,36 @@ fn handle_response<T: Display>(res: Result<T>) {
     }
 }
 
-async fn set_new_tari_price(client: &mut PaymentServerClient) -> Result<String, Error> {
-    let rate = dialoguer::Input::<f64>::new().with_prompt("Enter Tari price (per USD)").interact()?;
+fn input_tari_amount(prompt: &str) -> Result<MicroTari> {
+    let rate = dialoguer::Input::<f64>::new().with_prompt(prompt).interact()?;
     #[allow(clippy::cast_possible_truncation)]
     let price = MicroTari::from((rate * 1e6) as i64);
-    if Confirm::new().with_prompt(format!("Set Tari price to {price}?")).interact()? {
-        let pb = ProgressBar::new_spinner();
-        pb.enable_steady_tick(Duration::from_millis(100));
-        pb.set_style(
-            ProgressStyle::with_template("{spinner:5} {msg} [{elapsed}]")
-                .unwrap()
-                .tick_strings(&["🕛 ", "🕐 ", "🕑 ", "🕒 ", "🕓 ", "🕔 ", "🕕 ", "🕖 ", "🕗 ", "🕘 ", "🕙 ", "🕚 "]),
-        );
-        pb.set_message("Updating prices (this could take a few minutes)...");
-        match client.set_exchange_rate("USD", price).await {
-            Ok(()) => {
-                pb.finish_with_message("Done!");
-                Ok("Tari price set successfully".into())
-            },
-            Err(e) => {
-                pb.finish_with_message("Error!");
-                Err(e)
-            },
-        }
+    if Confirm::new().with_prompt(format!("Confirm value of {price}?")).interact()? {
+        Ok(price)
     } else {
         Err(anyhow::anyhow!("Cancelled"))
+    }
+}
+
+async fn set_new_tari_price(client: &mut PaymentServerClient) -> Result<String> {
+    let price = input_tari_amount("Enter Tari price (per USD)")?;
+    let pb = ProgressBar::new_spinner();
+    pb.enable_steady_tick(Duration::from_millis(100));
+    pb.set_style(
+        ProgressStyle::with_template("{spinner:5} {msg} [{elapsed}]")
+            .unwrap()
+            .tick_strings(&["🕛 ", "🕐 ", "🕑 ", "🕒 ", "🕓 ", "🕔 ", "🕕 ", "🕖 ", "🕗 ", "🕘 ", "🕙 ", "🕚 "]),
+    );
+    pb.set_message("Updating prices (this could take a few minutes)...");
+    match client.set_exchange_rate("USD", price).await {
+        Ok(()) => {
+            pb.finish_with_message("Done!");
+            Ok("Tari price set successfully".into())
+        },
+        Err(e) => {
+            pb.finish_with_message("Error!");
+            Err(e)
+        },
     }
 }
 

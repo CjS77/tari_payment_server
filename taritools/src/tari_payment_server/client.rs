@@ -9,13 +9,14 @@ use reqwest::{
     StatusCode,
 };
 use serde::de::DeserializeOwned;
+use tari_common_types::tari_address::TariAddress;
 use tari_jwt::{
     jwt_compact::{AlgorithmExt, Claims, Header},
     Ristretto256,
     Ristretto256SigningKey,
 };
 use tari_payment_engine::{
-    db_types::{LoginToken, Order, Role, UserAccount},
+    db_types::{CreditNote, LoginToken, Order, Role, UserAccount},
     order_objects::OrderResult,
     tpe_api::payment_objects::PaymentsResult,
 };
@@ -164,6 +165,35 @@ impl PaymentServerClient {
                 Err(anyhow!("Error fetching {path}: {code}, {msg}."))
             },
         }
+    }
+
+    pub async fn customer_ids(&self) -> Result<Vec<String>> {
+        self.auth_get_request("/api/customer_ids").await
+    }
+
+    pub async fn addresses(&self) -> Result<Vec<String>> {
+        self.auth_get_request("/api/addresses").await
+    }
+
+    pub async fn orders_for_address(&self, address: TariAddress) -> Result<OrderResult> {
+        self.auth_get_request(&format!("/api/orders/{}", address.to_hex())).await
+    }
+
+    pub async fn payments_for_address(&self, address: TariAddress) -> Result<PaymentsResult> {
+        self.auth_get_request(&format!("/api/payments/{}", address.to_hex())).await
+    }
+
+    pub async fn issue_credit(&self, customer_id: &str, amount: MicroTari, reason: String) -> Result<Vec<Order>> {
+        let url = self.url("/api/credit");
+        let credit = CreditNote::new(customer_id.to_string(), amount).with_reason(reason);
+        let res =
+            self.client.post(url).header("tpg_access_token", self.access_token.clone()).json(&credit).send().await?;
+        if !res.status().is_success() {
+            let msg = res.text().await?;
+            return Err(anyhow!("Error issuing credit: {msg}"));
+        }
+        let paid_orders = res.json().await?;
+        Ok(paid_orders)
     }
 }
 

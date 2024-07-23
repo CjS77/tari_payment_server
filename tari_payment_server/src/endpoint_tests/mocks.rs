@@ -3,7 +3,7 @@ use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
     db_types::{Order, OrderId, Payment, Role, UserAccount},
     order_objects::OrderQueryFilter,
-    tpe_api::account_objects::FullAccount,
+    tpe_api::account_objects::{FullAccount, Pagination},
     traits::{AccountApiError, AccountManagement, AuthApiError, AuthManagement},
 };
 
@@ -21,6 +21,8 @@ mock! {
         async fn history_for_id(&self, account_id: i64) -> Result<Option<FullAccount>, AccountApiError>;
         async fn search_orders(&self, query: OrderQueryFilter, only_address: Option<TariAddress>) -> Result<Vec<Order>, AccountApiError>;
         async fn creditors(&self) -> Result<Vec<UserAccount>, AccountApiError>;
+        async fn fetch_customer_ids(&self, pagination: &Pagination) -> Result<Vec<String>, AccountApiError>;
+        async fn fetch_addresses(&self, pagination: &Pagination) -> Result<Vec<TariAddress>, AccountApiError>;
     }
 }
 
