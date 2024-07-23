@@ -1,25 +1,20 @@
-use std::{
-    fmt::{Display, Write},
-    time::Duration,
-};
+use std::{fmt::Display, time::Duration};
 
 use anyhow::{Error, Result};
 use dialoguer::{console::Style, theme::ColorfulTheme, Confirm, FuzzySelect};
 use indicatif::{ProgressBar, ProgressStyle};
-use prettytable::{row, Cell, Row, Table};
-use tari_payment_engine::{
-    db_types::{Order, UserAccount},
-    order_objects::OrderResult,
-};
-use tari_payment_server::data_objects::ExchangeRateResult;
 use tpg_common::MicroTari;
 
 use crate::{
-    interactive::menus::{top_menu, Menu},
+    interactive::{
+        formatting::{format_exchange_rate, format_order_result, format_orders, format_payments, format_user_account},
+        menus::{top_menu, Menu},
+    },
     profile_manager::{read_config, Profile},
     tari_payment_server::client::PaymentServerClient,
 };
 
+pub mod formatting;
 pub mod menus;
 
 pub struct InteractiveApp {
@@ -87,6 +82,7 @@ impl InteractiveApp {
                 "My Account" => self.my_account().await,
                 "My Orders" => self.my_orders().await,
                 "My Open Orders" => self.my_unfulfilled_orders().await,
+                "My Payments" => self.my_payments().await,
                 "Admin Menu" => self.select_menu(menus::admin_menu()),
                 "User Menu" => self.select_menu(menus::user_menu()),
                 "Fetch Tari price" => self.fetch_tari_price().await,
@@ -130,6 +126,14 @@ impl InteractiveApp {
         let mut res = self.login().await;
         if res.is_ok() {
             res = self.client.as_mut().unwrap().my_unfulfilled_orders().await.and_then(format_orders);
+        }
+        handle_response(res)
+    }
+
+    async fn my_payments(&mut self) {
+        let mut res = self.login().await;
+        if res.is_ok() {
+            res = self.client.as_mut().unwrap().my_payments().await.and_then(format_payments);
         }
         handle_response(res)
     }
@@ -194,73 +198,4 @@ fn select_profile(theme: &ColorfulTheme) -> Result<Profile> {
         profile.clone()
     })?;
     Ok(profile)
-}
-
-fn format_user_account(account: UserAccount) -> String {
-    let mut table = Table::new();
-    table.add_row(row!["Field", "Value"]);
-    table.add_row(Row::new(vec![Cell::new("ID"), Cell::new(&account.id.to_string())]));
-    table.add_row(Row::new(vec![Cell::new("Created At"), Cell::new(&account.created_at.to_string())]));
-    table.add_row(Row::new(vec![Cell::new("Updated At"), Cell::new(&account.updated_at.to_string())]));
-    table.add_row(Row::new(vec![Cell::new("Total Received"), Cell::new(&account.total_received.to_string())]));
-    table.add_row(Row::new(vec![Cell::new("Current Pending"), Cell::new(&account.current_pending.to_string())]));
-    table.add_row(Row::new(vec![Cell::new("Current Balance"), Cell::new(&account.current_balance.to_string())]));
-    table.add_row(Row::new(vec![Cell::new("Total Orders"), Cell::new(&account.total_orders.to_string())]));
-    table.add_row(Row::new(vec![Cell::new("Current Orders"), Cell::new(&account.current_orders.to_string())]));
-
-    // Format the table to a string
-    table.to_string()
-}
-
-fn format_order_result(orders: OrderResult) -> Result<String> {
-    let mut f = String::new();
-    writeln!(f, "===============================================================================")?;
-    writeln!(
-        f,
-        "Orders for {address}\n{count:>4} orders. Total value: {value}",
-        count = orders.orders.len(),
-        address = orders.address,
-        value = orders.total_orders
-    )?;
-    writeln!(f, "===============================================================================")?;
-    orders.orders.iter().try_for_each(|order| format_order(order, &mut f))?;
-    Ok(f)
-}
-
-fn format_orders(orders: Vec<Order>) -> Result<String> {
-    let mut f = String::new();
-    writeln!(f, "===============================================================================")?;
-    if orders.is_empty() {
-        writeln!(f, "No open orders")?;
-    } else {
-        orders.iter().try_for_each(|order| format_order(order, &mut f))?;
-    }
-    writeln!(f, "===============================================================================")?;
-    Ok(f)
-}
-
-fn format_order(order: &Order, f: &mut dyn Write) -> Result<()> {
-    writeln!(
-        f,
-        "Order id: {id:15}          Created {created}",
-        id = order.order_id.to_string(),
-        created = order.created_at,
-    )?;
-    writeln!(f, "[{:^15}]                  Updated {}", order.status.to_string(), order.updated_at)?;
-    writeln!(f, "-----------------------------------------------------------------------------")?;
-    writeln!(f, "Total Price:    {total}", total = order.total_price)?;
-    writeln!(
-        f,
-        "Original Price: {original} {currency}",
-        original = order.original_price.as_ref().map(|s| s.as_str()).unwrap_or("Not given"),
-        currency = order.currency
-    )?;
-    writeln!(f, "Memo: {memo}", memo = order.memo.as_ref().map(|s| s.as_str()).unwrap_or("No memo"))?;
-    writeln!(f, "-----------------------------------------------------------------------------\n")?;
-    Ok(())
-}
-
-fn format_exchange_rate(rate: ExchangeRateResult) -> String {
-    let tari = MicroTari::from(rate.rate);
-    format!("1 {} => {tari} (Last update: {})", rate.currency, rate.updated_at)
 }
