@@ -33,11 +33,13 @@ use crate::{
     routes::{
         health,
         AccountRoute,
+        AddressesRoute,
         AuthRoute,
         CancelOrderRoute,
         CheckTokenRoute,
         ClaimOrderRoute,
         CreditorsRoute,
+        CustomerIdsRoute,
         FulfilOrderRoute,
         GetExchangeRateRoute,
         HistoryForAddressRoute,
@@ -160,6 +162,8 @@ pub fn create_server_instance(
             .service(ResetOrderRoute::<SqliteDatabase>::new())
             .service(GetExchangeRateRoute::<SqliteDatabase>::new())
             .service(UpdateShopifyExchangeRateRoute::<SqliteDatabase>::new())
+            .service(CustomerIdsRoute::<SqliteDatabase>::new())
+            .service(AddressesRoute::<SqliteDatabase>::new())
             .service(CheckTokenRoute::new());
         let use_x_forwarded_for = config.use_x_forwarded_for;
         let use_forwarded = config.use_forwarded;

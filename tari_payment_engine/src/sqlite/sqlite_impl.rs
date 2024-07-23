@@ -24,7 +24,10 @@ use crate::{
         UserAccount,
     },
     order_objects::{ModifyOrderRequest, OrderChanged, OrderQueryFilter},
-    tpe_api::{account_objects::FullAccount, exchange_objects::ExchangeRate},
+    tpe_api::{
+        account_objects::{FullAccount, Pagination},
+        exchange_objects::ExchangeRate,
+    },
     traits::{
         AccountApiError,
         AccountManagement,
@@ -725,6 +728,18 @@ impl AccountManagement for SqliteDatabase {
         let mut conn = self.pool.acquire().await?;
         let accounts = user_accounts::creditors(&mut conn).await?;
         Ok(accounts)
+    }
+
+    async fn fetch_customer_ids(&self, pagination: &Pagination) -> Result<Vec<String>, AccountApiError> {
+        let mut conn = self.pool.acquire().await?;
+        let ids = user_accounts::customer_ids(pagination, &mut conn).await?;
+        Ok(ids)
+    }
+
+    async fn fetch_addresses(&self, pagination: &Pagination) -> Result<Vec<TariAddress>, AccountApiError> {
+        let mut conn = self.pool.acquire().await?;
+        let addresses = user_accounts::addresses(pagination, &mut conn).await?;
+        Ok(addresses)
     }
 }
 

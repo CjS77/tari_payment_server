@@ -8,7 +8,10 @@ use tari_common_types::tari_address::TariAddress;
 use crate::{
     db_types::{Order, OrderId, UserAccount},
     order_objects::{OrderQueryFilter, OrderResult},
-    tpe_api::{account_objects::FullAccount, payment_objects::PaymentsResult},
+    tpe_api::{
+        account_objects::{FullAccount, Pagination},
+        payment_objects::PaymentsResult,
+    },
     traits::{AccountApiError, AccountManagement},
 };
 
@@ -94,5 +97,13 @@ where B: AccountManagement
 
     pub async fn creditors(&self) -> Result<Vec<UserAccount>, AccountApiError> {
         self.db.creditors().await
+    }
+
+    pub async fn fetch_customer_ids(&self, pagination: &Pagination) -> Result<Vec<String>, AccountApiError> {
+        self.db.fetch_customer_ids(pagination).await
+    }
+
+    pub async fn fetch_addresses(&self, pagination: &Pagination) -> Result<Vec<TariAddress>, AccountApiError> {
+        self.db.fetch_addresses(pagination).await
     }
 }

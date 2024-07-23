@@ -21,7 +21,7 @@
 //!         tokio::time::sleep(Duration::from_secs(5)).await; // <-- Ok. Worker thread will handle other requests here
 //!     }
 //! ```
-use std::str::FromStr;
+use std::{ops::Deref, str::FromStr};
 
 use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
 use log::*;
@@ -30,7 +30,10 @@ use tari_payment_engine::{
     db_types::{CreditNote, OrderId, OrderStatusType, Role, SerializedTariAddress},
     helpers::MemoSignature,
     order_objects::{OrderQueryFilter, OrderResult},
-    tpe_api::{account_objects::FullAccount, exchange_rate_api::ExchangeRateApi},
+    tpe_api::{
+        account_objects::{FullAccount, Pagination},
+        exchange_rate_api::ExchangeRateApi,
+    },
     traits::{
         AccountManagement,
         AuthManagement,
@@ -475,6 +478,41 @@ pub async fn get_orders<B: AccountManagement>(
             Err(ServerError::BackendError(e.to_string()))
         },
     }
+}
+
+route!(customer_ids => Get "/customer_ids" impl AccountManagement where requires [Role::ReadAll]);
+/// Utility endpoint to return all customer ids. Pagination is supported.
+pub async fn customer_ids<B: AccountManagement>(
+    api: web::Data<AccountApi<B>>,
+    pagination: web::Query<Pagination>,
+) -> Result<HttpResponse, ServerError> {
+    debug!("💻️ GET customer_ids");
+    let customer_ids = api.fetch_customer_ids(pagination.deref()).await.map_err(|e| {
+        debug!("💻️ Could not fetch customer ids. {e}");
+        ServerError::BackendError(e.to_string())
+    })?;
+    Ok(HttpResponse::Ok().json(customer_ids))
+}
+
+route!(addresses => Get "/addresses" impl AccountManagement where requires [Role::ReadAll]);
+/// Utility endpoint to return all addresses. Pagination is supported.
+/// Admin users (ReadAll and SuperAdmin roles) can use this endpoint to fetch all addresses on the system.
+pub async fn addresses<B: AccountManagement>(
+    api: web::Data<AccountApi<B>>,
+    pagination: web::Query<Pagination>,
+) -> Result<HttpResponse, ServerError> {
+    debug!("💻️ GET addresses");
+    let addresses = api
+        .fetch_addresses(pagination.deref())
+        .await
+        .map_err(|e| {
+            debug!("💻️ Could not fetch addresses. {e}");
+            ServerError::BackendError(e.to_string())
+        })?
+        .into_iter()
+        .map(SerializedTariAddress::from)
+        .collect::<Vec<SerializedTariAddress>>();
+    Ok(HttpResponse::Ok().json(addresses))
 }
 
 //----------------------------------------------   Payments  ----------------------------------------------------

@@ -1,5 +1,5 @@
 use log::{debug, error, trace};
-use sqlx::{pool::PoolConnection, Sqlite, SqliteConnection};
+use sqlx::{pool::PoolConnection, sqlite::SqliteRow, Row, Sqlite, SqliteConnection};
 use tari_common_types::tari_address::TariAddress;
 use tpg_common::MicroTari;
 
@@ -7,7 +7,7 @@ use crate::{
     db_types::{OrderId, UserAccount},
     order_objects::OrderQueryFilter,
     sqlite::db::{orders, transfers},
-    tpe_api::account_objects::{AccountAddress, CustomerId, FullAccount},
+    tpe_api::account_objects::{AccountAddress, CustomerId, FullAccount, Pagination},
     traits::AccountApiError,
 };
 
@@ -483,4 +483,47 @@ pub(crate) async fn creditors(conn: &mut SqliteConnection) -> Result<Vec<UserAcc
     .fetch_all(conn)
     .await?;
     Ok(accounts)
+}
+
+pub(crate) async fn customer_ids(
+    pagination: &Pagination,
+    conn: &mut SqliteConnection,
+) -> Result<Vec<String>, AccountApiError> {
+    let rows = with_pagination("SELECT customer_id FROM user_account_customer_ids", pagination, conn).await?;
+    let customer_ids = rows.into_iter().map(|r| r.get("customer_id")).collect::<Vec<String>>();
+    Ok(customer_ids)
+}
+
+pub(crate) async fn addresses(
+    pagination: &Pagination,
+    conn: &mut SqliteConnection,
+) -> Result<Vec<TariAddress>, AccountApiError> {
+    let rows = with_pagination("SELECT address FROM user_account_address", pagination, conn).await?;
+    let addresses = rows.into_iter().filter_map(|r| TariAddress::from_hex(r.get("address")).ok()).collect();
+    Ok(addresses)
+}
+
+async fn with_pagination(
+    q: &str,
+    pagination: &Pagination,
+    conn: &mut SqliteConnection,
+) -> Result<Vec<SqliteRow>, AccountApiError> {
+    let limit = match pagination.count {
+        Some(_) => " LIMIT ?",
+        None => "",
+    };
+    let offset = match pagination.count {
+        Some(_) => " OFFSET ?",
+        None => "",
+    };
+    let q = format!("{q} {limit} {offset}");
+    let mut query = sqlx::query(&q);
+    if let Some(count) = pagination.count {
+        query = query.bind(count);
+    }
+    if let Some(offset) = pagination.offset {
+        query = query.bind(offset);
+    }
+    let rows = query.fetch_all(conn).await?;
+    Ok(rows)
 }

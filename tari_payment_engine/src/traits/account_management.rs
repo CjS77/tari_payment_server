@@ -4,7 +4,7 @@ use thiserror::Error;
 use crate::{
     db_types::{Order, OrderId, Payment, UserAccount},
     order_objects::OrderQueryFilter,
-    tpe_api::account_objects::FullAccount,
+    tpe_api::account_objects::{FullAccount, Pagination},
 };
 
 #[derive(Debug, Clone, Error)]
@@ -98,4 +98,8 @@ pub trait AccountManagement {
     ) -> Result<Vec<Order>, AccountApiError>;
 
     async fn creditors(&self) -> Result<Vec<UserAccount>, AccountApiError>;
+
+    async fn fetch_customer_ids(&self, pagination: &Pagination) -> Result<Vec<String>, AccountApiError>;
+
+    async fn fetch_addresses(&self, pagination: &Pagination) -> Result<Vec<TariAddress>, AccountApiError>;
 }

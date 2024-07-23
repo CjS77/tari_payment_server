@@ -52,3 +52,9 @@ pub struct CustomerId {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Pagination {
+    pub offset: Option<i64>,
+    pub count: Option<i64>,
+}
