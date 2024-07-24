@@ -179,6 +179,10 @@ impl PaymentServerClient {
         self.auth_get_request(&format!("/api/orders/{}", address.to_hex())).await
     }
 
+    pub async fn order_by_id(&self, order_id: &str) -> Result<Option<Order>> {
+        self.auth_get_request(&format!("/api/order/id/{order_id}")).await
+    }
+
     pub async fn payments_for_address(&self, address: TariAddress) -> Result<PaymentsResult> {
         self.auth_get_request(&format!("/api/payments/{}", address.to_hex())).await
     }
