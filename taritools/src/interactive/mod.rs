@@ -10,10 +10,11 @@ use crate::{
     interactive::{
         formatting::{
             format_exchange_rate,
+            format_full_account,
             format_order,
             format_order_result,
             format_orders,
-            format_payments,
+            format_payments_result,
             format_user_account,
         },
         menus::{top_menu, Menu},
@@ -98,6 +99,7 @@ impl InteractiveApp {
                 "My Orders" => self.my_orders().await,
                 "My Open Orders" => self.my_unfulfilled_orders().await,
                 "My Payments" => self.my_payments().await,
+                "Account History" => handle_response(self.my_history().await),
                 "Admin Menu" => self.select_menu(menus::admin_menu()),
                 "User Menu" => self.select_menu(menus::user_menu()),
                 "Fetch Tari price" => self.fetch_tari_price().await,
@@ -159,7 +161,7 @@ impl InteractiveApp {
     async fn my_unfulfilled_orders(&mut self) {
         let mut res = self.login().await;
         if res.is_ok() {
-            res = self.client.as_mut().unwrap().my_unfulfilled_orders().await.and_then(format_orders);
+            res = self.client.as_mut().unwrap().my_unfulfilled_orders().await.map(|o| format_orders(&o));
         }
         handle_response(res)
     }
@@ -167,9 +169,16 @@ impl InteractiveApp {
     async fn my_payments(&mut self) {
         let mut res = self.login().await;
         if res.is_ok() {
-            res = self.client.as_mut().unwrap().my_payments().await.and_then(format_payments);
+            res = self.client.as_mut().unwrap().my_payments().await.and_then(format_payments_result);
         }
         handle_response(res)
+    }
+
+    async fn my_history(&mut self) -> Result<String> {
+        let _unused = self.login().await?;
+        let client = self.client.as_ref().unwrap();
+        let history = client.my_history().await?;
+        format_full_account(history)
     }
 
     async fn fetch_tari_price(&mut self) {
@@ -201,7 +210,7 @@ impl InteractiveApp {
             Ok("Credit issued successfully".into())
         } else {
             println!("Credit issued successfully.\nThe following {} orders have been paid as a result:", orders.len());
-            format_orders(orders)
+            Ok(format_orders(&orders))
         }
     }
 
@@ -217,7 +226,7 @@ impl InteractiveApp {
         let address = self.select_address().await?;
         let client = self.client.as_ref().unwrap();
         let payments = client.payments_for_address(address).await?;
-        format_payments(payments)
+        format_payments_result(payments)
     }
 
     async fn select_address(&mut self) -> Result<TariAddress> {

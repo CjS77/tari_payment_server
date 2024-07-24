@@ -16,7 +16,8 @@ pub const ADMIN_MENU: [&str; 9] = [
     "Payments for Address",
     "Exit",
 ];
-pub const USER_MENU: [&str; 7] = ["My Account", "Logout", "Back", "Exit", "My Orders", "My Open Orders", "My Payments"];
+pub const USER_MENU: [&str; 8] =
+    ["My Account", "Logout", "Back", "Exit", "My Orders", "My Open Orders", "My Payments", "Account History"];
 
 pub fn top_menu() -> &'static Menu {
     &("Main", &TOP_MENU)

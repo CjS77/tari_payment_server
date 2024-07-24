@@ -1,5 +1,6 @@
 use std::fmt::Write;
 
+use anyhow::Result;
 use prettytable::{
     format::{LinePosition, LineSeparator, TableFormat},
     row,
@@ -10,7 +11,10 @@ use prettytable::{
 use tari_payment_engine::{
     db_types::{Order, Payment, UserAccount},
     order_objects::OrderResult,
-    tpe_api::payment_objects::PaymentsResult,
+    tpe_api::{
+        account_objects::{AccountAddress, CustomerId, FullAccount},
+        payment_objects::PaymentsResult,
+    },
 };
 use tari_payment_server::data_objects::ExchangeRateResult;
 use tpg_common::MicroTari;
@@ -45,7 +49,43 @@ pub fn format_user_account(account: UserAccount) -> String {
     table.to_string()
 }
 
-pub fn format_order_result(orders: OrderResult) -> anyhow::Result<String> {
+pub fn format_addresses(addresses: &[AccountAddress]) -> String {
+    let mut table = Table::new();
+    table.set_titles(row!["Hex", "Emoji Id", "Created At", "Updated At"]);
+    addresses.iter().for_each(|address| {
+        let a = address.address.as_address();
+        table.add_row(row![a.to_hex(), a.to_emoji_string(), address.created_at, address.updated_at]);
+    });
+    markdown_style(&mut table);
+    table.to_string()
+}
+
+pub fn format_customer_ids(ids: &[CustomerId]) -> String {
+    let mut table = Table::new();
+    table.set_titles(row!["Customer id", "Created At", "Updated At"]);
+    ids.iter().for_each(|id| {
+        table.add_row(row![id.customer_id, id.created_at, id.updated_at]);
+    });
+    markdown_style(&mut table);
+    table.to_string()
+}
+
+pub fn format_full_account(account: FullAccount) -> Result<String> {
+    let mut s = String::new();
+    writeln!(s, "# Account Summary")?;
+    writeln!(s, "{}", format_user_account(account.account)).unwrap();
+    writeln!(s, "# Addresses")?;
+    writeln!(s, "{}\n", format_addresses(&account.addresses))?;
+    writeln!(s, "# Customer IDs")?;
+    writeln!(s, "{}\n", format_customer_ids(&account.customer_ids))?;
+    writeln!(s, "# Orders")?;
+    writeln!(s, "{}\n", format_orders(&account.orders))?;
+    writeln!(s, "# Payments")?;
+    writeln!(s, "{}\n", format_payments(&account.payments))?;
+    Ok(s)
+}
+
+pub fn format_order_result(orders: OrderResult) -> Result<String> {
     let mut f = String::new();
     writeln!(f, "===============================================================================")?;
     writeln!(
@@ -56,23 +96,47 @@ pub fn format_order_result(orders: OrderResult) -> anyhow::Result<String> {
         value = orders.total_orders
     )?;
     writeln!(f, "===============================================================================")?;
-    orders.orders.iter().try_for_each(|order| format_order(order, &mut f))?;
+    writeln!(f, "{}", format_orders(&orders.orders))?;
     Ok(f)
 }
 
-pub fn format_orders(orders: Vec<Order>) -> anyhow::Result<String> {
-    let mut f = String::new();
-    writeln!(f, "===============================================================================")?;
+pub fn format_orders(orders: &[Order]) -> String {
     if orders.is_empty() {
-        writeln!(f, "No open orders")?;
-    } else {
-        orders.iter().try_for_each(|order| format_order(order, &mut f))?;
+        return "No open orders".to_string();
     }
-    writeln!(f, "===============================================================================")?;
-    Ok(f)
+    let mut table = Table::new();
+    table.set_titles(row!["ID", "Amount", "Status", "Original price", "Currency", "Memo", "Created At", "Updated At"]);
+    let mut memos = Vec::new();
+    orders.iter().for_each(|order| {
+        let memo_note = match order.memo {
+            Some(ref memo) => {
+                memos.push(memo.clone());
+                format!("{}^", memos.len())
+            },
+            None => String::default(),
+        };
+        table.add_row(row![
+            order.id,
+            order.total_price.to_string(),
+            order.status.to_string(),
+            order.original_price.as_deref().unwrap_or_default(),
+            order.currency,
+            memo_note,
+            order.created_at.to_string(),
+            order.updated_at.to_string()
+        ]);
+    });
+    markdown_style(&mut table);
+    let memo_notes =
+        memos.iter().enumerate().map(|(i, memo)| format!("^{}: {}", i + 1, memo)).collect::<Vec<String>>().join("\n");
+    if memo_notes.is_empty() {
+        format!("{table}\n")
+    } else {
+        format!("{table}\n## Memos\n{memo_notes}")
+    }
 }
 
-pub fn format_order(order: &Order, f: &mut dyn Write) -> anyhow::Result<()> {
+pub fn format_order(order: &Order, f: &mut dyn Write) -> Result<()> {
     writeln!(
         f,
         "Order id: {id:15}          Created {created}",
@@ -93,7 +157,7 @@ pub fn format_order(order: &Order, f: &mut dyn Write) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn format_payments(payments: PaymentsResult) -> anyhow::Result<String> {
+pub fn format_payments_result(payments: PaymentsResult) -> Result<String> {
     let mut f = String::new();
     writeln!(f, "===============================================================================")?;
     writeln!(f, "Payments for {});", payments.address.as_hex())?;
@@ -104,14 +168,18 @@ pub fn format_payments(payments: PaymentsResult) -> anyhow::Result<String> {
         value = payments.total_payments
     )?;
     writeln!(f, "===============================================================================")?;
+    f.write_str(&format_payments(&payments.payments))?;
+    Ok(f)
+}
+
+pub fn format_payments(payments: &[Payment]) -> String {
     let mut table = Table::new();
     table.set_titles(row!["TX id", "Amount", "Status", "Sender", "OrderID", "Memo", "Created At", "Updated At"]);
-    payments.payments.iter().for_each(|payment| {
+    payments.iter().for_each(|payment| {
         table.add_row(payment_to_row(payment));
     });
     markdown_style(&mut table);
-    f.write_str(&table.to_string())?;
-    Ok(f)
+    table.to_string()
 }
 
 pub fn payment_to_row(payment: &Payment) -> Row {
