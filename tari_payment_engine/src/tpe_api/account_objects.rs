@@ -6,11 +6,11 @@ use crate::db_types::{Order, Payment, SerializedTariAddress, UserAccount};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FullAccount {
-    account: UserAccount,
-    addresses: Vec<AccountAddress>,
-    customer_ids: Vec<CustomerId>,
-    orders: Vec<Order>,
-    payments: Vec<Payment>,
+    pub account: UserAccount,
+    pub addresses: Vec<AccountAddress>,
+    pub customer_ids: Vec<CustomerId>,
+    pub orders: Vec<Order>,
+    pub payments: Vec<Payment>,
 }
 
 impl FullAccount {

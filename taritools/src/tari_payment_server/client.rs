@@ -18,7 +18,7 @@ use tari_jwt::{
 use tari_payment_engine::{
     db_types::{CreditNote, LoginToken, Order, Role, UserAccount},
     order_objects::OrderResult,
-    tpe_api::payment_objects::PaymentsResult,
+    tpe_api::{account_objects::FullAccount, payment_objects::PaymentsResult},
 };
 use tari_payment_server::data_objects::{
     ExchangeRateResult,
@@ -148,6 +148,16 @@ impl PaymentServerClient {
 
     pub async fn my_payments(&self) -> Result<PaymentsResult> {
         self.auth_get_request("/api/payments").await
+    }
+
+    /// Returns the Account History (or full account) for the authenticated address (anchor address).
+    ///
+    /// **Note**: This could return orders and payments that are not present in [`my_orders`], or [`my_payments']
+    /// respectively, since these methods only provide data directly linked to the anchor address, whereas `my_history`
+    /// does a reverse link search to find _all_ addresses attached to the account before querying for orders and
+    /// payments.
+    pub async fn my_history(&self) -> Result<FullAccount> {
+        self.auth_get_request("/api/history").await
     }
 
     async fn auth_get_request<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
