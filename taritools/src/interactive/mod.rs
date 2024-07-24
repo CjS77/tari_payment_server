@@ -8,7 +8,14 @@ use tpg_common::MicroTari;
 
 use crate::{
     interactive::{
-        formatting::{format_exchange_rate, format_order_result, format_orders, format_payments, format_user_account},
+        formatting::{
+            format_exchange_rate,
+            format_order,
+            format_order_result,
+            format_orders,
+            format_payments,
+            format_user_account,
+        },
         menus::{top_menu, Menu},
         selector::{AddressSelector, CustomerSelector},
     },
@@ -96,6 +103,7 @@ impl InteractiveApp {
                 "Fetch Tari price" => self.fetch_tari_price().await,
                 "Set Tari price" => self.set_tari_price().await,
                 "Issue Credit" => handle_response(self.issue_credit().await),
+                "Order by Id" => handle_response(self.order_by_id().await),
                 "Orders for Address" => handle_response(self.orders_for_address().await),
                 "Payments for Address" => handle_response(self.payments_for_address().await),
                 "Logout" => self.logout(),
@@ -123,6 +131,21 @@ impl InteractiveApp {
             res = self.client.as_mut().unwrap().my_account().await.map(format_user_account);
         }
         handle_response(res)
+    }
+
+    async fn order_by_id(&mut self) -> Result<String> {
+        let _unused = self.login().await?;
+        let order_id = dialoguer::Input::<String>::new().with_prompt("Enter order ID").interact()?;
+        let order = self
+            .client
+            .as_mut()
+            .unwrap()
+            .order_by_id(&order_id)
+            .await?
+            .ok_or(anyhow::anyhow!("Order does not exist"))?;
+        let mut s = String::new();
+        format_order(&order, &mut s)?;
+        Ok(s)
     }
 
     async fn my_orders(&mut self) {
