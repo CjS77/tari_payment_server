@@ -160,6 +160,14 @@ impl PaymentServerClient {
         self.auth_get_request("/api/history").await
     }
 
+    pub async fn history_for_address(&self, address: &TariAddress) -> Result<FullAccount> {
+        self.auth_get_request(&format!("/api/history/address/{}", address.to_hex())).await
+    }
+
+    pub async fn history_for_id(&self, account_id: i64) -> Result<FullAccount> {
+        self.auth_get_request(&format!("/api/history/id/{account_id}")).await
+    }
+
     async fn auth_get_request<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
         let url = self.url(path);
         let res = self.client.get(url).header("tpg_access_token", self.access_token.clone()).send().await?;

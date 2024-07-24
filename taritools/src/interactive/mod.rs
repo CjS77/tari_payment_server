@@ -108,6 +108,8 @@ impl InteractiveApp {
                 "Order by Id" => handle_response(self.order_by_id().await),
                 "Orders for Address" => handle_response(self.orders_for_address().await),
                 "Payments for Address" => handle_response(self.payments_for_address().await),
+                "History for Address" => handle_response(self.history_for_address().await),
+                "History for Account Id" => handle_response(self.history_for_id().await),
                 "Logout" => self.logout(),
                 "Back" => self.pop_menu(),
                 "Exit" => break,
@@ -178,6 +180,22 @@ impl InteractiveApp {
         let _unused = self.login().await?;
         let client = self.client.as_ref().unwrap();
         let history = client.my_history().await?;
+        format_full_account(history)
+    }
+
+    async fn history_for_address(&mut self) -> Result<String> {
+        let _unused = self.login().await;
+        let address = self.select_address().await?;
+        let client = self.client.as_ref().unwrap();
+        let history = client.history_for_address(&address).await?;
+        format_full_account(history)
+    }
+
+    async fn history_for_id(&mut self) -> Result<String> {
+        let _unused = self.login().await;
+        let client = self.client.as_ref().unwrap();
+        let account_id = dialoguer::Input::<i64>::new().with_prompt("Enter account id (NOT customer id)").interact()?;
+        let history = client.history_for_id(account_id).await?;
         format_full_account(history)
     }
 
