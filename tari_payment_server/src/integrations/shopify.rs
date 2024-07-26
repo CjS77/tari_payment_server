@@ -9,7 +9,7 @@ use shopify_tools::{
     ShopifyOrder,
 };
 use tari_payment_engine::{
-    db_types::{NewOrder, Order, OrderId, OrderStatusType},
+    db_types::{NewOrder, Order, OrderId},
     events::{EventHandlers, EventHooks, OrderAnnulledEvent},
     helpers::MemoSignatureError,
     tpe_api::{exchange_objects::ExchangeRate, exchange_rate_api::ExchangeRateApi},
@@ -119,20 +119,12 @@ pub fn create_shopify_event_handlers(config: ShopifyApiConfig) -> Result<EventHa
     // --- On OrderAnnulled Handler ---
     hooks.on_order_annulled(move |ev| {
         let OrderAnnulledEvent { order, status } = ev;
-        if !matches!(status, OrderStatusType::Expired) {
-            info!(
-                "🛍️ Order {} has been annulled, but the cancellation reason is not due to expiry ({}), and so the \
-                 annulment will have originated from outside of Tari Payment Server. Therefore no action is taken \
-                 now. If this is not the case, then file an issue to handle this unexpected use case.",
-                order.order_id, status
-            );
-            return no_op();
-        }
         let order_id = match parse_shopify_order_id(&order) {
             Some(value) => value,
             None => return no_op(),
         };
         let api_clone = api.clone();
+        debug!("🛍️ Order {order_id} has been annulled. Reason: {status}. Sending cancellation request to Shopify.");
         Box::pin(async move {
             match api_clone.cancel_order(order_id).await {
                 Ok(o) => info!(

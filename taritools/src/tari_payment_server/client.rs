@@ -16,13 +16,14 @@ use tari_jwt::{
     Ristretto256SigningKey,
 };
 use tari_payment_engine::{
-    db_types::{CreditNote, LoginToken, Order, Role, UserAccount},
-    order_objects::OrderResult,
+    db_types::{CreditNote, LoginToken, Order, OrderId, Role, UserAccount},
+    order_objects::{OrderChanged, OrderResult},
     tpe_api::{account_objects::FullAccount, payment_objects::PaymentsResult},
 };
 use tari_payment_server::data_objects::{
     ExchangeRateResult,
     ExchangeRateUpdate,
+    ModifyOrderParams,
     PaymentNotification,
     TransactionConfirmationNotification,
 };
@@ -199,6 +200,42 @@ impl PaymentServerClient {
 
     pub async fn order_by_id(&self, order_id: &str) -> Result<Option<Order>> {
         self.auth_get_request(&format!("/api/order/id/{order_id}")).await
+    }
+
+    pub async fn cancel_order(&self, params: &ModifyOrderParams) -> Result<Order> {
+        let url = self.url("/api/cancel");
+        let res =
+            self.client.post(url).header("tpg_access_token", self.access_token.clone()).json(params).send().await?;
+        if !res.status().is_success() {
+            let msg = res.text().await?;
+            return Err(anyhow!("Error cancelling order: {msg}"));
+        }
+        let order = res.json().await?;
+        Ok(order)
+    }
+
+    pub async fn fulfil_order(&self, params: &ModifyOrderParams) -> Result<Order> {
+        let url = self.url("/api/fulfill");
+        let res =
+            self.client.post(url).header("tpg_access_token", self.access_token.clone()).json(params).send().await?;
+        if !res.status().is_success() {
+            let msg = res.text().await?;
+            return Err(anyhow!("Error fulfilling order: {msg}"));
+        }
+        let order = res.json().await?;
+        Ok(order)
+    }
+
+    pub async fn reset_order(&self, order_id: &OrderId) -> Result<Order> {
+        let url = self.url(&format!("/api/reset_order/{order_id}"));
+        let res = self.client.patch(url).header("tpg_access_token", self.access_token.clone()).send().await?;
+        let code = res.status();
+        if !res.status().is_success() {
+            let msg = res.text().await?;
+            return Err(anyhow!("Error {code}. Could not reset order. {msg}"));
+        }
+        let changes: OrderChanged = res.json().await?;
+        Ok(changes.new_order)
     }
 
     pub async fn payments_for_address(&self, address: TariAddress) -> Result<PaymentsResult> {

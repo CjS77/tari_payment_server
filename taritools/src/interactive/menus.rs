@@ -5,7 +5,10 @@
 pub type Menu = (&'static str, &'static [&'static str]);
 
 pub const TOP_MENU: [&str; 5] = ["Admin Menu", "User Menu", "Server health", "Logout", "Exit"];
-pub const ADMIN_MENU: [&str; 11] = [
+pub const ADMIN_MENU: [&str; 14] = [
+    "Cancel Order",
+    "Mark order as Paid",
+    "Reset Order",
     "Fetch Tari price",
     "Set Tari price",
     "Logout",
