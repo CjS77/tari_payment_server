@@ -4,6 +4,8 @@ use anyhow::Result;
 use dialoguer::{console::Style, theme::ColorfulTheme, Confirm, FuzzySelect};
 use indicatif::{ProgressBar, ProgressStyle};
 use tari_common_types::tari_address::TariAddress;
+use tari_payment_engine::db_types::OrderId;
+use tari_payment_server::data_objects::ModifyOrderParams;
 use tpg_common::MicroTari;
 
 use crate::{
@@ -102,6 +104,9 @@ impl InteractiveApp {
                 "Account History" => handle_response(self.my_history().await),
                 "Admin Menu" => self.select_menu(menus::admin_menu()),
                 "User Menu" => self.select_menu(menus::user_menu()),
+                "Cancel Order" => handle_response(self.cancel_order().await),
+                "Reset Order" => handle_response(self.reset_order().await),
+                "Mark order as Paid" => handle_response(self.fulfil_order().await),
                 "Fetch Tari price" => self.fetch_tari_price().await,
                 "Set Tari price" => self.set_tari_price().await,
                 "Issue Credit" => handle_response(self.issue_credit().await),
@@ -213,6 +218,44 @@ impl InteractiveApp {
             res = set_new_tari_price(self.client.as_mut().unwrap()).await
         }
         handle_response(res)
+    }
+
+    fn get_modify_order_params(&self) -> Result<ModifyOrderParams> {
+        let order_id = dialoguer::Input::<String>::new().with_prompt("Enter order ID").interact()?;
+        let order_id = OrderId::new(order_id);
+        let reason = dialoguer::Input::<String>::new().with_prompt("Enter reason").interact()?;
+        Ok(ModifyOrderParams { order_id, reason })
+    }
+
+    async fn cancel_order(&mut self) -> Result<String> {
+        let _unused = self.login().await?;
+        let params = self.get_modify_order_params()?;
+        let client = self.client.as_ref().unwrap();
+        let order = client.cancel_order(&params).await?;
+        let mut s = String::new();
+        format_order(&order, &mut s)?;
+        Ok(s)
+    }
+
+    async fn fulfil_order(&mut self) -> Result<String> {
+        let _unused = self.login().await?;
+        let params = self.get_modify_order_params()?;
+        let client = self.client.as_ref().unwrap();
+        let order = client.fulfil_order(&params).await?;
+        let mut s = String::new();
+        format_order(&order, &mut s)?;
+        Ok(s)
+    }
+
+    async fn reset_order(&mut self) -> Result<String> {
+        let _unused = self.login().await?;
+        let order_id = dialoguer::Input::<String>::new().with_prompt("Enter order ID").interact()?;
+        let order_id = OrderId::new(order_id);
+        let client = self.client.as_ref().unwrap();
+        let order = client.reset_order(&order_id).await?;
+        let mut s = String::new();
+        format_order(&order, &mut s)?;
+        Ok(s)
     }
 
     async fn issue_credit(&mut self) -> Result<String> {

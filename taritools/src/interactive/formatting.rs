@@ -105,7 +105,17 @@ pub fn format_orders(orders: &[Order]) -> String {
         return "No open orders".to_string();
     }
     let mut table = Table::new();
-    table.set_titles(row!["ID", "Amount", "Status", "Original price", "Currency", "Memo", "Created At", "Updated At"]);
+    table.set_titles(row![
+        "ID",
+        "Order id",
+        "Amount",
+        "Status",
+        "Original price",
+        "Currency",
+        "Memo",
+        "Created At",
+        "Updated At"
+    ]);
     let mut memos = Vec::new();
     orders.iter().for_each(|order| {
         let memo_note = match order.memo {
@@ -117,6 +127,7 @@ pub fn format_orders(orders: &[Order]) -> String {
         };
         table.add_row(row![
             order.id,
+            order.order_id,
             order.total_price.to_string(),
             order.status.to_string(),
             order.original_price.as_deref().unwrap_or_default(),

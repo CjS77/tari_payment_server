@@ -383,7 +383,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         let order = orders::fetch_order_by_order_id(order_id, &mut tx)
             .await?
             .ok_or_else(|| AccountApiError::OrderDoesNotExist(order_id.clone()))?;
-        if order.status != OrderStatusType::New {
+        if !&[OrderStatusType::New, OrderStatusType::Unclaimed].contains(&order.status) {
             error!("🗃️ Order {} is not in 'New' status. Cannot call cancel_or_expire_order", order.id);
             return Err(PaymentGatewayError::OrderModificationForbidden);
         }
