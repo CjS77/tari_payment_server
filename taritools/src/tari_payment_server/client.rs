@@ -19,11 +19,13 @@ use tari_payment_engine::{
     db_types::{CreditNote, LoginToken, Order, OrderId, Role, UserAccount},
     order_objects::{OrderChanged, OrderResult},
     tpe_api::{account_objects::FullAccount, payment_objects::PaymentsResult},
+    traits::OrderMovedResult,
 };
 use tari_payment_server::data_objects::{
     ExchangeRateResult,
     ExchangeRateUpdate,
     ModifyOrderParams,
+    MoveOrderParams,
     PaymentNotification,
     TransactionConfirmationNotification,
     UpdateMemoParams,
@@ -199,8 +201,9 @@ impl PaymentServerClient {
         self.auth_get_request(&format!("/api/orders/{}", address.to_hex())).await
     }
 
-    pub async fn order_by_id(&self, order_id: &str) -> Result<Option<Order>> {
-        self.auth_get_request(&format!("/api/order/id/{order_id}")).await
+    pub async fn order_by_id(&self, order_id: &OrderId) -> Result<Option<Order>> {
+        let id = urlencoding::encode(order_id.as_str());
+        self.auth_get_request(&format!("/api/order/id/{id}")).await
     }
 
     pub async fn cancel_order(&self, params: &ModifyOrderParams) -> Result<Order> {
@@ -267,6 +270,19 @@ impl PaymentServerClient {
         }
         let order: Order = res.json().await?;
         Ok(order)
+    }
+
+    pub async fn reassign_order(&self, params: &MoveOrderParams) -> Result<OrderMovedResult> {
+        let url = self.url("/api/reassign_order");
+        let res =
+            self.client.patch(url).header("tpg_access_token", self.access_token.clone()).json(params).send().await?;
+        let code = res.status();
+        if !res.status().is_success() {
+            let msg = res.text().await?;
+            return Err(anyhow!("Error {code}. Could not reassign order. {msg}"));
+        }
+        let result: OrderMovedResult = res.json().await?;
+        Ok(result)
     }
 }
 
