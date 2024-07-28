@@ -26,6 +26,7 @@ use tari_payment_server::data_objects::{
     ModifyOrderParams,
     PaymentNotification,
     TransactionConfirmationNotification,
+    UpdateMemoParams,
 };
 use tpg_common::MicroTari;
 
@@ -253,6 +254,19 @@ impl PaymentServerClient {
         }
         let paid_orders = res.json().await?;
         Ok(paid_orders)
+    }
+
+    pub async fn edit_memo(&self, params: &UpdateMemoParams) -> Result<Order> {
+        let url = self.url("/api/order_memo");
+        let res =
+            self.client.patch(url).header("tpg_access_token", self.access_token.clone()).json(params).send().await?;
+        let code = res.status();
+        if !res.status().is_success() {
+            let msg = res.text().await?;
+            return Err(anyhow!("Error {code}. Could not edit memo. {msg}"));
+        }
+        let order: Order = res.json().await?;
+        Ok(order)
     }
 }
 

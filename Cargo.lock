@@ -1195,6 +1195,7 @@ dependencies = [
  "console",
  "fuzzy-matcher",
  "shell-words",
+ "tempfile",
  "thiserror",
 ]
 
