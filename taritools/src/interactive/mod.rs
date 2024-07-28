@@ -1,11 +1,15 @@
-use std::{fmt::Display, time::Duration};
+use std::{
+    fmt::{Display, Write},
+    time::Duration,
+};
 
 use anyhow::Result;
 use dialoguer::{console::Style, theme::ColorfulTheme, Confirm, FuzzySelect};
 use indicatif::{ProgressBar, ProgressStyle};
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::db_types::OrderId;
-use tari_payment_server::data_objects::{ModifyOrderParams, UpdateMemoParams};
+use tari_payment_server::data_objects::{ModifyOrderParams, MoveOrderParams, UpdateMemoParams};
+use tokio::join;
 use tpg_common::MicroTari;
 
 use crate::{
@@ -18,6 +22,7 @@ use crate::{
             format_orders,
             format_payments_result,
             format_user_account,
+            print_order,
         },
         menus::{top_menu, Menu},
         selector::{AddressSelector, CustomerSelector},
@@ -116,6 +121,7 @@ impl InteractiveApp {
                 "History for Address" => handle_response(self.history_for_address().await),
                 "History for Account Id" => handle_response(self.history_for_id().await),
                 "Edit memo" => handle_response(self.edit_memo().await),
+                "Reassign Order" => handle_response(self.reassign_order().await),
                 "Logout" => self.logout(),
                 "Back" => self.pop_menu(),
                 "Exit" => break,
@@ -150,12 +156,10 @@ impl InteractiveApp {
             .client
             .as_mut()
             .unwrap()
-            .order_by_id(&order_id)
+            .order_by_id(&OrderId::new(order_id))
             .await?
             .ok_or(anyhow::anyhow!("Order does not exist"))?;
-        let mut s = String::new();
-        format_order(&order, &mut s)?;
-        Ok(s)
+        print_order(&order)
     }
 
     async fn my_orders(&mut self) {
@@ -233,9 +237,7 @@ impl InteractiveApp {
         let params = self.get_modify_order_params()?;
         let client = self.client.as_ref().unwrap();
         let order = client.cancel_order(&params).await?;
-        let mut s = String::new();
-        format_order(&order, &mut s)?;
-        Ok(s)
+        print_order(&order)
     }
 
     async fn fulfil_order(&mut self) -> Result<String> {
@@ -243,9 +245,7 @@ impl InteractiveApp {
         let params = self.get_modify_order_params()?;
         let client = self.client.as_ref().unwrap();
         let order = client.fulfil_order(&params).await?;
-        let mut s = String::new();
-        format_order(&order, &mut s)?;
-        Ok(s)
+        print_order(&order)
     }
 
     async fn reset_order(&mut self) -> Result<String> {
@@ -254,9 +254,7 @@ impl InteractiveApp {
         let order_id = OrderId::new(order_id);
         let client = self.client.as_ref().unwrap();
         let order = client.reset_order(&order_id).await?;
-        let mut s = String::new();
-        format_order(&order, &mut s)?;
-        Ok(s)
+        print_order(&order)
     }
 
     async fn issue_credit(&mut self) -> Result<String> {
@@ -304,17 +302,44 @@ impl InteractiveApp {
         let _unused = self.login().await;
         let params = self.get_modify_order_params()?;
         let client = self.client.as_ref().unwrap();
-        let order = client
-            .order_by_id(params.order_id.as_str())
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Order does not exist"))?;
+        let order =
+            client.order_by_id(&params.order_id).await?.ok_or_else(|| anyhow::anyhow!("Order does not exist"))?;
         let old_memo = order.memo.unwrap_or_else(|| "Provide a new memo".to_string());
         let new_memo = dialoguer::Editor::new().edit(&old_memo)?.ok_or_else(|| anyhow::anyhow!("No memo provided"))?;
         let params = UpdateMemoParams { order_id: params.order_id, new_memo, reason: Some(params.reason) };
         let order = client.edit_memo(&params).await?;
-        let mut s = String::new();
-        format_order(&order, &mut s)?;
-        Ok(s)
+        print_order(&order)
+    }
+
+    async fn reassign_order(&mut self) -> Result<String> {
+        let _unused = self.login().await;
+        let params = self.get_modify_order_params()?;
+        let client = self.client.as_ref().unwrap();
+        let (cust_ids_res, order_res) = join!(self.customer_ids.update(client), client.order_by_id(&params.order_id));
+        cust_ids_res?;
+        let order = order_res?.ok_or_else(|| anyhow::anyhow!("Order {} does not exist", params.order_id))?;
+        let formatted_order = print_order(&order)?;
+        println!("You're about to re-assign this order:\n{formatted_order}");
+        let idx =
+            FuzzySelect::new().with_prompt("Select new customer ID").items(self.customer_ids.items()).interact()?;
+        let new_customer_id = self.customer_ids.items()[idx].to_string();
+        let params = MoveOrderParams { order_id: params.order_id, new_customer_id, reason: params.reason };
+        let result = client.reassign_order(&params).await?;
+        let mut msg = format!("# Order {} reassignment summary\n", params.order_id);
+        writeln!(
+            msg,
+            "**Customer id** changed from {} to {}",
+            result.orders.old_order.customer_id, result.orders.new_order.customer_id
+        )?;
+        writeln!(msg, "*Account id** changed from {} to {}", result.old_account_id, result.new_account_id)?;
+        if result.is_filled {
+            writeln!(msg, "The new account had sufficient credit to cover the order and it has been marked as PAID")?;
+        }
+        writeln!(msg, "\n## Old order")?;
+        format_order(&result.orders.old_order, &mut msg)?;
+        writeln!(msg, "## New order")?;
+        format_order(&result.orders.new_order, &mut msg)?;
+        Ok(msg)
     }
 }
 

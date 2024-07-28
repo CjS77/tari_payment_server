@@ -210,3 +210,9 @@ pub fn format_exchange_rate(rate: ExchangeRateResult) -> String {
     let tari = MicroTari::from(rate.rate);
     format!("1 {} => {tari} (Last update: {})", rate.currency, rate.updated_at)
 }
+
+pub fn print_order(order: &Order) -> Result<String> {
+    let mut f = String::new();
+    format_order(order, &mut f)?;
+    Ok(f)
+}
