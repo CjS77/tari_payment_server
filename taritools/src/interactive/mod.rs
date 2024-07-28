@@ -5,7 +5,7 @@ use dialoguer::{console::Style, theme::ColorfulTheme, Confirm, FuzzySelect};
 use indicatif::{ProgressBar, ProgressStyle};
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::db_types::OrderId;
-use tari_payment_server::data_objects::ModifyOrderParams;
+use tari_payment_server::data_objects::{ModifyOrderParams, UpdateMemoParams};
 use tpg_common::MicroTari;
 
 use crate::{
@@ -115,6 +115,7 @@ impl InteractiveApp {
                 "Payments for Address" => handle_response(self.payments_for_address().await),
                 "History for Address" => handle_response(self.history_for_address().await),
                 "History for Account Id" => handle_response(self.history_for_id().await),
+                "Edit memo" => handle_response(self.edit_memo().await),
                 "Logout" => self.logout(),
                 "Back" => self.pop_menu(),
                 "Exit" => break,
@@ -297,6 +298,23 @@ impl InteractiveApp {
         let idx = FuzzySelect::new().with_prompt("Select address").items(self.addresses.items()).interact()?;
         let address = TariAddress::from_hex(&self.addresses.items()[idx])?;
         Ok(address)
+    }
+
+    async fn edit_memo(&mut self) -> Result<String> {
+        let _unused = self.login().await;
+        let params = self.get_modify_order_params()?;
+        let client = self.client.as_ref().unwrap();
+        let order = client
+            .order_by_id(params.order_id.as_str())
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Order does not exist"))?;
+        let old_memo = order.memo.unwrap_or_else(|| "Provide a new memo".to_string());
+        let new_memo = dialoguer::Editor::new().edit(&old_memo)?.ok_or_else(|| anyhow::anyhow!("No memo provided"))?;
+        let params = UpdateMemoParams { order_id: params.order_id, new_memo, reason: Some(params.reason) };
+        let order = client.edit_memo(&params).await?;
+        let mut s = String::new();
+        format_order(&order, &mut s)?;
+        Ok(s)
     }
 }
 
