@@ -33,14 +33,17 @@ use tari_payment_engine::{
     tpe_api::{
         account_objects::{FullAccount, Pagination},
         exchange_rate_api::ExchangeRateApi,
+        wallet_api::WalletManagementApi,
     },
     traits::{
         AccountManagement,
         AuthManagement,
         ExchangeRates,
+        NewWalletInfo,
         PaymentGatewayDatabase,
         PaymentGatewayError,
         WalletAuth,
+        WalletManagement,
     },
     AccountApi,
     AuthApi,
@@ -855,7 +858,7 @@ where
     HttpResponse::Ok().json(result)
 }
 
-//----------------------------------------------   Roles  ----------------------------------------------------
+//----------------------------------------------   SuperAdmin  ----------------------------------------------------
 route!(update_roles => Post "/roles" impl AuthManagement where requires [Role::SuperAdmin]);
 pub async fn update_roles<B: AuthManagement>(
     api: web::Data<AuthApi<B>>,
@@ -871,6 +874,76 @@ pub async fn update_roles<B: AuthManagement>(
         api.assign_roles(&address, &acl_request.apply).await?;
         api.remove_roles(&address, &acl_request.revoke).await?;
     }
+    Ok(HttpResponse::Ok().finish())
+}
+
+route!(get_authorized_wallets => Get "/wallets" impl WalletManagement where requires [Role::ReadAll]);
+/// Get all wallets that are authorized to receive funds on behalf of the payment gateway.
+///
+/// This endpoint is only accessible to users with the `ReadAll` role.
+pub async fn get_authorized_wallets<W: WalletManagement>(
+    api: web::Data<WalletManagementApi<W>>,
+) -> Result<HttpResponse, ServerError> {
+    debug!("💻️ GET wallets");
+    let wallets = api.fetch_authorized_wallets().await.map_err(|e| {
+        debug!("💻️ Could not fetch wallets. {e}");
+        ServerError::BackendError(e.to_string())
+    })?;
+    Ok(HttpResponse::Ok().json(wallets))
+}
+
+route!(get_authorized_addresses => Get "/send_to" impl WalletManagement);
+/// Get all wallet addresses that are authorized to receive funds on behalf of the payment gateway.
+///
+/// Only addresses are returned. IP addresses and nonces are not included.
+///
+/// This is a publicly accessible endpoint.
+pub async fn get_authorized_addresses<W: WalletManagement>(
+    api: web::Data<WalletManagementApi<W>>,
+) -> Result<HttpResponse, ServerError> {
+    debug!("💻️ GET wallets");
+    let wallets = api
+        .fetch_authorized_wallets()
+        .await
+        .map_err(|e| {
+            debug!("💻️ Could not fetch wallets. {e}");
+            ServerError::BackendError(e.to_string())
+        })?
+        .into_iter()
+        .map(|w| w.address)
+        .collect::<Vec<_>>();
+    Ok(HttpResponse::Ok().json(wallets))
+}
+
+route!(remove_authorized_wallet => Delete "/wallets/{address}" impl WalletManagement where requires [Role::SuperAdmin]);
+/// Remove a wallet from the list of authorized wallets.
+/// This endpoint is only accessible to users with the `SuperAdmin` role.
+pub async fn remove_authorized_wallet<W: WalletManagement>(
+    api: web::Data<WalletManagementApi<W>>,
+    address: web::Path<SerializedTariAddress>,
+) -> Result<HttpResponse, ServerError> {
+    let address = address.into_inner().to_address();
+    debug!("💻️ DELETE wallet {address}");
+    api.deregister_wallet(&address).await.map_err(|e| {
+        info!("💻️ Could not remove wallet. {e}");
+        ServerError::BackendError(e.to_string())
+    })?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+route!(add_authorized_wallet => Post "/wallets" impl WalletManagement where requires [Role::SuperAdmin]);
+/// Add a wallet to the list of authorized wallets.
+/// This endpoint is only accessible to users with the `SuperAdmin` role.
+pub async fn add_authorized_wallet<W: WalletManagement>(
+    api: web::Data<WalletManagementApi<W>>,
+    body: web::Json<NewWalletInfo>,
+) -> Result<HttpResponse, ServerError> {
+    let wallet = body.into_inner();
+    debug!("💻️ POST authorize_new_wallet {}", wallet.address.as_hex());
+    api.register_wallet(wallet).await.map_err(|e| {
+        info!("💻️ Could not add wallet. {e}");
+        ServerError::BackendError(e.to_string())
+    })?;
     Ok(HttpResponse::Ok().finish())
 }
 

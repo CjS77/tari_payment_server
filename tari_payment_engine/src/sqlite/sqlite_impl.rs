@@ -814,12 +814,18 @@ impl WalletManagement for SqliteDatabase {
         wallet_auth::register_wallet(wallet, &mut conn).await
     }
 
-    async fn deregister_wallet(&self, _wallet_address: &TariAddress) -> Result<WalletInfo, WalletManagementError> {
-        todo!()
+    async fn deregister_wallet(&self, _wallet_address: &TariAddress) -> Result<(), WalletManagementError> {
+        let mut conn = self.pool.acquire().await?;
+        wallet_auth::deregister_wallet(_wallet_address, &mut conn).await
     }
 
     async fn update_wallet_info(&self, _wallet: UpdateWalletInfo) -> Result<(), WalletManagementError> {
         todo!()
+    }
+
+    async fn fetch_authorized_wallets(&self) -> Result<Vec<WalletInfo>, WalletManagementError> {
+        let mut conn = self.pool.acquire().await?;
+        wallet_auth::fetch_authorized_wallets(&mut conn).await
     }
 }
 
