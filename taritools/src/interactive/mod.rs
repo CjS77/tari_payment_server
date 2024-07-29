@@ -94,6 +94,7 @@ impl InteractiveApp {
     }
 
     pub async fn run(&mut self) -> Result<()> {
+        print_logo();
         loop {
             let theme = ColorfulTheme { prompt_style: Style::new().magenta().bold(), ..ColorfulTheme::default() };
             let i = FuzzySelect::with_theme(&theme)
@@ -341,6 +342,11 @@ impl InteractiveApp {
         format_order(&result.orders.new_order, &mut msg)?;
         Ok(msg)
     }
+}
+
+fn print_logo() {
+    const LOGO: &str = include_str!("../../../assets/logo.txt");
+    println!("{LOGO}");
 }
 
 fn handle_response<T: Display>(res: Result<T>) {
