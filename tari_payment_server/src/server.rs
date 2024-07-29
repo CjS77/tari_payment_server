@@ -14,7 +14,7 @@ use log::*;
 use shopify_tools::ShopifyApi;
 use tari_payment_engine::{
     events::EventProducers,
-    tpe_api::exchange_rate_api::ExchangeRateApi,
+    tpe_api::{exchange_rate_api::ExchangeRateApi, wallet_api::WalletManagementApi},
     AccountApi,
     AuthApi,
     OrderFlowApi,
@@ -33,6 +33,7 @@ use crate::{
     routes::{
         health,
         AccountRoute,
+        AddAuthorizedWalletRoute,
         AddressesRoute,
         AuthRoute,
         CancelOrderRoute,
@@ -41,6 +42,8 @@ use crate::{
         CreditorsRoute,
         CustomerIdsRoute,
         FulfilOrderRoute,
+        GetAuthorizedAddressesRoute,
+        GetAuthorizedWalletsRoute,
         GetExchangeRateRoute,
         HistoryForAddressRoute,
         HistoryForIdRoute,
@@ -56,6 +59,7 @@ use crate::{
         OrdersSearchRoute,
         PaymentsRoute,
         ReassignOrderRoute,
+        RemoveAuthorizedWalletRoute,
         ResetOrderRoute,
         TxConfirmationNotificationRoute,
         UnfulfilledOrdersRoute,
@@ -119,6 +123,7 @@ pub fn create_server_instance(
         let authority = build_tps_authority(config.auth.clone());
         let accounts_api = AccountApi::new(db.clone());
         let wallet_auth = WalletAuthApi::new(db.clone());
+        let wallet_manager = WalletManagementApi::new(db.clone());
         let exchange_rates = ExchangeRateApi::new(db.clone());
         let hmac_middleware = HmacMiddlewareFactory::new(
             "X-Shopify-Hmac-Sha256",
@@ -134,6 +139,7 @@ pub fn create_server_instance(
             .app_data(web::Data::new(auth_api))
             .app_data(web::Data::new(jwt_signer))
             .app_data(web::Data::new(wallet_auth))
+            .app_data(web::Data::new(wallet_manager))
             .app_data(web::Data::new(exchange_rates))
             .app_data(web::Data::new(proxy_config));
         // Routes that require authentication
@@ -164,6 +170,9 @@ pub fn create_server_instance(
             .service(UpdateShopifyExchangeRateRoute::<SqliteDatabase>::new())
             .service(CustomerIdsRoute::<SqliteDatabase>::new())
             .service(AddressesRoute::<SqliteDatabase>::new())
+            .service(GetAuthorizedWalletsRoute::<SqliteDatabase>::new())
+            .service(RemoveAuthorizedWalletRoute::<SqliteDatabase>::new())
+            .service(AddAuthorizedWalletRoute::<SqliteDatabase>::new())
             .service(CheckTokenRoute::new());
         let use_x_forwarded_for = config.use_x_forwarded_for;
         let use_forwarded = config.use_forwarded;
@@ -182,6 +191,7 @@ pub fn create_server_instance(
             .service(ShopifyOnProductUpdatedRoute::<SqliteDatabase>::new())
             .service(health);
         let wallet_scope = web::scope("/wallet")
+            .service(GetAuthorizedAddressesRoute::<SqliteDatabase>::new())
             .service(IncomingPaymentNotificationRoute::<SqliteDatabase, SqliteDatabase>::new())
             .service(TxConfirmationNotificationRoute::<SqliteDatabase, SqliteDatabase>::new());
         app = app.service(wallet_scope);

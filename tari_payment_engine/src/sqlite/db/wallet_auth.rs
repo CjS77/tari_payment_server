@@ -3,7 +3,10 @@ use std::net::IpAddr;
 use sqlx::{query, Row, SqliteConnection};
 use tari_common_types::tari_address::TariAddress;
 
-use crate::traits::{NewWalletInfo, WalletAuthApiError, WalletInfo, WalletManagementError};
+use crate::{
+    db_types::SerializedTariAddress,
+    traits::{NewWalletInfo, WalletAuthApiError, WalletInfo, WalletManagementError},
+};
 
 pub async fn fetch_wallet_info_for_address(
     address: &TariAddress,
@@ -68,4 +71,37 @@ pub(crate) async fn register_wallet(
         panic!("Find out what caused this... Wallet already registered?");
     }
     Ok(())
+}
+
+pub(crate) async fn deregister_wallet(
+    address: &TariAddress,
+    conn: &mut SqliteConnection,
+) -> Result<(), WalletManagementError> {
+    let address = address.to_hex();
+    let result = query!(r#"DELETE FROM wallet_auth WHERE address = ?"#, address).execute(conn).await?;
+    if result.rows_affected() == 0 {
+        return Err(WalletManagementError::DatabaseError("Wallet not found".to_string()));
+    }
+    Ok(())
+}
+
+pub(crate) async fn fetch_authorized_wallets(
+    conn: &mut SqliteConnection,
+) -> Result<Vec<WalletInfo>, WalletManagementError> {
+    query("SELECT * FROM wallet_auth")
+        .fetch_all(conn)
+        .await?
+        .into_iter()
+        .map(|row| {
+            let ip_address = row
+                .get::<&str, _>("ip_address")
+                .parse::<IpAddr>()
+                .map_err(|e| WalletManagementError::DatabaseError(format!("Invalid IP address. {e}")))?;
+            let address = TariAddress::from_hex(row.get("address"))
+                .map_err(|e| WalletManagementError::DatabaseError(format!("Invalid TariAddress. {e}")))?;
+            let address = SerializedTariAddress::from(address);
+            let last_nonce = row.get("last_nonce");
+            Ok(WalletInfo { address, ip_address, last_nonce })
+        })
+        .collect::<Result<Vec<WalletInfo>, WalletManagementError>>()
 }

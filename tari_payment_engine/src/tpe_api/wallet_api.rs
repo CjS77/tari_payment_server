@@ -6,7 +6,7 @@ use tari_common_types::tari_address::TariAddress;
 
 use crate::{
     helpers::WalletSignature,
-    traits::{WalletAuth, WalletAuthApiError, WalletInfo},
+    traits::{NewWalletInfo, WalletAuth, WalletAuthApiError, WalletInfo, WalletManagement, WalletManagementError},
 };
 
 #[derive(Clone)]
@@ -72,5 +72,32 @@ where B: WalletAuth
         }
         self.update_wallet_nonce(address, sig.nonce).await?;
         Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct WalletManagementApi<B> {
+    db: B,
+}
+
+impl<B> WalletManagementApi<B> {
+    pub fn new(db: B) -> Self {
+        Self { db }
+    }
+}
+
+impl<B> WalletManagementApi<B>
+where B: WalletManagement
+{
+    pub async fn fetch_authorized_wallets(&self) -> Result<Vec<WalletInfo>, WalletManagementError> {
+        self.db.fetch_authorized_wallets().await
+    }
+
+    pub async fn register_wallet(&self, new_wallet_info: NewWalletInfo) -> Result<(), WalletManagementError> {
+        self.db.register_wallet(new_wallet_info).await
+    }
+
+    pub async fn deregister_wallet(&self, address: &TariAddress) -> Result<(), WalletManagementError> {
+        self.db.deregister_wallet(address).await
     }
 }
