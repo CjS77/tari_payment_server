@@ -19,7 +19,7 @@ use tari_payment_engine::{
     db_types::{CreditNote, LoginToken, Order, OrderId, Role, SerializedTariAddress, UserAccount},
     order_objects::{OrderChanged, OrderResult},
     tpe_api::{account_objects::FullAccount, payment_objects::PaymentsResult},
-    traits::OrderMovedResult,
+    traits::{NewWalletInfo, OrderMovedResult, WalletInfo},
 };
 use tari_payment_server::data_objects::{
     ExchangeRateResult,
@@ -100,6 +100,31 @@ impl PaymentServerClient {
         let addresses = res.json::<Vec<SerializedTariAddress>>().await?;
         let addresses = addresses.into_iter().map(|a| a.to_address()).collect();
         Ok(addresses)
+    }
+
+    pub async fn authorized_wallets(&self) -> Result<Vec<WalletInfo>> {
+        self.auth_get_request("/api/wallets").await
+    }
+
+    pub async fn add_authorized_wallet(&self, wallet: &NewWalletInfo) -> Result<()> {
+        let url = self.url("/api/wallets");
+        let res =
+            self.client.post(url).header("tpg_access_token", self.access_token.clone()).json(wallet).send().await?;
+        if !res.status().is_success() {
+            let msg = res.text().await?;
+            return Err(anyhow!("Error adding wallet: {msg}"));
+        }
+        Ok(())
+    }
+
+    pub async fn remove_authorized_wallet(&self, address: &TariAddress) -> Result<()> {
+        let url = self.url(&format!("/api/wallets/{}", address.to_hex()));
+        let res = self.client.delete(url).header("tpg_access_token", self.access_token.clone()).send().await?;
+        if !res.status().is_success() {
+            let msg = res.text().await?;
+            return Err(anyhow!("Error removing wallet: {msg}"));
+        }
+        Ok(())
     }
 
     pub async fn my_account(&self) -> Result<UserAccount> {

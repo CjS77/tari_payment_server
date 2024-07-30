@@ -1,13 +1,17 @@
 use std::{
     fmt::{Display, Write},
+    net::IpAddr,
     time::Duration,
 };
 
 use anyhow::Result;
-use dialoguer::{console::Style, theme::ColorfulTheme, Confirm, FuzzySelect};
+use dialoguer::{console::Style, theme::ColorfulTheme, Confirm, FuzzySelect, Select};
 use indicatif::{ProgressBar, ProgressStyle};
 use tari_common_types::tari_address::TariAddress;
-use tari_payment_engine::db_types::OrderId;
+use tari_payment_engine::{
+    db_types::{OrderId, SerializedTariAddress},
+    traits::NewWalletInfo,
+};
 use tari_payment_server::data_objects::{ModifyOrderParams, MoveOrderParams, UpdateMemoParams};
 use tokio::join;
 use tpg_common::MicroTari;
@@ -23,6 +27,7 @@ use crate::{
             format_orders,
             format_payments_result,
             format_user_account,
+            format_wallet_list,
             print_order,
         },
         menus::{top_menu, Menu},
@@ -125,9 +130,9 @@ impl InteractiveApp {
                 "Edit memo" => handle_response(self.edit_memo().await),
                 "Reassign Order" => handle_response(self.reassign_order().await),
                 "List payment addresses" => handle_response(self.get_payment_addresses().await),
-                "Add authorized wallet" => todo!(),
-                "Remove authorized wallets" => todo!(),
-                "List authorized wallets" => todo!(),
+                "Add authorized wallet" => handle_response(self.add_authorized_wallet().await),
+                "Remove authorized wallets" => handle_response(self.remove_authorized_wallet().await),
+                "List authorized wallets" => handle_response(self.list_authorized_wallets().await),
                 "Logout" => self.logout(),
                 "Back" => self.pop_menu(),
                 "Exit" => break,
@@ -151,6 +156,39 @@ impl InteractiveApp {
         let client = PaymentServerClient::new(Profile::default());
         let addresses = client.payment_addresses().await?;
         Ok(format_addresses_with_qr_code(&addresses))
+    }
+
+    async fn list_authorized_wallets(&mut self) -> Result<String> {
+        let _unused = self.login().await?;
+        let client = self.client.as_ref().unwrap();
+        let wallets = client.authorized_wallets().await?;
+        Ok(format_wallet_list(&wallets))
+    }
+
+    async fn add_authorized_wallet(&mut self) -> Result<String> {
+        let _unused = self.login().await?;
+        let address =
+            dialoguer::Input::<String>::new().with_prompt("Tari address for new payment wallet:").interact()?;
+        let address = SerializedTariAddress::from(TariAddress::from_hex(&address)?);
+        let ip_address =
+            dialoguer::Input::<String>::new().with_prompt("IP address for new payment wallet:").interact()?;
+        let ip_address = ip_address.parse::<IpAddr>()?;
+        let new_wallet = NewWalletInfo { address, ip_address, initial_nonce: None };
+        let client = self.client.as_ref().unwrap();
+        client.add_authorized_wallet(&new_wallet).await?;
+        Ok("New wallet has been added successfully".into())
+    }
+
+    async fn remove_authorized_wallet(&mut self) -> Result<String> {
+        let _unused = self.login().await?;
+        let client = self.client.as_ref().unwrap();
+        let addresses = client.payment_addresses().await?;
+        let items =
+            addresses.iter().map(|a| format!("{} ({})", a.to_hex(), a.to_emoji_string())).collect::<Vec<String>>();
+        let idx = Select::new().with_prompt("Select wallet to remove").items(&items).interact()?;
+        let address = &addresses[idx];
+        client.remove_authorized_wallet(address).await?;
+        Ok(format!("Wallet {address} has been removed successfully"))
     }
 
     async fn my_account(&mut self) {
