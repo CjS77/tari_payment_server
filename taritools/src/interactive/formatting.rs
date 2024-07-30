@@ -8,6 +8,8 @@ use prettytable::{
     Row,
     Table,
 };
+use qrcode::{render::unicode, QrCode};
+use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
     db_types::{Order, Payment, UserAccount},
     order_objects::OrderResult,
@@ -215,4 +217,25 @@ pub fn print_order(order: &Order) -> Result<String> {
     let mut f = String::new();
     format_order(order, &mut f)?;
     Ok(f)
+}
+
+pub fn format_addresses_with_qr_code(addresses: &[TariAddress]) -> String {
+    let mut table = Table::new();
+    table.set_titles(row!["Hex", "Emoji Id", "QR Code"]);
+    addresses.iter().for_each(|a| {
+        let hex = a.to_hex();
+        let qr_link = format!("tari://{}/transactions/send?tariAddress={hex}", a.network());
+        let code = QrCode::new(qr_link)
+            .map(|code| {
+                code.render::<unicode::Dense1x2>()
+                    .dark_color(unicode::Dense1x2::Dark)
+                    .light_color(unicode::Dense1x2::Light)
+                    .quiet_zone(false)
+                    .build()
+            })
+            .unwrap_or_default();
+        table.add_row(row![hex, a.to_emoji_string(), code]);
+    });
+    markdown_style(&mut table);
+    table.to_string()
 }

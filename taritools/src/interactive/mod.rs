@@ -15,6 +15,7 @@ use tpg_common::MicroTari;
 use crate::{
     interactive::{
         formatting::{
+            format_addresses_with_qr_code,
             format_exchange_rate,
             format_full_account,
             format_order,
@@ -123,6 +124,10 @@ impl InteractiveApp {
                 "History for Account Id" => handle_response(self.history_for_id().await),
                 "Edit memo" => handle_response(self.edit_memo().await),
                 "Reassign Order" => handle_response(self.reassign_order().await),
+                "List payment addresses" => handle_response(self.get_payment_addresses().await),
+                "Add authorized wallet" => todo!(),
+                "Remove authorized wallets" => todo!(),
+                "List authorized wallets" => todo!(),
                 "Logout" => self.logout(),
                 "Back" => self.pop_menu(),
                 "Exit" => break,
@@ -140,6 +145,12 @@ impl InteractiveApp {
     async fn server_health(&self) {
         let client = PaymentServerClient::new(Profile::default());
         handle_response(client.health().await)
+    }
+
+    async fn get_payment_addresses(&mut self) -> Result<String> {
+        let client = PaymentServerClient::new(Profile::default());
+        let addresses = client.payment_addresses().await?;
+        Ok(format_addresses_with_qr_code(&addresses))
     }
 
     async fn my_account(&mut self) {
