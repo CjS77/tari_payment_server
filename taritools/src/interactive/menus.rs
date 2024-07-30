@@ -5,7 +5,7 @@
 pub type Menu = (&'static str, &'static [&'static str]);
 
 pub const TOP_MENU: [&str; 5] = ["Admin Menu", "User Menu", "Server health", "Logout", "Exit"];
-pub const ADMIN_MENU: [&str; 16] = [
+pub const ADMIN_MENU: [&str; 19] = [
     "Cancel Order",
     "Mark order as Paid",
     "Reset Order",
@@ -21,10 +21,22 @@ pub const ADMIN_MENU: [&str; 16] = [
     "History for Account Id",
     "Edit memo",
     "Reassign Order",
+    "Add authorized wallet",
+    "Remove authorized wallets",
+    "List authorized wallets",
     "Exit",
 ];
-pub const USER_MENU: [&str; 8] =
-    ["My Account", "Logout", "Back", "Exit", "My Orders", "My Open Orders", "My Payments", "Account History"];
+pub const USER_MENU: [&str; 9] = [
+    "My Account",
+    "Logout",
+    "Back",
+    "Exit",
+    "My Orders",
+    "My Open Orders",
+    "My Payments",
+    "Account History",
+    "List payment addresses",
+];
 
 pub fn top_menu() -> &'static Menu {
     &("Main", &TOP_MENU)

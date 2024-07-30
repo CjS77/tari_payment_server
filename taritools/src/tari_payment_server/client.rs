@@ -16,7 +16,7 @@ use tari_jwt::{
     Ristretto256SigningKey,
 };
 use tari_payment_engine::{
-    db_types::{CreditNote, LoginToken, Order, OrderId, Role, UserAccount},
+    db_types::{CreditNote, LoginToken, Order, OrderId, Role, SerializedTariAddress, UserAccount},
     order_objects::{OrderChanged, OrderResult},
     tpe_api::{account_objects::FullAccount, payment_objects::PaymentsResult},
     traits::OrderMovedResult,
@@ -89,6 +89,17 @@ impl PaymentServerClient {
         let res = self.client.get(url).send().await?;
         let response = res.text().await?;
         Ok(response)
+    }
+
+    /// Retrieve the list of Tari addresses that can be used to send payments to the payment server.
+    ///
+    /// This method does not require authentication.
+    pub async fn payment_addresses(&self) -> Result<Vec<TariAddress>> {
+        let url = self.url("/wallet/send_to");
+        let res = self.client.get(url).send().await?;
+        let addresses = res.json::<Vec<SerializedTariAddress>>().await?;
+        let addresses = addresses.into_iter().map(|a| a.to_address()).collect();
+        Ok(addresses)
     }
 
     pub async fn my_account(&self) -> Result<UserAccount> {
