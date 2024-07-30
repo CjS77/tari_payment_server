@@ -1,0 +1,26 @@
+# .dockerignore
+
+# Ignore target directory
+target/
+
+# Ignore docker files
+docker/
+
+# Ignore version control directories and files
+.git/
+.gitignore
+
+# Ignore IDE-specific files and directories
+.idea/
+.vscode/
+*.iml
+
+# Ignore other common temporary files and directories
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*.swn
+.DS_Store
+node_modules/
