@@ -17,6 +17,7 @@ use tari_payment_engine::{
         account_objects::{AccountAddress, CustomerId, FullAccount},
         payment_objects::PaymentsResult,
     },
+    traits::WalletInfo,
 };
 use tari_payment_server::data_objects::ExchangeRateResult;
 use tpg_common::MicroTari;
@@ -168,6 +169,21 @@ pub fn format_order(order: &Order, f: &mut dyn Write) -> Result<()> {
     writeln!(f, "Memo: {memo}", memo = order.memo.as_deref().unwrap_or("No memo"))?;
     writeln!(f, "-----------------------------------------------------------------------------\n")?;
     Ok(())
+}
+
+pub fn format_wallet_list(wallets: &[WalletInfo]) -> String {
+    let mut table = Table::new();
+    table.set_titles(row!["Address", "Emoji ID", "IP Address", "Last nonce"]);
+    wallets.iter().for_each(|wallet| {
+        table.add_row(row![
+            wallet.address,
+            wallet.address.as_address().to_emoji_string(),
+            wallet.ip_address,
+            wallet.last_nonce,
+        ]);
+    });
+    markdown_style(&mut table);
+    table.to_string()
 }
 
 pub fn format_payments_result(payments: PaymentsResult) -> Result<String> {
