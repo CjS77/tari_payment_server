@@ -1,6 +1,8 @@
 # Stage 1: Build the binary
 FROM rust:1-slim-bookworm AS builder
 ARG FEATURES="sqlite"
+ENV DATABASE_URL=sqlite://data/tari_store.db
+ENV DATABASE_TYPE=sqlite
 
 # Install necessary dependencies including C compiler
 RUN apt-get update && apt-get install -y \

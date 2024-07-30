@@ -1,0 +1,181 @@
+name: Create Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    name: Build binaries for Windows, MacOs and Linux
+    runs-on: ubuntu-latest
+
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+      DATABASE_URL: sqlite://${{ github.workspace }}/data/tari_store.db
+      DATABASE_TYPE: sqlite
+      RUST_LOG: info
+      TOOLCHAIN: nightly-2024-02-20
+
+
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract tag name
+        id: extract_tag
+        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.TOOLCHAIN }}
+
+      - name: Install sqlx
+        run: |
+          cargo +stable install sqlx-cli --no-default-features --features sqlite
+          sqlx --version
+
+      - name: Run migrations
+        id: run_migrations
+        run: |
+          mkdir -p ${{ github.workspace  }}/data
+          touch ${{ github.workspace  }}/data/tari_store.db
+          sqlx migrate run --source tari_payment_engine/src/sqlite/migrations -D sqlite://${{ github.workspace }}/data/tari_store.db
+
+      # Build tari tools binaries
+      - name: Build binaries for Ubuntu
+        id: ubuntu_build
+        if: steps.run_migrations.outcome == 'success'
+        run: cargo build --release
+        env:
+          CARGO_TARGET_DIR: target/ubuntu
+
+      - name: Build binaries for Windows
+        id: win_build
+        if: steps.ubuntu_build.outcome == 'success'
+        continue-on-error: true
+        uses: houseabsolute/actions-rust-cross@v0.0.13
+        with:
+          target: x86_64-pc-windows-gnu
+          toolchain: nightly
+          args: --release
+        env:
+          CARGO_TARGET_DIR: target/windows
+
+      - name: Build taritools for macOS
+        id: macos_build
+        if: steps.ubuntu_build.outcome == 'success'
+        continue-on-error: true
+        uses: houseabsolute/actions-rust-cross@v0.0.13
+        with:
+          target: x86_64-apple-darwin
+          toolchain: nightly
+          args: --release
+        env:
+          CARGO_TARGET_DIR: target/macos
+
+      - name: Create ubuntu zip files
+        run: |
+          zip -j taritools-ubuntu.zip target/ubuntu/release/taritools .env.sample taritools/scripts/*
+          zip -j tari_payment_server-ubuntu.zip target/ubuntu/release/tari_payment_server .env.sample README.md SHOPIFY_INTEGRATION.md
+
+      - name: Create windows zip files
+        if: steps.win_build.outcome == 'success'
+        continue-on-error: true
+        run: |
+          zip -j taritools-windows.zip target/windows/release/taritools.exe .env.sample taritools/scripts/*
+          zip -j tari_payment_server-windows.zip target/windows/release/tari_payment_server.exe .env.sample README.md SHOPIFY_INTEGRATION.mdzip -j tari_payment_server-windows.zip target/windows/release/tari_payment_server.exe .env.sample README.md SHOPIFY_INTEGRATION.md
+
+      - name: Create macos zip files
+        if: steps.macos_build.outcome == 'success'
+        continue-on-error: true
+        run: |
+          zip -j taritools-macos.zip target/macos/release/taritools .env.sample taritools/scripts/*
+          zip -j tari_payment_server-macos.zip target/macos/release/tari_payment_server .env.sample README.md SHOPIFY_INTEGRATION.md
+
+      - name: "Upload release assets: Taritools (Ubuntu)"
+        if: steps.ubuntu_build.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@v3
+        with:
+          name: taritools-ubuntu
+          path: taritools-ubuntu.zip
+
+      - name: "Upload release assets: Tari Payment Server (Ubuntu)"
+        if: steps.ubuntu_build.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@v3
+        with:
+          name: tari_payment_server-ubuntu
+          path: tari_payment_server-ubuntu.zip
+
+      - name: "Upload release assets: Taritools (Windows)"
+        if: steps.win_build.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@v3
+        with:
+          name: taritools-windows
+          path: taritools-windows.zip
+
+      - name: "Upload release assets: Tari Payment Server (Windows)"
+        if: steps.win_build.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@v3
+        with:
+          name: tari_payment_server-windows
+          path: tari_payment_server-windows.zip
+
+      - name: "Upload release assets: Taritools (MacOs)"
+        if: steps.macos_build.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@v3
+        with:
+          name: taritools-macos
+          path: taritools-macos.zip
+
+      - name: "Upload release assets: Tari Payment Server (MacOs)"
+        if: steps.macos_build.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@v3
+        with:
+          name: tari_payment_server-macos
+          path: tari_payment_server-macos.zip
+
+      # Build and push docker containers
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/CjS77/tari_payment_server
+
+      - name: Build and push Docker image
+        id: push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/tari_payment_server.Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ${{ env.REGISTRY }}/CjS77/tari_payment_server
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true

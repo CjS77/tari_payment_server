@@ -15,6 +15,9 @@ docker/
 .vscode/
 *.iml
 
+# Ignore secrets
+.env
+
 # Ignore other common temporary files and directories
 *.log
 *.tmp
