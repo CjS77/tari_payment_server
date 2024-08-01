@@ -65,6 +65,7 @@ where B: PaymentGatewayDatabase
     /// This function:
     /// * Checks that the signature is valid,
     /// * Checks that the order exists, and is in the `New` status,
+    ///
     /// If these checks pass, then
     /// * an account for the wallet address is created, if necessary,
     /// * the order associated with the address in the signature

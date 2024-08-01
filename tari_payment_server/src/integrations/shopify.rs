@@ -79,10 +79,10 @@ pub const SHOPIFY_EVENT_BUFFER_SIZE: usize = 25;
 /// Only the following events are relevant to interacting with the Shopify API:
 ///
 /// 1. OrderPaidEvent - Once an order is marked as paid in the payment engine, we send a REST request to the Shopify API
-/// to mark the order as fulfilled.
+///    to mark the order as fulfilled.
 /// 2. OrderAnnulledEvent - If an order is cancelled or expires, we send a REST request to the Shopify API to mark the
-/// order as cancelled. If an order is expired from the Shopify Admin UI, then this REST call will be spurious, but no
-/// harm will be done.
+///    order as cancelled. If an order is expired from the Shopify Admin UI, then this REST call will be spurious, but
+///    no harm will be done.
 pub fn create_shopify_event_handlers(config: ShopifyApiConfig) -> Result<EventHandlers, ShopifyApiError> {
     let mut hooks = EventHooks::default();
     let api = ShopifyApi::new(config)?;
@@ -96,7 +96,8 @@ pub fn create_shopify_event_handlers(config: ShopifyApiConfig) -> Result<EventHa
         };
         let Some(original_price) = order.original_price else {
             error!(
-                "🛍️ The order that has just been marked as paid does not have an original price. Shopify orders should
+                "🛍️ The order that has just been marked as paid does not have an original price. Shopify orders \
+                 should
             have populated this field. TODO: Calculate the original price from the prevailing Tari price. Order \
                  details: {order:?}"
             );

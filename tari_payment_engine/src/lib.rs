@@ -12,12 +12,11 @@
 //!    use the public API provided by the payment engine.
 //! 3. The [`mod@db_types`] module defined the data types used in the database.
 //! 4. The [`mod@events`] module defines the events that can be subscribed to. These events are emitted when certain
-//!    actions
-//! occur within the payment engine. For example, when a new order is created, an `OrderCreated` event is emitted.
-//! A simple Pub-Sub mechanism is used so that you can easily hook into these events and perform custom actions.
+//!    actions occur within the payment engine. For example, when a new order is created, an `OrderCreated` event is
+//!    emitted. A simple Pub-Sub mechanism is used so that you can easily hook into these events and perform custom
+//!    actions.
 //! 5. The [`mod@traits`] module the public contract specification that backends must implement in order to be used by
-//!    the
-//!   payment engine.
+//!    the payment engine.
 
 #[cfg(feature = "sqlite")]
 pub mod sqlite;

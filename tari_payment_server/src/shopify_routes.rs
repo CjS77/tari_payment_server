@@ -123,8 +123,8 @@ where
                 },
                 Err(ShopifyApiError::EmptyResponse) => {
                     warn!(
-                        "🛍️️ Variant {} not found for product {}({}). The product might just have been deleted, or this \
-                         could be a bug",
+                        "🛍️️ Variant {} not found for product {}({}). The product might just have been deleted, or \
+                         this could be a bug",
                         variant.id, product.title, product.id
                     );
                 },

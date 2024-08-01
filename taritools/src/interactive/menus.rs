@@ -4,8 +4,8 @@
 //! called for each menu that contains the command.
 pub type Menu = (&'static str, &'static [&'static str]);
 
-pub const TOP_MENU: [&str; 5] = ["Admin Menu", "User Menu", "Server health", "Logout", "Exit"];
-pub const ADMIN_MENU: [&str; 19] = [
+pub const TOP_MENU: [&str; 4] = ["Admin Menu", "User Menu", "Logout", "Exit"];
+pub const ADMIN_MENU: [&str; 20] = [
     "Cancel Order",
     "Mark order as Paid",
     "Reset Order",
@@ -24,9 +24,11 @@ pub const ADMIN_MENU: [&str; 19] = [
     "Add authorized wallet",
     "Remove authorized wallets",
     "List authorized wallets",
+    "Server health",
     "Exit",
 ];
-pub const USER_MENU: [&str; 9] = [
+pub const USER_MENU: [&str; 10] = [
+    "Add profile",
     "My Account",
     "Logout",
     "Back",

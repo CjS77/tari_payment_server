@@ -108,6 +108,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     /// * The payment is marked as `Unconfirmed`
     /// * creates a new account for the address if one does not already exist
     /// * Adds the payment amount to the account's total received, and total pending
+    ///
     /// Returns the account id for the public key.
     async fn process_new_payment_for_pubkey(&self, payment: NewPayment) -> Result<(i64, Payment), PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;

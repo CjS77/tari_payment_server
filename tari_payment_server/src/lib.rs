@@ -37,7 +37,7 @@
 ///  * Authenticate (login)
 ///  * Perform an order or payment operation
 ///  * Go away (and let the token expire)
-
+///
 /// The server validates the login token, and provides an access token is response.
 ///
 /// To access authenticated endpoints, the user must provide the access token in the `tpg_access_token` header with
