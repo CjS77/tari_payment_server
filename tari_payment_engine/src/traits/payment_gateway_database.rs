@@ -60,6 +60,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     ///   done.
     /// * The payment is marked as `Unconfirmed`
     /// * creates a new account for the public key if one does not already exist
+    ///
     /// Returns the account id for the public key.
     async fn process_new_payment_for_pubkey(&self, payment: NewPayment) -> Result<(i64, Payment), PaymentGatewayError>;
 
@@ -68,6 +69,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// * The payment is marked as `Confirmed`
     /// * The payment type is set to `Manual`
     /// * creates a new account for the customer id if one does not already exist
+    ///
     /// Returns the account id for the customer id.
     async fn process_credit_note_for_customer(&self, note: CreditNote) -> Result<(i64, Payment), PaymentGatewayError>;
 

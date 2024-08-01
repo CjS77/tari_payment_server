@@ -1,7 +1,7 @@
 name: Tests
 on: [pull_request]
 env:
-  toolchain: nightly-2024-02-20
+  toolchain: nightly-2024-06-20
 
 jobs:
   test:

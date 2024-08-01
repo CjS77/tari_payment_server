@@ -16,7 +16,7 @@ jobs:
       DATABASE_URL: sqlite://${{ github.workspace }}/data/tari_store.db
       DATABASE_TYPE: sqlite
       RUST_LOG: info
-      TOOLCHAIN: nightly-2024-02-20
+      TOOLCHAIN: nightly-2024-06-20
 
 
     permissions:

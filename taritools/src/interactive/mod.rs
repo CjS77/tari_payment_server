@@ -5,16 +5,23 @@ use std::{
 };
 
 use anyhow::Result;
-use dialoguer::{console::Style, theme::ColorfulTheme, Confirm, FuzzySelect, Select};
+use dialoguer::{console::Style, theme::ColorfulTheme, Confirm, FuzzySelect, MultiSelect, Select};
 use indicatif::{ProgressBar, ProgressStyle};
+use tari_common::configuration::Network;
 use tari_common_types::tari_address::TariAddress;
+use tari_crypto::{
+    keys::PublicKey,
+    ristretto::{RistrettoPublicKey, RistrettoSecretKey},
+    tari_utilities::hex::Hex,
+};
 use tari_payment_engine::{
-    db_types::{OrderId, SerializedTariAddress},
+    db_types::{OrderId, Role, SerializedTariAddress},
     traits::NewWalletInfo,
 };
 use tari_payment_server::data_objects::{ModifyOrderParams, MoveOrderParams, UpdateMemoParams};
 use tokio::join;
 use tpg_common::MicroTari;
+use zeroize::Zeroize;
 
 use crate::{
     interactive::{
@@ -31,15 +38,17 @@ use crate::{
             print_order,
         },
         menus::{top_menu, Menu},
+        seed_phrase::{seed_words_to_comms_key, string_to_seed_words},
         selector::{AddressSelector, CustomerSelector},
     },
-    profile_manager::{read_config, Profile},
+    profile_manager::{read_config, write_config, Profile},
     tari_payment_server::client::PaymentServerClient,
 };
 
 pub mod formatting;
 pub mod menus;
 
+pub mod seed_phrase;
 pub mod selector;
 
 pub struct InteractiveApp {
@@ -133,6 +142,7 @@ impl InteractiveApp {
                 "Add authorized wallet" => handle_response(self.add_authorized_wallet().await),
                 "Remove authorized wallets" => handle_response(self.remove_authorized_wallet().await),
                 "List authorized wallets" => handle_response(self.list_authorized_wallets().await),
+                "Add profile" => handle_response(self.add_profile().await),
                 "Logout" => self.logout(),
                 "Back" => self.pop_menu(),
                 "Exit" => break,
@@ -391,6 +401,64 @@ impl InteractiveApp {
         format_order(&result.orders.new_order, &mut msg)?;
         Ok(msg)
     }
+
+    async fn add_profile(&mut self) -> Result<String> {
+        let name = dialoguer::Input::<String>::new().with_prompt("Enter profile name").interact()?;
+        let secret_type = Select::new()
+            .with_prompt("Select secret type")
+            .items(&["Provide secret key", "Provide seed phrase", "Use environment variable"])
+            .interact()?;
+        let (address, secret_key, secret_key_envar) = match secret_type {
+            0 => {
+                let secret_key =
+                    dialoguer::Input::<String>::new().with_prompt("Enter secret key (in hex):").interact()?;
+                let key = RistrettoSecretKey::from_hex(&secret_key)?;
+                let address = confirm_address(&key)?;
+                let secret_key = Some(key);
+                (address, secret_key, None)
+            },
+            1 => {
+                let seed_phrase =
+                    dialoguer::Input::<String>::new().with_prompt("Enter seed phrase (space separated):").interact()?;
+                let seed_words = string_to_seed_words(seed_phrase)?;
+                let key = seed_words_to_comms_key(seed_words)?;
+                let address = confirm_address(&key)?;
+                let secret_key = Some(key);
+                (address, secret_key, None)
+            },
+            2 => {
+                let envar =
+                    dialoguer::Input::<String>::new().with_prompt("Enter environment variable name").interact()?;
+                let key = std::env::var(&envar)?;
+                let mut key = RistrettoSecretKey::from_hex(&key)?;
+                let address = confirm_address(&key)?;
+                key.zeroize();
+                let secret_key_envar = Some(envar);
+                (address, None, secret_key_envar)
+            },
+            _ => unreachable!(),
+        };
+        let roles = MultiSelect::new()
+            .with_prompt("Select roles")
+            .items(&["User", "ReadAll", "Write", "SuperAdmin"])
+            .interact()?;
+        let roles = roles
+            .iter()
+            .map(|i| match i {
+                0 => Role::User,
+                1 => Role::ReadAll,
+                2 => Role::Write,
+                3 => Role::SuperAdmin,
+                _ => unreachable!(),
+            })
+            .collect();
+        let server = dialoguer::Input::<String>::new().with_prompt("Enter server URL").interact()?;
+        let mut user_data = read_config()?;
+        let profile = Profile { name, address, secret_key, secret_key_envar, roles, server };
+        user_data.profiles.push(profile);
+        write_config(&user_data)?;
+        Ok("Profile added successfully".into())
+    }
 }
 
 fn print_logo() {
@@ -402,6 +470,26 @@ fn handle_response<T: Display>(res: Result<T>) {
     match res {
         Ok(res) => println!("{res}"),
         Err(e) => println!("Error: {}", e),
+    }
+}
+
+fn confirm_address(secret_key: &RistrettoSecretKey) -> Result<SerializedTariAddress> {
+    let network = Select::new().with_prompt("Select network").items(&["Mainnet", "Stagenet", "Nextnet"]).interact()?;
+    let network = match network {
+        0 => Network::MainNet,
+        1 => Network::StageNet,
+        2 => Network::NextNet,
+        _ => unreachable!(),
+    };
+    let pubkey = RistrettoPublicKey::from_secret_key(secret_key);
+    let address = TariAddress::new(pubkey, network);
+    let confirm = Confirm::new()
+        .with_prompt(format!("Use address {} ({})?", address.to_hex(), address.to_emoji_string()))
+        .interact()?;
+    if confirm {
+        Ok(SerializedTariAddress::from(address))
+    } else {
+        Err(anyhow::anyhow!("Cancelled"))
     }
 }
 

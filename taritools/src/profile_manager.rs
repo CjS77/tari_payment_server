@@ -91,3 +91,10 @@ pub fn read_config() -> io::Result<UserData> {
         toml::from_str(&config_str).map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))?;
     Ok(config)
 }
+
+pub fn write_config(config: &UserData) -> anyhow::Result<()> {
+    let config_path = get_config_path()?;
+    let config_str = toml::to_string(config)?;
+    fs::write(config_path, config_str)?;
+    Ok(())
+}
