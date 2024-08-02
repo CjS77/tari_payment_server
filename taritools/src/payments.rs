@@ -22,8 +22,8 @@ pub enum WalletCommand {
 pub struct ReceivedPaymentParams {
     #[arg(short, long)]
     pub profile: String,
-    #[arg(short, long)]
-    pub amount: i64,
+    #[arg(short, long, value_parser = parse_amount)]
+    pub amount: MicroTari,
     #[arg(short, long)]
     pub txid: String,
     #[arg(short, long)]
@@ -32,10 +32,26 @@ pub struct ReceivedPaymentParams {
     pub sender: String,
 }
 
+fn parse_amount(s: &str) -> std::result::Result<MicroTari, String> {
+    #[allow(clippy::cast_possible_truncation)]
+    let value = s.parse::<i64>().or_else(|e| {
+        if s.ends_with(" T") {
+            s.trim_end_matches(" T").parse::<f64>().map(|v| (v * 1.0e6) as i64).map_err(|_| e.to_string())
+        } else if s.ends_with(" uT") {
+            s.trim_end_matches(" uT").parse::<i64>().map_err(|_| e.to_string())
+        } else if s.ends_with(" µT") {
+            s.trim_end_matches(" µT").parse::<i64>().map_err(|_| e.to_string())
+        } else {
+            Err(e.to_string())
+        }
+    })?;
+    Ok(MicroTari::from(value))
+}
+
 impl From<ReceivedPaymentParams> for NewPayment {
     fn from(params: ReceivedPaymentParams) -> Self {
         let sender = params.sender.parse::<SerializedTariAddress>().unwrap();
-        let amount = MicroTari::from(params.amount);
+        let amount = params.amount;
         let memo = params.memo;
         let order_id = None;
         let txid = params.txid;
