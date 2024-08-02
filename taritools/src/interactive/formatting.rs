@@ -12,7 +12,7 @@ use qrcode::{render::unicode, QrCode};
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
     db_types::{Order, Payment, UserAccount},
-    order_objects::OrderResult,
+    order_objects::{ClaimedOrder, OrderResult},
     tpe_api::{
         account_objects::{AccountAddress, CustomerId, FullAccount},
         payment_objects::PaymentsResult,
@@ -239,19 +239,35 @@ pub fn format_addresses_with_qr_code(addresses: &[TariAddress]) -> String {
     let mut table = Table::new();
     table.set_titles(row!["Hex", "Emoji Id", "QR Code"]);
     addresses.iter().for_each(|a| {
-        let hex = a.to_hex();
-        let qr_link = format!("tari://{}/transactions/send?tariAddress={hex}", a.network());
-        let code = QrCode::new(qr_link)
-            .map(|code| {
-                code.render::<unicode::Dense1x2>()
-                    .dark_color(unicode::Dense1x2::Dark)
-                    .light_color(unicode::Dense1x2::Light)
-                    .quiet_zone(false)
-                    .build()
-            })
-            .unwrap_or_default();
-        table.add_row(row![hex, a.to_emoji_string(), code]);
+        let (hex, emoji, qr) = format_address_with_qr_code(a);
+        table.add_row(row![hex, emoji, qr]);
     });
     markdown_style(&mut table);
     table.to_string()
+}
+
+pub fn format_address_with_qr_code(address: &TariAddress) -> (String, String, String) {
+    let qr_link = format!("tari://{}/transactions/send?tariAddress={}", address.network(), address.to_hex());
+    let code = QrCode::new(qr_link)
+        .map(|code| {
+            code.render::<unicode::Dense1x2>()
+                .dark_color(unicode::Dense1x2::Dark)
+                .light_color(unicode::Dense1x2::Light)
+                .quiet_zone(false)
+                .build()
+        })
+        .unwrap_or_default();
+    (address.to_hex(), address.to_emoji_string(), code)
+}
+
+pub fn format_claimed_order(order: &ClaimedOrder) -> Result<String> {
+    let mut f = String::new();
+    writeln!(f, "## Claimed order details")?;
+    writeln!(f, "Order id: {:<25} Status: {}", order.order_id.as_str(), order.status)?;
+    writeln!(f, "Amount: {}", order.total_price)?;
+    writeln!(f, "Payment due before: {}", order.expires_at)?;
+    let (hex, emoji, qr) = format_address_with_qr_code(&order.send_to);
+    writeln!(f, "Send Payment to: {hex} ({emoji})")?;
+    writeln!(f, "{qr}")?;
+    Ok(f)
 }

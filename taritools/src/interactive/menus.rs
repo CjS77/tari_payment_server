@@ -27,8 +27,9 @@ pub const ADMIN_MENU: [&str; 20] = [
     "Server health",
     "Exit",
 ];
-pub const USER_MENU: [&str; 10] = [
+pub const USER_MENU: [&str; 11] = [
     "Add profile",
+    "Claim Order",
     "My Account",
     "Logout",
     "Back",

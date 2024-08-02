@@ -17,7 +17,8 @@ use tari_jwt::{
 };
 use tari_payment_engine::{
     db_types::{CreditNote, LoginToken, Order, OrderId, Role, SerializedTariAddress, UserAccount},
-    order_objects::{OrderChanged, OrderResult},
+    helpers::MemoSignature,
+    order_objects::{ClaimedOrder, OrderChanged, OrderResult},
     tpe_api::{account_objects::FullAccount, payment_objects::PaymentsResult},
     traits::{NewWalletInfo, OrderMovedResult, WalletInfo},
 };
@@ -142,6 +143,17 @@ impl PaymentServerClient {
 
     pub async fn fetch_exchange_rates(&self, currency: &str) -> Result<ExchangeRateResult> {
         self.auth_get_request(&format!("/api/exchange_rate/{currency}")).await
+    }
+
+    pub async fn claim_order(&self, signature: &MemoSignature) -> Result<ClaimedOrder> {
+        let url = self.url("/order/claim");
+        let res = self.client.post(url).json(&signature).send().await?;
+        if !res.status().is_success() {
+            let msg = res.text().await?;
+            return Err(anyhow!("Error setting exchange rates: {msg}"));
+        }
+        let claimed_order = res.json().await?;
+        Ok(claimed_order)
     }
 
     pub async fn set_exchange_rate(&self, currency: &str, price_in_tari: MicroTari) -> Result<()> {
