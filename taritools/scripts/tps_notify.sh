@@ -7,28 +7,32 @@
 BINPATH=${TARITOOLS_PATH:-$HOME/.cargo/bin}
 BIN=$BINPATH/taritools
 PROFILE="TPS Hot Wallet"
+LOGFILE=$HOME/.taritools/tps_notify.log
 
 register_received_payment() {
-  ${BIN} wallet received --profile "$PROFILE" --amount $2 --txid $3 --message "$4" --sender $5
+  ${BIN} wallet received --profile "$PROFILE" --amount "$2" --txid $3 --memo "$4" --sender $5 &>>$LOGFILE
+  echo "Registering payment received is complete" >> $LOGFILE
 }
 
 register_confirmation() {
-  ${BIN} wallet confirmation --profile "$PROFILE" --txid $3
+  ${BIN} wallet confirmed --profile "$PROFILE" --txid $3 &>>$LOGFILE
+  echo "Registering confirmation received is complete" >> $LOGFILE
 }
 
 # Log the event
-echo "$@" >> $HOME/.taritools/tps_notify.log
-
-if [ -z "${12}" ]; then
+echo "$@" >> $LOGFILE
+if [ -n "${12}" ]; then
   if [ "$1" == "received" ]; then
+    echo "Registering payment received" >> $LOGFILE
     register_received_payment "$@"
-  elif [ "$1" == "confirmed" ]; then
+  elif [ "$1" == "confirmation" ]; then
+    echo "Registering confirmation received" >> $LOGFILE
     register_confirmation "$@"
   else
-    echo "Unhandled main event: $@"
+    echo "Unhandled main event: $@" >> $LOGFILE
   fi
 else
-  echo "Unhandled short event: $@"
+  echo "Unhandled short event: $@" >> $LOGFILE
 # TODO - handle cancellations
 fi
 

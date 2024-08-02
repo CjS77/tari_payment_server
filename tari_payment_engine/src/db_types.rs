@@ -183,6 +183,7 @@ impl From<String> for OrderStatusType {
 #[derive(Debug, Clone, Error)]
 #[error("Invalid conversion from string: {0}")]
 pub struct ConversionError(String);
+
 impl FromStr for OrderStatusType {
     type Err = ConversionError;
 
@@ -233,6 +234,7 @@ impl OrderId {
         &self.0
     }
 }
+
 //--------------------------------------     OrderStatus       ---------------------------------------------------------
 #[derive(Debug, Clone)]
 pub struct OrderStatus {
@@ -434,12 +436,15 @@ impl NewPayment {
     /// 2. The `claim` field must be present.
     /// 3. The `claim` field must be a valid JSON object containing a valid `MemoSignature`.
     pub fn try_extract_order_id(&mut self) -> Option<bool> {
-        self.memo.as_ref().and_then(|m| serde_json::from_str::<MemoSignature>(m).ok()).map(|m| {
-            let result = m.is_valid();
-            if result {
-                self.order_id = Some(OrderId::new(m.order_id));
-            }
-            result
+        self.memo.as_ref().map(|m| match serde_json::from_str::<MemoSignature>(m) {
+            Ok(m) => {
+                let result = m.is_valid();
+                if result {
+                    self.order_id = Some(OrderId::new(m.order_id));
+                }
+                result
+            },
+            Err(_) => false,
         })
     }
 }
@@ -568,6 +573,7 @@ mod test {
     use serde_json::json;
 
     use super::*;
+
     #[test]
     fn extract_order_id() {
         let mut payment = NewPayment::new(
