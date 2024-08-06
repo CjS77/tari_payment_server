@@ -32,6 +32,7 @@ use tari_payment_server::data_objects::{
     UpdateMemoParams,
 };
 use tpg_common::MicroTari;
+use url::Url;
 
 use crate::profile_manager::Profile;
 
@@ -55,7 +56,7 @@ impl PaymentServerClient {
     }
 
     pub fn server(&self) -> &str {
-        &self.profile.server
+        self.profile.server.as_str()
     }
 
     pub fn profile_name(&self) -> &str {
@@ -66,14 +67,15 @@ impl PaymentServerClient {
         self.profile.roles.clone()
     }
 
-    pub fn url(&self, path: &str) -> String {
-        format!("{}{}", self.profile.server, path)
+    pub fn url(&self, path: &str) -> Result<Url> {
+        self.profile.server.join(path).map_err(|e| anyhow!("Failed to join URL: {}", e))
     }
 
     pub async fn authenticate(&mut self) -> Result<()> {
         println!("Authenticating with payment server");
         let token = generate_auth_token(&self.profile)?;
-        let url = self.url("/auth");
+        let url = self.url("/auth")?;
+        println!("url: {}", url);
         let res = self.client.post(url).header("tpg_auth_token", token).send().await?;
         if !res.status().is_success() {
             let reason = res.text().await?;
@@ -86,7 +88,7 @@ impl PaymentServerClient {
     }
 
     pub async fn health(&self) -> Result<String> {
-        let url = self.url("/health");
+        let url = self.url("/health")?;
         let res = self.client.get(url).send().await?;
         let response = res.text().await?;
         Ok(response)
@@ -96,7 +98,7 @@ impl PaymentServerClient {
     ///
     /// This method does not require authentication.
     pub async fn payment_addresses(&self) -> Result<Vec<TariAddress>> {
-        let url = self.url("/wallet/send_to");
+        let url = self.url("/wallet/send_to")?;
         let res = self.client.get(url).send().await?;
         let addresses = res.json::<Vec<SerializedTariAddress>>().await?;
         let addresses = addresses.into_iter().map(|a| a.to_address()).collect();
@@ -108,7 +110,7 @@ impl PaymentServerClient {
     }
 
     pub async fn add_authorized_wallet(&self, wallet: &NewWalletInfo) -> Result<()> {
-        let url = self.url("/api/wallets");
+        let url = self.url("/api/wallets")?;
         let res =
             self.client.post(url).header("tpg_access_token", self.access_token.clone()).json(wallet).send().await?;
         if !res.status().is_success() {
@@ -119,7 +121,7 @@ impl PaymentServerClient {
     }
 
     pub async fn remove_authorized_wallet(&self, address: &TariAddress) -> Result<()> {
-        let url = self.url(&format!("/api/wallets/{}", address.to_hex()));
+        let url = self.url(&format!("/api/wallets/{}", address.to_hex()))?;
         let res = self.client.delete(url).header("tpg_access_token", self.access_token.clone()).send().await?;
         if !res.status().is_success() {
             let msg = res.text().await?;
@@ -129,7 +131,7 @@ impl PaymentServerClient {
     }
 
     pub async fn my_account(&self) -> Result<UserAccount> {
-        let url = self.url("/api/account");
+        let url = self.url("/api/account")?;
         let res = self.client.get(url).header("tpg_access_token", self.access_token.clone()).send().await?;
         match res.status() {
             StatusCode::OK => Ok(res.json().await?),
@@ -146,7 +148,7 @@ impl PaymentServerClient {
     }
 
     pub async fn claim_order(&self, signature: &MemoSignature) -> Result<ClaimedOrder> {
-        let url = self.url("/order/claim");
+        let url = self.url("/order/claim")?;
         let res = self.client.post(url).json(&signature).send().await?;
         if !res.status().is_success() {
             let msg = res.text().await?;
@@ -157,7 +159,7 @@ impl PaymentServerClient {
     }
 
     pub async fn set_exchange_rate(&self, currency: &str, price_in_tari: MicroTari) -> Result<()> {
-        let url = self.url("/api/exchange_rate");
+        let url = self.url("/api/exchange_rate")?;
         let rate = ExchangeRateUpdate { currency: currency.to_string(), rate: price_in_tari.value() as u64 };
         let res =
             self.client.post(url).header("tpg_access_token", self.access_token.clone()).json(&rate).send().await?;
@@ -170,7 +172,7 @@ impl PaymentServerClient {
 
     /// Send a payment notification to the payment server.
     pub async fn payment_notification(&self, notification: PaymentNotification) -> Result<()> {
-        let url = self.url("/wallet/incoming_payment");
+        let url = self.url("/wallet/incoming_payment")?;
         let res = self.client.post(url).json(&notification).send().await?;
         if !res.status().is_success() {
             let msg = res.text().await?;
@@ -181,7 +183,7 @@ impl PaymentServerClient {
 
     /// Send a payment confirmation to the payment server.
     pub async fn payment_confirmation(&self, confirmation: TransactionConfirmationNotification) -> Result<()> {
-        let url = self.url("/wallet/tx_confirmation");
+        let url = self.url("/wallet/tx_confirmation")?;
         let res = self.client.post(url).json(&confirmation).send().await?;
         if !res.status().is_success() {
             let msg = res.text().await?;
@@ -221,7 +223,7 @@ impl PaymentServerClient {
     }
 
     async fn auth_get_request<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
-        let url = self.url(path);
+        let url = self.url(path)?;
         let res = self.client.get(url).header("tpg_access_token", self.access_token.clone()).send().await?;
         match res.status() {
             StatusCode::OK => Ok({
@@ -255,7 +257,7 @@ impl PaymentServerClient {
     }
 
     pub async fn cancel_order(&self, params: &ModifyOrderParams) -> Result<Order> {
-        let url = self.url("/api/cancel");
+        let url = self.url("/api/cancel")?;
         let res =
             self.client.post(url).header("tpg_access_token", self.access_token.clone()).json(params).send().await?;
         if !res.status().is_success() {
@@ -267,7 +269,7 @@ impl PaymentServerClient {
     }
 
     pub async fn fulfil_order(&self, params: &ModifyOrderParams) -> Result<Order> {
-        let url = self.url("/api/fulfill");
+        let url = self.url("/api/fulfill")?;
         let res =
             self.client.post(url).header("tpg_access_token", self.access_token.clone()).json(params).send().await?;
         if !res.status().is_success() {
@@ -279,7 +281,7 @@ impl PaymentServerClient {
     }
 
     pub async fn reset_order(&self, order_id: &OrderId) -> Result<Order> {
-        let url = self.url(&format!("/api/reset_order/{order_id}"));
+        let url = self.url(&format!("/api/reset_order/{order_id}"))?;
         let res = self.client.patch(url).header("tpg_access_token", self.access_token.clone()).send().await?;
         let code = res.status();
         if !res.status().is_success() {
@@ -295,7 +297,7 @@ impl PaymentServerClient {
     }
 
     pub async fn issue_credit(&self, customer_id: &str, amount: MicroTari, reason: String) -> Result<Vec<Order>> {
-        let url = self.url("/api/credit");
+        let url = self.url("/api/credit")?;
         let credit = CreditNote::new(customer_id.to_string(), amount).with_reason(reason);
         let res =
             self.client.post(url).header("tpg_access_token", self.access_token.clone()).json(&credit).send().await?;
@@ -308,7 +310,7 @@ impl PaymentServerClient {
     }
 
     pub async fn edit_memo(&self, params: &UpdateMemoParams) -> Result<Order> {
-        let url = self.url("/api/order_memo");
+        let url = self.url("/api/order_memo")?;
         let res =
             self.client.patch(url).header("tpg_access_token", self.access_token.clone()).json(params).send().await?;
         let code = res.status();
@@ -321,7 +323,7 @@ impl PaymentServerClient {
     }
 
     pub async fn reassign_order(&self, params: &MoveOrderParams) -> Result<OrderMovedResult> {
-        let url = self.url("/api/reassign_order");
+        let url = self.url("/api/reassign_order")?;
         let res =
             self.client.patch(url).header("tpg_access_token", self.access_token.clone()).json(params).send().await?;
         let code = res.status();

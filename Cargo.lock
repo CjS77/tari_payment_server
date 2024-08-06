@@ -4545,7 +4545,7 @@ dependencies = [
 
 [[package]]
 name = "taritools"
-version = "0.1.0"
+version = "0.1.16"
 dependencies = [
  "anyhow",
  "blake2",
@@ -4577,6 +4577,7 @@ dependencies = [
  "tokio",
  "toml 0.8.19",
  "tpg_common",
+ "url",
  "urlencoding",
  "zeroize",
 ]
@@ -5097,6 +5098,7 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
+ "serde",
 ]
 
 [[package]]

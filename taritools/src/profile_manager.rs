@@ -5,8 +5,10 @@ use std::{
     path::PathBuf,
 };
 
+use anyhow::anyhow;
 use dirs::home_dir;
 use log::{info, warn};
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use tari_crypto::{ristretto::RistrettoSecretKey, tari_utilities::hex::Hex};
 use tari_payment_engine::db_types::{Role, SerializedTariAddress};
@@ -23,7 +25,7 @@ pub struct Profile {
     pub secret_key: Option<RistrettoSecretKey>,
     pub secret_key_envar: Option<String>,
     pub roles: Vec<Role>,
-    pub server: String,
+    pub server: Url,
 }
 
 impl Profile {
@@ -38,6 +40,11 @@ impl Profile {
             })
         })
     }
+
+    pub fn server_url_for(server: &str) -> anyhow::Result<String> {
+        let url = Url::parse(server)?;
+        url.host_str().map(|s| s.to_string()).ok_or_else(|| anyhow!("Invalid server URL, {}", server))
+    }
 }
 
 impl Default for Profile {
@@ -48,7 +55,7 @@ impl Default for Profile {
             secret_key: None,
             secret_key_envar: None,
             roles: vec![Role::User],
-            server: "http://localhost:4444".to_string(),
+            server: Url::parse("http://localhost:4444").unwrap(),
         }
     }
 }

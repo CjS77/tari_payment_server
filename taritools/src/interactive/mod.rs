@@ -469,6 +469,7 @@ impl InteractiveApp {
             })
             .collect();
         let server = dialoguer::Input::<String>::new().with_prompt("Enter server URL").interact()?;
+        let server = url::Url::parse(&server)?;
         let mut user_data = read_config()?;
         let profile = Profile { name, address, secret_key, secret_key_envar, roles, server };
         user_data.profiles.push(profile);
