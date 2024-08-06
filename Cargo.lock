@@ -4577,6 +4577,7 @@ dependencies = [
  "tokio",
  "toml 0.8.19",
  "tpg_common",
+ "url",
  "urlencoding",
  "zeroize",
 ]
@@ -5097,6 +5098,7 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
+ "serde",
 ]
 
 [[package]]
