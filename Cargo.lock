@@ -4545,7 +4545,7 @@ dependencies = [
 
 [[package]]
 name = "taritools"
-version = "0.1.0"
+version = "0.1.16"
 dependencies = [
  "anyhow",
  "blake2",
