@@ -55,7 +55,8 @@ impl Default for Profile {
             secret_key: None,
             secret_key_envar: None,
             roles: vec![Role::User],
-            server: Url::parse("http://localhost:4444").unwrap(),
+            server: Url::parse("http://localhost:4444")
+                .expect("Hardcoded Url (lh4) is invalid. Report this to the developers"),
         }
     }
 }

@@ -96,7 +96,7 @@ impl InteractiveApp {
     pub fn menu_prompt(&self) -> String {
         let breadcrumbs = self.breadcrumbs.iter().map(|m| m.0).collect::<Vec<&str>>().join(" » ");
         let status = if self.is_logged_in() {
-            let client = self.user.as_ref().unwrap();
+            let client = self.user.as_ref().expect("User is logged in. Client should not be None");
             client.profile.name.as_str()
         } else {
             "Not logged in"
@@ -107,7 +107,7 @@ impl InteractiveApp {
     pub fn pop_menu(&mut self) {
         if self.breadcrumbs.len() > 1 {
             self.breadcrumbs.pop();
-            self.current_menu = self.breadcrumbs.last().unwrap();
+            self.current_menu = self.breadcrumbs.last().unwrap_or(&top_menu());
         }
     }
 
@@ -187,7 +187,7 @@ impl InteractiveApp {
 
     async fn list_authorized_wallets(&mut self) -> Result<String> {
         let _unused = self.login().await?;
-        let client = self.client().unwrap();
+        let client = self.client().expect("User is logged in. Client should not be None");
         let wallets = client.authorized_wallets().await?;
         Ok(format_wallet_list(&wallets))
     }
@@ -201,14 +201,14 @@ impl InteractiveApp {
             dialoguer::Input::<String>::new().with_prompt("IP address for new payment wallet:").interact()?;
         let ip_address = ip_address.parse::<IpAddr>()?;
         let new_wallet = NewWalletInfo { address, ip_address, initial_nonce: None };
-        let client = self.client().unwrap();
+        let client = self.client().expect("User is logged in. Client should not be None");
         client.add_authorized_wallet(&new_wallet).await?;
         Ok("New wallet has been added successfully".into())
     }
 
     async fn remove_authorized_wallet(&mut self) -> Result<String> {
         let _unused = self.login().await?;
-        let client = self.client().unwrap();
+        let client = self.client().expect("User is logged in. Client should not be None");
         let addresses = client.payment_addresses().await?;
         let items =
             addresses.iter().map(|a| format!("{} ({})", a.to_hex(), a.to_emoji_string())).collect::<Vec<String>>();
@@ -221,7 +221,12 @@ impl InteractiveApp {
     async fn my_account(&mut self) {
         let mut res = self.login().await;
         if res.is_ok() {
-            res = self.client().unwrap().my_account().await.map(format_user_account);
+            res = self
+                .client()
+                .expect("User is logged in. Client should not be None")
+                .my_account()
+                .await
+                .map(format_user_account);
         }
         handle_response(res)
     }
@@ -231,7 +236,7 @@ impl InteractiveApp {
         let order_id = dialoguer::Input::<String>::new().with_prompt("Enter order ID").interact()?;
         let order = self
             .client()
-            .unwrap()
+            .expect("User is logged in. Client should not be None")
             .order_by_id(&OrderId::new(order_id))
             .await?
             .ok_or(anyhow::anyhow!("Order does not exist"))?;
@@ -241,7 +246,12 @@ impl InteractiveApp {
     async fn my_orders(&mut self) {
         let mut res = self.login().await;
         if res.is_ok() {
-            res = self.client().unwrap().my_orders().await.and_then(format_order_result);
+            res = self
+                .client()
+                .expect("User is logged in. Client should not be None")
+                .my_orders()
+                .await
+                .and_then(format_order_result);
         }
         handle_response(res)
     }
@@ -249,7 +259,12 @@ impl InteractiveApp {
     async fn my_unfulfilled_orders(&mut self) {
         let mut res = self.login().await;
         if res.is_ok() {
-            res = self.client().unwrap().my_unfulfilled_orders().await.map(|o| format_orders(&o));
+            res = self
+                .client()
+                .expect("User is logged in. Client should not be None")
+                .my_unfulfilled_orders()
+                .await
+                .map(|o| format_orders(&o));
         }
         handle_response(res)
     }
@@ -257,14 +272,19 @@ impl InteractiveApp {
     async fn my_payments(&mut self) {
         let mut res = self.login().await;
         if res.is_ok() {
-            res = self.client().unwrap().my_payments().await.and_then(format_payments_result);
+            res = self
+                .client()
+                .expect("User is logged in. Client should not be None")
+                .my_payments()
+                .await
+                .and_then(format_payments_result);
         }
         handle_response(res)
     }
 
     async fn my_history(&mut self) -> Result<String> {
         let _unused = self.login().await?;
-        let client = self.client().unwrap();
+        let client = self.client().expect("User is logged in. Client should not be None");
         let history = client.my_history().await?;
         format_full_account(history)
     }
@@ -272,14 +292,14 @@ impl InteractiveApp {
     async fn history_for_address(&mut self) -> Result<String> {
         let _unused = self.login().await;
         let address = self.select_address().await?;
-        let client = self.client().unwrap();
+        let client = self.client().expect("User is logged in. Client should not be None");
         let history = client.history_for_address(&address).await?;
         format_full_account(history)
     }
 
     async fn history_for_id(&mut self) -> Result<String> {
         let _unused = self.login().await;
-        let client = self.client().unwrap();
+        let client = self.client().expect("User is logged in. Client should not be None");
         let account_id = dialoguer::Input::<i64>::new().with_prompt("Enter account id (NOT customer id)").interact()?;
         let history = client.history_for_id(account_id).await?;
         format_full_account(history)
@@ -288,7 +308,12 @@ impl InteractiveApp {
     async fn fetch_tari_price(&mut self) {
         let mut res = self.login().await;
         if res.is_ok() {
-            res = self.client().unwrap().fetch_exchange_rates("USD").await.map(format_exchange_rate);
+            res = self
+                .client()
+                .expect("User is logged in. Client should not be None")
+                .fetch_exchange_rates("USD")
+                .await
+                .map(format_exchange_rate);
         }
         handle_response(res)
     }
@@ -296,7 +321,7 @@ impl InteractiveApp {
     async fn set_tari_price(&mut self) {
         let mut res = self.login().await;
         if res.is_ok() {
-            res = set_new_tari_price(self.client_mut().unwrap()).await
+            res = set_new_tari_price(self.client_mut().expect("User is logged in. Client should not be None")).await
         }
         handle_response(res)
     }
@@ -311,7 +336,7 @@ impl InteractiveApp {
     async fn cancel_order(&mut self) -> Result<String> {
         let _unused = self.login().await?;
         let params = self.get_modify_order_params()?;
-        let client = self.client().unwrap();
+        let client = self.client().expect("User is logged in. Client should not be None");
         let order = client.cancel_order(&params).await?;
         print_order(&order)
     }
@@ -319,7 +344,7 @@ impl InteractiveApp {
     async fn fulfil_order(&mut self) -> Result<String> {
         let _unused = self.login().await?;
         let params = self.get_modify_order_params()?;
-        let client = self.client().unwrap();
+        let client = self.client().expect("User is logged in. Client should not be None");
         let order = client.fulfil_order(&params).await?;
         print_order(&order)
     }
@@ -328,14 +353,14 @@ impl InteractiveApp {
         let _unused = self.login().await?;
         let order_id = dialoguer::Input::<String>::new().with_prompt("Enter order ID").interact()?;
         let order_id = OrderId::new(order_id);
-        let client = self.client().unwrap();
+        let client = self.client().expect("User is logged in. Client should not be None");
         let order = client.reset_order(&order_id).await?;
         print_order(&order)
     }
 
     async fn issue_credit(&mut self) -> Result<String> {
         let _unused = self.login().await?;
-        let client = &self.user.as_ref().unwrap().client;
+        let client = &self.user.as_ref().expect("User is logged in. Client should not be None").client;
         self.customer_ids.update(client).await?;
         let idx = FuzzySelect::new().with_prompt("Select customer ID").items(self.customer_ids.items()).interact()?;
         let cust_id = &self.customer_ids.items()[idx];
@@ -353,21 +378,21 @@ impl InteractiveApp {
     async fn orders_for_address(&mut self) -> Result<String> {
         let _unused = self.login().await;
         let address = self.select_address().await?;
-        let client = self.client().unwrap();
+        let client = self.client().expect("User is logged in. Client should not be None");
         client.orders_for_address(address).await.and_then(format_order_result)
     }
 
     async fn payments_for_address(&mut self) -> Result<String> {
         let _unused = self.login().await;
         let address = self.select_address().await?;
-        let client = self.client().unwrap();
+        let client = self.client().expect("User is logged in. Client should not be None");
         let payments = client.payments_for_address(address).await?;
         format_payments_result(payments)
     }
 
     async fn select_address(&mut self) -> Result<TariAddress> {
         let _s = self.login().await?;
-        let client = &self.user.as_ref().unwrap().client;
+        let client = &self.user.as_ref().expect("User is logged in. Client should not be None").client;
         self.addresses.update(client).await?;
         let idx = FuzzySelect::new().with_prompt("Select address").items(self.addresses.items()).interact()?;
         let address = TariAddress::from_hex(&self.addresses.items()[idx])?;
@@ -377,7 +402,7 @@ impl InteractiveApp {
     async fn edit_memo(&mut self) -> Result<String> {
         let _unused = self.login().await;
         let params = self.get_modify_order_params()?;
-        let client = self.client().unwrap();
+        let client = self.client().expect("User is logged in. Client should not be None");
         let order =
             client.order_by_id(&params.order_id).await?.ok_or_else(|| anyhow::anyhow!("Order does not exist"))?;
         let old_memo = order.memo.unwrap_or_else(|| "Provide a new memo".to_string());
@@ -390,7 +415,7 @@ impl InteractiveApp {
     async fn reassign_order(&mut self) -> Result<String> {
         let _unused = self.login().await;
         let params = self.get_modify_order_params()?;
-        let client = &self.user.as_ref().unwrap().client;
+        let client = &self.user.as_ref().expect("User is logged in. Client should not be None").client;
         let (cust_ids_res, order_res) = join!(self.customer_ids.update(client), client.order_by_id(&params.order_id));
         cust_ids_res?;
         let order = order_res?.ok_or_else(|| anyhow::anyhow!("Order {} does not exist", params.order_id))?;
@@ -481,7 +506,8 @@ impl InteractiveApp {
         let _unused = self.login().await;
         let order_id = dialoguer::Input::<String>::new().with_prompt("Enter order ID").interact()?;
         let order_id = OrderId::new(order_id);
-        let ProfileInfo { client, profile } = self.user.as_ref().unwrap();
+        let ProfileInfo { client, profile } =
+            self.user.as_ref().expect("User is logged in. Profile should not be None");
         let key = profile.secret_key().ok_or(anyhow::anyhow!("No secret key found for profile"))?;
         let address = profile.address.as_address().clone();
         let signature = MemoSignature::create(address, order_id.to_string(), &key)?;
@@ -539,7 +565,7 @@ async fn set_new_tari_price(client: &mut PaymentServerClient) -> Result<String> 
     pb.enable_steady_tick(Duration::from_millis(100));
     pb.set_style(
         ProgressStyle::with_template("{spinner:5} {msg} [{elapsed}]")
-            .unwrap()
+            .expect("Hardcoded progress template is invalid. Report this to the developers")
             .tick_strings(&["🕛 ", "🕐 ", "🕑 ", "🕒 ", "🕓 ", "🕔 ", "🕕 ", "🕖 ", "🕗 ", "🕘 ", "🕙 ", "🕚 "]),
     );
     pb.set_message("Updating prices (this could take a few minutes)...");

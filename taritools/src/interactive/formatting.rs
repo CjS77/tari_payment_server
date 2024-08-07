@@ -76,7 +76,7 @@ pub fn format_customer_ids(ids: &[CustomerId]) -> String {
 pub fn format_full_account(account: FullAccount) -> Result<String> {
     let mut s = String::new();
     writeln!(s, "# Account Summary")?;
-    writeln!(s, "{}", format_user_account(account.account)).unwrap();
+    writeln!(s, "{}", format_user_account(account.account))?;
     writeln!(s, "# Addresses")?;
     writeln!(s, "{}\n", format_addresses(&account.addresses))?;
     writeln!(s, "# Customer IDs")?;
