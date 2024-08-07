@@ -49,7 +49,8 @@ pub async fn fetch_shopify_order(id: u64) {
     let api = new_shopify_api();
     match api.get_order(id).await {
         Ok(order) => {
-            let json = serde_json::to_string_pretty(&order).unwrap();
+            let json = serde_json::to_string_pretty(&order)
+                .unwrap_or_else(|e| format!("Could not represent order as JSON. {e}"));
             println!("Order #{id}\n{json}");
         },
         Err(e) => {
@@ -62,7 +63,8 @@ pub async fn cancel_shopify_order(id: u64) {
     let api = new_shopify_api();
     match api.cancel_order(id).await {
         Ok(order) => {
-            let json = serde_json::to_string_pretty(&order).unwrap();
+            let json = serde_json::to_string_pretty(&order)
+                .unwrap_or_else(|e| format!("Could not represent order as JSON. {e}"));
             println!("Cancelled order #{id}\n{json}");
         },
         Err(e) => {
@@ -75,7 +77,8 @@ pub async fn mark_order_as_paid(id: u64, amount: String, currency: String) {
     let api = new_shopify_api();
     match api.mark_order_as_paid(id, amount, currency).await {
         Ok(tx) => {
-            let json = serde_json::to_string_pretty(&tx).unwrap();
+            let json = serde_json::to_string_pretty(&tx)
+                .unwrap_or_else(|e| format!("Could not represent transaction as JSON. {e}"));
             println!("Marked order #{id} as paid\n{json}");
         },
         Err(e) => {
@@ -88,7 +91,8 @@ pub async fn fetch_exchange_rates() {
     let api = new_shopify_api();
     match api.get_exchange_rates().await {
         Ok(rates) => {
-            let json = serde_json::to_string_pretty(&rates).unwrap();
+            let json = serde_json::to_string_pretty(&rates)
+                .unwrap_or_else(|e| format!("Could not represent rate as JSON. {e}"));
             println!("Exchange rates\n{json}");
         },
         Err(e) => {
@@ -102,7 +106,8 @@ pub async fn set_exchange_rates(rates: Vec<ExchangeRate>) {
     match api.set_exchange_rates(&rates).await {
         Ok(new_rates) => {
             println!("Exchange rates updated");
-            let json = serde_json::to_string_pretty(&new_rates).unwrap();
+            let json = serde_json::to_string_pretty(&new_rates)
+                .unwrap_or_else(|e| format!("Could not represent rates as JSON. {e}"));
             println!("New rates:\n{json}");
         },
         Err(e) => {
@@ -115,7 +120,8 @@ pub async fn fetch_all_variants() {
     let api = new_shopify_api();
     match api.fetch_all_variants().await {
         Ok(variants) => {
-            let json = serde_json::to_string_pretty(&variants).unwrap();
+            let json = serde_json::to_string_pretty(&variants)
+                .unwrap_or_else(|e| format!("Could not represent product as JSON. {e}"));
             println!("Variants\n{json}");
         },
         Err(e) => {
@@ -128,7 +134,8 @@ pub async fn get_variant(id: u64) {
     let api = new_shopify_api();
     match api.fetch_variant(id).await {
         Ok(variant) => {
-            let json = serde_json::to_string_pretty(&variant).unwrap();
+            let json = serde_json::to_string_pretty(&variant)
+                .unwrap_or_else(|e| format!("Could not represent product as JSON. {e}"));
             println!("Variant #{id}\n{json}");
         },
         Err(ShopifyApiError::EmptyResponse) => {
@@ -146,7 +153,8 @@ pub async fn update_prices(rate: i64) {
     match api.update_all_prices(rate).await {
         Ok(variants) => {
             println!("Prices updated");
-            let json = serde_json::to_string_pretty(&variants).unwrap();
+            let json = serde_json::to_string_pretty(&variants)
+                .unwrap_or_else(|e| format!("Could not represent product as JSON. {e}"));
             println!("Variants:\n{json}");
         },
         Err(e) => {
@@ -159,7 +167,8 @@ pub async fn list_webhooks() {
     let api = new_shopify_api();
     match api.fetch_webhooks().await {
         Ok(webhooks) => {
-            let json = serde_json::to_string_pretty(&webhooks).unwrap();
+            let json = serde_json::to_string_pretty(&webhooks)
+                .unwrap_or_else(|e| format!("Could not represent webhook as JSON. {e}"));
             println!("Webhooks\n{json}");
         },
         Err(e) => {
@@ -200,7 +209,8 @@ async fn install_webhooks(url: String) {
             None => match api.install_webhook(&address, topic).await {
                 Ok(webhook) => {
                     println!("Webhook installed for {topic}");
-                    let json = serde_json::to_string_pretty(&webhook).unwrap();
+                    let json = serde_json::to_string_pretty(&webhook)
+                        .unwrap_or_else(|e| format!("Could not represent webhook as JSON. {e}"));
                     println!("Webhook:\n{json}");
                 },
                 Err(e) => {

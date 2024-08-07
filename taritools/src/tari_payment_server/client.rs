@@ -230,7 +230,7 @@ impl PaymentServerClient {
                 res.json().await?
                 // let body: Value = res.json().await?;
                 // println!("body: {:?}", body);
-                // serde_json::from_value(body).unwrap()
+                // serde_json::from_value(body).unwrap_or_else(|e| format!("Could not represent response as JSON. {e}"))
             }),
             code => {
                 let msg = res.text().await?;

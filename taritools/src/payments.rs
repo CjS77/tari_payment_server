@@ -50,7 +50,10 @@ fn parse_amount(s: &str) -> std::result::Result<MicroTari, String> {
 
 impl From<ReceivedPaymentParams> for NewPayment {
     fn from(params: ReceivedPaymentParams) -> Self {
-        let sender = params.sender.parse::<SerializedTariAddress>().unwrap();
+        let sender = params
+            .sender
+            .parse::<SerializedTariAddress>()
+            .expect("Invalid Tari Address in parameters. Has the Tari address format changed?");
         let amount = params.amount;
         let memo = params.memo;
         let order_id = None;
@@ -91,7 +94,10 @@ pub fn print_payment_auth(params: PaymentAuthParams) {
             println!("Network       : {}", params.network);
             println!("Nonce: {}", params.nonce);
             println!("auth: {}", wallet_signature.as_json());
-            println!("payment: {}", serde_json::to_string(&payment).unwrap());
+            println!(
+                "payment: {}",
+                serde_json::to_string(&payment).unwrap_or_else(|e| format!("Could not represent payment as JSON. {e}"))
+            );
             println!("------------------------------------------------------------------------");
         },
         Err(e) => {
@@ -139,7 +145,11 @@ pub fn print_tx_confirm(params: TxConfirmParams) {
             println!("Network       : {}", params.network);
             println!("Nonce: {}", params.nonce);
             println!("auth: {}", wallet_signature.as_json());
-            println!("confirmation: {}", serde_json::to_string(&confirmation).unwrap());
+            println!(
+                "confirmation: {}",
+                serde_json::to_string(&confirmation)
+                    .unwrap_or_else(|e| format!("Could not represent confirmation as JSON. {e}"))
+            );
             println!("------------------------------------------------------------------------");
         },
         Err(e) => {
