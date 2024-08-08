@@ -9,7 +9,7 @@ pub enum ShopifyCommand {
     /// Retrieve or modify Shopify orders
     Orders(OrdersCommand),
     #[command(subcommand)]
-    /// Retrieve or modify exchange rates
+    /// [Deprecated] Retrieve or modify exchange rates. Use the interactive mode of Taritools instead.
     Rates(RatesCommand),
     #[command(subcommand)]
     /// Retrieve or modify products

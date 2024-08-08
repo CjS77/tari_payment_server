@@ -4,60 +4,52 @@
 //! called for each menu that contains the command.
 pub type Menu = (&'static str, &'static [&'static str]);
 
-
+// Command aliases. Keep this list in alphabetical order.
 pub mod commands {
+    pub const ADD_AUTH_WALLET: &str = "Add authorized wallet";
+    pub const ADD_PROFILE: &str = "Add profile";
     pub const CANCEL: &str = "Cancel Order";
-    pub const MARK_PAID: &str = "Mark order as Paid";
-    pub const RESET: &str = "Reset Order";
+    pub const CLAIM_ORDER: &str = "Claim Order";
+    pub const EDIT_MEMO: &str = "Edit memo";
+    pub const EXIT: &str = "Exit";
     pub const FETCH_PRICE: &str = "Fetch Tari price";
-    pub const SET_PRICE: &str = "Set Tari price";
-    pub const LOGOUT: &str = "Logout";
-    pub const BACK: &str = "Back";
+    pub const HISTORY_FOR_ACCOUNT_ID: &str = "History for Account Id";
+    pub const HISTORY_FOR_ADDRESS: &str = "History for Address";
     pub const ISSUE_CREDIT: &str = "Issue Credit";
+    pub const LIST_AUTH_WALLETS: &str = "List authorized wallets";
+    pub const LIST_PAYMENT_ADDRESSES: &str = "List payment addresses";
+    pub const LOGOUT: &str = "Logout";
+    pub const MARK_ORDER_PAID: &str = "Mark order as Paid";
+    pub const MY_ACCOUNT: &str = "My Account";
+    pub const MY_ACCOUNT_HISTORY: &str = "Account History";
+    pub const MY_OPEN_ORDERS: &str = "My Open Orders";
+    pub const MY_ORDERS: &str = "My Orders";
+    pub const MY_PAYMENTS: &str = "My Payments";
+    pub const NAV_BACK: &str = "Back";
+    pub const NAV_TO_ADMIN_MENU: &str = "Admin Menu";
+    pub const NAV_TO_USER_MENU: &str = "User Menu";
     pub const ORDER_BY_ID: &str = "Order by Id";
     pub const ORDERS_FOR_ADDRESS: &str = "Orders for Address";
     pub const PAYMENTS_FOR_ADDRESS: &str = "Payments for Address";
-    pub const HISTORY_FOR_ADDRESS: &str = "History for Address";
-    pub const HISTORY_FOR_ACCOUNT_ID: &str = "History for Account Id";
-    pub const EDIT_MEMO: &str = "Edit memo";
     pub const REASSIGN_ORDER: &str = "Reassign Order";
-    pub const ADD_AUTH_WALLET: &str = "Add authorized wallet";
     pub const REMOVE_AUTH_WALLETS: &str = "Remove authorized wallets";
-    pub const LIST_AUTH_WALLETS: &str = "List authorized wallets";
+    pub const RESET_ORDER: &str = "Reset Order";
     pub const SERVER_HEALTH: &str = "Server health";
-    pub const EXIT: &str = "Exit";
-    pub const ADD_PROFILE: &str = "Add profile";
-    pub const CLAIM_ORDER: &str = "Claim Order";
-    pub const MY_ACCOUNT: &str = "My Account";
-    pub const MY_ORDERS: &str = "My Orders";
-    pub const MY_OPEN_ORDERS: &str = "My Open Orders";
-    pub const MY_PAYMENTS: &str = "My Payments";
-    pub const ACCOUNT_HISTORY: &str = "Account History";
-    pub const LIST_PAYMENT_ADDRESSES: &str = "List payment addresses";
-
-    pub const ADMIN_MENU_STR: &str = "Admin Menu";
-    pub const USER_MENU_STR: &str = "User Menu";
-    pub const LOGOUT_STR: &str = "Logout";
-    pub const EXIT_STR: &str = "Exit";
+    pub const SET_PRICE: &str = "Set Tari price";
 }
 
 pub use commands::*;
 
-pub const TOP_MENU: [&str; 4] = [
-    ADMIN_MENU_STR,
-    USER_MENU_STR,
-    LOGOUT_STR,
-    EXIT_STR,
-];
+pub const TOP_MENU: [&str; 4] = [NAV_TO_ADMIN_MENU, NAV_TO_USER_MENU, LOGOUT, EXIT];
 
 pub const ADMIN_MENU: [&str; 20] = [
     CANCEL,
-    MARK_PAID,
-    RESET,
+    MARK_ORDER_PAID,
+    RESET_ORDER,
     FETCH_PRICE,
     SET_PRICE,
     LOGOUT,
-    BACK,
+    NAV_BACK,
     ISSUE_CREDIT,
     ORDER_BY_ID,
     ORDERS_FOR_ADDRESS,
@@ -78,12 +70,12 @@ pub const USER_MENU: [&str; 11] = [
     CLAIM_ORDER,
     MY_ACCOUNT,
     LOGOUT,
-    BACK,
+    NAV_BACK,
     EXIT,
     MY_ORDERS,
     MY_OPEN_ORDERS,
     MY_PAYMENTS,
-    ACCOUNT_HISTORY,
+    MY_ACCOUNT_HISTORY,
     LIST_PAYMENT_ADDRESSES,
 ];
 

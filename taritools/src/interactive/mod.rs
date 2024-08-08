@@ -3,11 +3,11 @@ use std::{
     net::IpAddr,
     time::Duration,
 };
-use menus::commands::*;
 
 use anyhow::Result;
 use dialoguer::{console::Style, theme::ColorfulTheme, Confirm, FuzzySelect, MultiSelect, Select};
 use indicatif::{ProgressBar, ProgressStyle};
+use menus::commands::*;
 use tari_common::configuration::Network;
 use tari_common_types::tari_address::TariAddress;
 use tari_crypto::{
@@ -58,7 +58,6 @@ struct ProfileInfo {
     client: PaymentServerClient,
     profile: Profile,
 }
-
 
 pub struct InteractiveApp {
     user: Option<ProfileInfo>,
@@ -133,12 +132,12 @@ impl InteractiveApp {
                 CLAIM_ORDER => handle_response(self.claim_order().await),
                 MY_OPEN_ORDERS => self.my_unfulfilled_orders().await,
                 MY_PAYMENTS => self.my_payments().await,
-                ACCOUNT_HISTORY => handle_response(self.my_history().await),
-                ADMIN_MENU_STR => self.select_menu(menus::admin_menu()),
-                USER_MENU_STR => self.select_menu(menus::user_menu()),
+                MY_ACCOUNT_HISTORY => handle_response(self.my_history().await),
+                NAV_TO_ADMIN_MENU => self.select_menu(menus::admin_menu()),
+                NAV_TO_USER_MENU => self.select_menu(menus::user_menu()),
                 CANCEL => handle_response(self.cancel_order().await),
-                RESET => handle_response(self.reset_order().await),
-                MARK_PAID => handle_response(self.fulfil_order().await),
+                RESET_ORDER => handle_response(self.reset_order().await),
+                MARK_ORDER_PAID => handle_response(self.fulfil_order().await),
                 FETCH_PRICE => self.fetch_tari_price().await,
                 SET_PRICE => self.set_tari_price().await,
                 ISSUE_CREDIT => handle_response(self.issue_credit().await),
@@ -154,9 +153,9 @@ impl InteractiveApp {
                 REMOVE_AUTH_WALLETS => handle_response(self.remove_authorized_wallet().await),
                 LIST_AUTH_WALLETS => handle_response(self.list_authorized_wallets().await),
                 ADD_PROFILE => handle_response(self.add_profile().await),
-                LOGOUT_STR => self.logout(),
-                BACK => self.pop_menu(),
-                EXIT_STR => break,
+                LOGOUT => self.logout(),
+                NAV_BACK => self.pop_menu(),
+                EXIT => break,
                 _ => continue,
             }
         }
