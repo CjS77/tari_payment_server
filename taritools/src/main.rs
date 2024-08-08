@@ -30,36 +30,70 @@ pub const APP_NAME: &str = env!("CARGO_PKG_NAME");
 #[derive(Parser, Debug)]
 #[command(version = "1.0.0", author = "CjS77")]
 pub struct Arguments {
+    /// The network to use (nextnet, stagenet, mainnet). Default is mainnet.
     #[arg(short, long, default_value = "mainnet")]
     network: Network,
-    /// Generate a new random Tari address
     #[command(subcommand)]
     command: Command,
 }
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
+    /// Generate and print a new random secret key and print the associated public key, Tari address, and emoji id.
     #[clap(name = "address")]
     NewAddress,
+    /// Generate a JWT token for use in authenticating with the Tari Payment Server (e.g. for Curl or Postman).
+    /// Usually, it's much easier to use the interactive mode of Taritools and let it handle authentication for
+    /// you.
+    ///
+    /// When using this command, you can specify the roles desired for the login token (assuming they've been granted
+    /// on the server of course).
     #[clap(name = "token")]
     AccessToken {
         /// The secret key to use for the token
         #[arg(short = 's', long = "seckey")]
         secret: String,
+        /// The network to use (nextnet, stagenet, mainnet). Default is mainnet.
         #[arg(short = 'n', long = "network", default_value = "mainnet")]
         network: Network,
         /// Roles you want the token to grant
         #[arg(short = 'r', long = "roles", default_value = "user")]
         roles: Vec<String>,
     },
-    #[clap(name = "memo", about = "Generate a memo signature in order to authenticate orders in storefronts")]
+    /// Generate a memo signature in order to claim orders in storefronts.
+    ///
+    /// This is useful to paste into the memo field of a payment from the console wallet, but it's generally far more
+    /// convenient to use the 'Claim order' command in the interactive mode of Taritools.
+    #[clap(name = "memo")]
     MemoSignature(MemoSignatureParams),
+    /// Generate a payment authorization signature to acknowledge a payment to a hot wallet.
+    ///
+    /// This command will very seldom be used directly outside of testing.
     #[clap(name = "payment")]
     PaymentAuth(PaymentAuthParams),
+    /// Generate a transaction confirmation signature to confirm a payment to a hot wallet.
+    ///
+    /// This command will very seldom be used directly outside of testing.
     #[clap(name = "confirm")]
     TxConfirm(TxConfirmParams),
-    #[command(subcommand)]
+    /// Commands for interacting with Shopify storefronts.
+    ///
+    /// There are several subcommands for interacting with your shopify store. Your environment (or `.env` file)
+    /// must contain the following variables:
+    ///
+    /// * `TPG_SHOPIFY_SHOP`: Your Shopify shop name, e.g. `my-shop.myshopify.com`
+    /// * `TPG_SHOPIFY_API_VERSION`: Optional. The API version to use. Default is `2024-04`.
+    /// * `TPG_SHOPIFY_STOREFRONT_ACCESS_TOKEN`: Your Shopify storefront access token. e.g. `yyyyyyyyy`
+    /// * `TPG_SHOPIFY_ADMIN_ACCESS_TOKEN`: Your Shopify admin access token. e.g. `shpat_xxxxxxxx`
+    /// * `TPG_SHOPIFY_API_SECRET`: Your Shopify API secret. e.g. `aaaaaaaaaaaa`
+    ///
+    /// Not all of these environment variables are required for all commands, but the `TPG_SHOPIFY_ADMIN_ACCESS_TOKEN`
+    ///  and `TPG_SHOPIFY_SHOP` are required for most of the important administrative commands in taritools.
+    #[command(subcommand, verbatim_doc_comment)]
     Shopify(ShopifyCommand),
+    /// Commands created for use by console wallet to communicate with the Tari Payment Server.
+    ///
+    /// See `tps_notify.sh`.
     #[command(subcommand)]
     Wallet(WalletCommand),
 }
@@ -69,10 +103,13 @@ pub struct PaymentAuthParams {
     /// The payment wallet's secret key
     #[arg(short = 's', long = "seckey")]
     secret: String,
-    #[arg(short = 'n', long = "network", default_value = "mainnet")]
     /// The network to use (testnet, stagenet, mainnet)
+    #[arg(short = 'n', long = "network", default_value = "mainnet")]
     network: Network,
-    /// A monotonically increasing nonce
+    /// A monotonically increasing nonce.
+    ///
+    /// The current Unix epoch is a good stateless means of generating a nonce, assuming the calls aren't made more
+    /// than once per second.
     #[arg(short = 'c', long = "nonce", default_value = "1")]
     nonce: i64,
     /// The amount of the payment, in Tari
@@ -97,8 +134,8 @@ pub struct MemoSignatureParams {
     /// The user's wallet secret key
     #[arg(short = 's', long = "seckey")]
     secret: String,
-    #[arg(short = 'n', long = "network", default_value = "mainnet")]
     /// The network to use (testnet, stagenet, mainnet)
+    #[arg(short = 'n', long = "network", default_value = "mainnet")]
     network: Network,
     /// The order number associated with this payment. Generally extracted from the memo.
     #[arg(short = 'o', long = "order")]
@@ -110,8 +147,8 @@ pub struct TxConfirmParams {
     /// The payment wallet's secret key
     #[arg(short = 's', long = "seckey")]
     secret: String,
-    #[arg(short = 'n', long = "network", default_value = "mainnet")]
     /// The network to use (testnet, stagenet, mainnet)
+    #[arg(short = 'n', long = "network", default_value = "mainnet")]
     network: Network,
     /// A monotonically increasing nonce
     #[arg(short = 'c', long = "nonce", default_value = "1")]
