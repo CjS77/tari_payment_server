@@ -1,0 +1,65 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:129.0) Gecko/20100101 Firefox/129.0" version="24.7.6">
+  <diagram name="Page-1" id="X-A5G_VCiraket9ba7Rw">
+    <mxGraphModel dx="2954" dy="1126" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="w0FSIwxksBT_AQNrZpyY-2" value="&lt;b&gt;TARI payment server&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="160" y="120" width="200" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="w0FSIwxksBT_AQNrZpyY-12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=blockThin;startFill=1;" edge="1" parent="1" source="w0FSIwxksBT_AQNrZpyY-3" target="w0FSIwxksBT_AQNrZpyY-10">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="260" y="350" />
+              <mxPoint x="260" y="350" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="w0FSIwxksBT_AQNrZpyY-3" value="&lt;div&gt;&lt;b&gt;Payment Engine&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Business logic&lt;/div&gt;&lt;div&gt;Event handlers&lt;br&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="190" y="250" width="140" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="w0FSIwxksBT_AQNrZpyY-11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=block;startFill=1;" edge="1" parent="1" source="w0FSIwxksBT_AQNrZpyY-4" target="w0FSIwxksBT_AQNrZpyY-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="w0FSIwxksBT_AQNrZpyY-4" value="&lt;div&gt;&lt;b&gt;REST API&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="190" y="160" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="w0FSIwxksBT_AQNrZpyY-5" value="Shopify store" style="html=1;verticalLabelPosition=bottom;align=center;labelBackgroundColor=#ffffff;verticalAlign=top;strokeWidth=2;strokeColor=#0080F0;shadow=0;dashed=0;shape=mxgraph.ios7.icons.bag;" vertex="1" parent="1">
+          <mxGeometry x="600" y="120" width="130" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="w0FSIwxksBT_AQNrZpyY-6" value="Shopify API" style="endArrow=classic;html=1;rounded=0;entryX=0.009;entryY=0.317;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" target="w0FSIwxksBT_AQNrZpyY-5">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="360" y="160" as="sourcePoint" />
+            <mxPoint x="590" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="w0FSIwxksBT_AQNrZpyY-7" value="Webhooks" style="endArrow=classic;html=1;rounded=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;exitX=0;exitY=0.667;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="w0FSIwxksBT_AQNrZpyY-5" target="w0FSIwxksBT_AQNrZpyY-2">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="480" y="530" as="sourcePoint" />
+            <mxPoint x="710" y="530" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="w0FSIwxksBT_AQNrZpyY-8" value="&lt;div&gt;TARI console wallet&lt;/div&gt;" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://cdn3.iconfinder.com/data/icons/essential-pack/32/85-Wallet-128.png" vertex="1" parent="1">
+          <mxGeometry x="600" y="310" width="128" height="128" as="geometry" />
+        </mxCell>
+        <mxCell id="w0FSIwxksBT_AQNrZpyY-9" value="Notification script" style="endArrow=classic;html=1;rounded=0;entryX=0.995;entryY=0.718;entryDx=0;entryDy=0;exitX=-0.008;exitY=0.383;exitDx=0;exitDy=0;exitPerimeter=0;entryPerimeter=0;" edge="1" parent="1" source="w0FSIwxksBT_AQNrZpyY-8" target="w0FSIwxksBT_AQNrZpyY-2">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="590" y="350" as="sourcePoint" />
+            <mxPoint x="350" y="353" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="w0FSIwxksBT_AQNrZpyY-10" value="&lt;b&gt;DB&lt;/b&gt;" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="190" y="370" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="w0FSIwxksBT_AQNrZpyY-14" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="w0FSIwxksBT_AQNrZpyY-13" target="w0FSIwxksBT_AQNrZpyY-2">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="260" y="460" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="w0FSIwxksBT_AQNrZpyY-13" value="&lt;b&gt;Taritools&lt;/b&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;TPS API client&lt;/div&gt;&lt;div&gt;Admin tools&lt;br&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="160" y="520" width="200" height="90" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
