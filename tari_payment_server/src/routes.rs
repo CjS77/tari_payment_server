@@ -453,6 +453,7 @@ route!(claim_order => Post "/order/claim" impl PaymentGatewayDatabase);
 ///
 /// This route is unauthenticated
 pub async fn claim_order<B: PaymentGatewayDatabase>(
+    claims: JwtClaims,
     body: web::Json<MemoSignature>,
     api: web::Data<OrderFlowApi<B>>,
 ) -> Result<HttpResponse, ServerError> {
@@ -462,7 +463,11 @@ pub async fn claim_order<B: PaymentGatewayDatabase>(
         memo_signature.address.as_address(),
         memo_signature.order_id
     );
-    let result = api.claim_order(&memo_signature).await.map_err(|e| {
+    let mut allowed = vec![OrderStatusType::Unclaimed];
+    if claims.roles.contains(&Role::Write) {
+        allowed.extend([OrderStatusType::New, OrderStatusType::Unclaimed, OrderStatusType::Expired]);
+    }
+    let result = api.claim_order(&memo_signature, &allowed).await.map_err(|e| {
         debug!("💻️ Order claim failed. {e}");
         e
     })?;

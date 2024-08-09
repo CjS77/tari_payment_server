@@ -64,13 +64,13 @@ where B: PaymentGatewayDatabase
     ///
     /// This function:
     /// * Checks that the signature is valid,
-    /// * Checks that the order exists, and is in the `New` status,
+    /// * Checks that the order exists, and is in one of the statuses provided in `allowed` statuses,
     ///
     /// If these checks pass, then
     /// * an account for the wallet address is created, if necessary,
     /// * the order associated with the address in the signature
     /// * The OrderClaimed event is fired.
-    pub async fn claim_order(&self, signature: &MemoSignature) -> Result<ClaimedOrder, PaymentGatewayError> {
+    pub async fn claim_order(&self, signature: &MemoSignature, allowed: &[OrderStatusType]) -> Result<ClaimedOrder, PaymentGatewayError> {
         if !signature.is_valid() {
             return Err(PaymentGatewayError::InvalidSignature);
         }
@@ -81,6 +81,11 @@ where B: PaymentGatewayDatabase
             .await?
             .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
         let address = signature.address.as_address();
+        if !allowed.contains(&order.status) {
+            warn!("🔄️📦️ A wallet ({}) tried to claim order [{}] but it is already in status {}", signature.address.as_hex(), order_id, order.status);
+            return Err(PaymentGatewayError::OrderModificationForbidden);
+        }
+
         let (account, order) = self.db.attach_order_to_address(&order.order_id, address).await?;
         debug!("🖇️📦️ Order [{order_id}] is attached to account {}", account.id);
         self.call_order_claimed_hook(&order, address).await;
