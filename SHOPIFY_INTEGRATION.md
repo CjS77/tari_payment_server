@@ -1,33 +1,9 @@
-# Installation Guide
-
-This guide provides a walkthrough of installing and setting up the Tari Payment Gateway with:
-* A Shopify storefront
-* A Tari console wallet.
-
-The Tari Payment Server consists of the following parts:
-
-* The **Tari Payment Server** (TPS), which is a REST API server in front of the Tari Payment Engine and a Database, 
-  that 
-  tracks orders, payments, and the links between them. It has support for automatic account tracking (for example, 
-  if a Tari wallet sends more Tari than is needed, TPS will remember which store accounts were used with that 
-  address and apply the excess as a credit in future orders).
-* A Storefront. As of today, only **Shopify Storefront**s are supported, but integrations for other popular 
-  storefronts can be added.
-* A **hot wallet**, which acts as the receiver for all payments for orders.
-
-The hot wallet, TPS and storefront communicate with each other via webhooks and REST APIs. We employ a stateless 
-communication protocol, which requires that all messages must be signedm and which accounts for the majority of the 
-complexity of setting up the system.
-
-This guide will walk you through everything you need to do to set up a Tari Payment Server. If anything is unclear, 
-or you have a suggestion for improving this document, please submit an issue or a pull request.
-
-# Shopify Storefront
+# How to set up Shopify Storefront integration with Tari Payment Server
 
 ## Initial setup
 
 1. You need to have an existing Shopify store. If you don't have one, you can create one [here](https://www.shopify.com/).
-2. Set up your store with the products you want to sell, configure the theme, etc.
+2. Set up your store with the products you want to sell, configure the theme and so on.
 3. If you only want to accept Tari payments, you can remove all other payment methods from your store. 
    To do this, go to `Apps and Sales Channels` and remove all pre-installed apps, except for "Online Store".
 4. Configure your store to process **Manual Payments** ([Shopify Help](https://help.shopify.com/en/manual/payments/additional-payment-methods/activate-payment-methods)). 
@@ -41,7 +17,7 @@ or you have a suggestion for improving this document, please submit an issue or 
 1. From your store's admin, go to `Settings` -> `Apps and sales channels`.
 2. Click on `Develop apps`.
 3. Click on `Create app`.
-4. Fill in the details of your app. Give the title `Tari integration`.
+4. Fill in the details of your app. Give the app the title `Tari integration`, or whatever suits your fancy.
 5. Select `Storefront API` and enable the following permissions:
    * Checkouts: `unauthenticated_write_checkouts`, `unauthenticated_read_checkouts`
    * Products: `unauthenticated_read_product_listings`, `unauthenticated_read_product_inventory`
@@ -60,7 +36,7 @@ or you have a suggestion for improving this document, please submit an issue or 
 
 ## Configure the store to display prices in Tari.
 
-Shopify makes it difficult to display prices in a currency other than the store's base currency, or in a 
+Shopify makes it difficult to display prices in a currency other than the store's base currency or a 
 'recognised' local currency. And in 2024, Shopify has been deprecating APIs that allows apps to alter the 
 checkout experience, making it nearly impossible to provide a completely seamless experience for merchants wanting 
 to provide an end-to-end Tari payment experience.
@@ -70,17 +46,28 @@ configured XTR-USD exchange rate to set a [metafield] on every product [variant]
 rate is updated, as well as a global rate set in a metaobject variable in the odd instance where a product or 
 variant price has not been set yet. 
 
-**Important**: The source of truth for the exchange rate is the value in the Tari Payment Server database, 
-not the store. If you update the exchange rate in the store, or alter the Tari price in the metafield for a 
-product, then any orders using those products will display the wrong price, and you will get a mismatch between 
-the amount the payment server is expecting and the final order price on the customer's invoice. You can use the 
-CLI utility to update the exchange rate; this will reset all the [metafield] values in the shopify product list. 
-You can freely update the USD price of products in the store. The payment server will detect this update and 
-update the [metafield] value for the product automatically.
+### Inportant note!
 
-**Note**: The base unit for Tari is  _microTari (μT)_. The `tari_price` metafield always represents the price in μT, 
+The source of truth for the exchange rate is the value in the Tari Payment Server database, 
+_not the store_. If you update the exchange rate in the store, or alter the Tari price in the metafield for a 
+product, then any orders using those products will display the wrong price, and you will get a mismatch between 
+the amount the payment server is expecting and the final order price on the customer's invoice. 
+
+You can use the [`taritools`]  CLI utility to update the exchange rate; this will reset all the [metafield] values in 
+ the shopify product list. 
+ 
+You can freely update the USD price of products in the store. The payment server will detect this update and 
+update the [metafield] value for the product automatically (assuming your 
+[webhooks](#configure-webhooks-to-interact-with-your-server) have been set up correctly).
+
+### Another important note
+
+The base unit for Tari is  _microTari (μT)_. The `tari_price` metafield always represents the price in μT, 
 and therefore any representation of the price in XTR **must** be divided by 1,000,000 to get the price in XTR.
-   
+                                   
+
+### Updating the shopify templates
+
   In `snippets/price.liquid` (or whatever your theme uses to display price) replace the content with:
  ```html
   {% assign formatted_price = price | times: rate | divided_by: 1000000 %}
@@ -243,54 +230,14 @@ You might also want to replace `qrserver.com` with your own QR code generator.
 Shopify also scrubs links from anchor tags in the email templates (e.g. `<a href="tari://...">`), so clickable links 
 to trigger deep links will not work. (If there's a workaround, please let us know!)
 
-# Tari console hot wallet
-
-You should use the Tari console wallet as your hot wallet for the payment server.
-
-## Install the Tari console wallet.
-
-Follow the instructions on the [Tari Website](https://tari.com/downloads) to install and configure the Tari console 
-wallet.
-
-Tari Payment Server takes advantage of the `notifier` script to let the server know when payments are received and 
-confirmed.
-
-## Configure the notifier script.
-
-1. Edit the Tari configuration file. This is usually located at `$HOME/.tari/{network}/config/config.toml`. Replace `
-   {nework}` with the network you are using, e.g. `mainnet`.
-2. Under the `[wallet]` section, add or edit the following line:
-   ```toml
-   notify_file = "{path_to_HOME}/.taritools/tps_notify.sh"
-   ```
-3. Add a wallet profile to your taritools configuration file.
-   1. Edit `$HOME/.taritools/config.toml`.
-   2. Add a profile with the name `TPS Hot Wallet`. Something like:
-      ```toml
-      [[profiles]]
-      name="TPS Hot Wallet"
-      address="b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d"
-      # For security reasons, we suggest you don't store the secret key in the config file.
-      secret_key=""
-      # The secret key will be loaded from the specified enviroment variable instead.
-      secret_key_env="TPG_HOT_WALLET_SECRET_KEY"
-      roles=["user"]
-      server="https://my_tps_server"
-      ```
-4. Restart your hot wallet, and you should be good to go. Watch the logs in the TPS to check that the wallet hits 
-   the `/wallet/incoming_payment` and `/wallet/tx_confirmation` endpoints.
-
-
-# Tari tools
-
-## Configuring `taritools`
-The `taritools` CLI utility is configured using the same `.env` file as the Tari Payment Server.
-
-### Shopify commands
-The `shopify` command makes use of the following environment variables to work correctly. If these are set in the `.
-env` file, they will be used by the CLI utility. If not, you must set them up manually in your environment.
+## Shopify commands in Taritools
+The `taritools shopify` command makes use of the following environment variables to work correctly. 
+If these are set in the `.env` file, they will be used by the CLI utility. 
+If not, you must set them up manually in your environment.
 
 * `TPG_SHOPIFY_SHOP`
 * `TPG_SHOPIFY_API_VERSION`
 * `TPG_SHOPIFY_ADMIN_ACCESS_TOKEN`
 * `TPG_SHOPIFY_API_SECRET`
+  
+[`taritools`]: ./taritools/README.md "Taritools README"
