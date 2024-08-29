@@ -220,6 +220,11 @@ Make sure that both `tari_payment_server` and `taritools` are in your `PATH`.
 
 [Tari payment server]: https://github.com/CjS77/tari_payment_server "Tari Payment Server on Github"
 
+Alternatively, the `sqlx` binary is also distributed in the 
+[release assets](https://github.com/CjS77/tari_payment_server/tags) on Github.
+
+## Run the database migrations
+
 
 # Tari console hot wallet
 
