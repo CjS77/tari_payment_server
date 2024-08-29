@@ -70,49 +70,44 @@ jobs:
         env:
           CARGO_TARGET_DIR: target/windows
 
-      - name: Create ubuntu zip files
-        run: |
-          zip -j taritools-ubuntu.zip target/ubuntu/release/taritools .env.sample taritools/scripts/*
-          zip -j tari_payment_server-ubuntu.zip target/ubuntu/release/tari_payment_server .env.sample README.md SHOPIFY_INTEGRATION.md
-
-      - name: Create windows zip files
-        if: steps.win_build.outcome == 'success'
-        continue-on-error: true
-        run: |
-          zip -j taritools-windows.zip target/windows/release/taritools.exe .env.sample taritools/scripts/*
-          zip -j tari_payment_server-windows.zip target/windows/release/tari_payment_server.exe .env.sample README.md SHOPIFY_INTEGRATION.mdzip -j tari_payment_server-windows.zip target/windows/release/tari_payment_server.exe .env.sample README.md SHOPIFY_INTEGRATION.md
-
-      - name: "Upload release assets: Taritools (Ubuntu)"
+      - name: "Prepare release assets (Ubuntu)"
         if: steps.ubuntu_build.outcome == 'success'
-        continue-on-error: true
-        uses: actions/upload-artifact@v3
-        with:
-          name: taritools-ubuntu
-          path: taritools-ubuntu.zip
+        run: |
+          mkdir release_assets
+          cp README.md INSTALLATION.md SHOPIFY_INTEGRATION.md release_assets/
+          cp .env.sample release_assets/
+          cp -r taritools/scripts release_assets/
+          cp $(which sqlx) release_assets/
+          chmod +x release_assets/sqlx
+          cp target/ubuntu/release/taritools release_assets/
+          cp target/ubuntu/release/tari_payment_server release_assets/
 
       - name: "Upload release assets: Tari Payment Server (Ubuntu)"
         if: steps.ubuntu_build.outcome == 'success'
         continue-on-error: true
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tari_payment_server-ubuntu
-          path: tari_payment_server-ubuntu.zip
+          path: release_assets/*
 
-      - name: "Upload release assets: Taritools (Windows)"
+      - name: "Prepare release assets (Windows)"
         if: steps.win_build.outcome == 'success'
-        continue-on-error: true
-        uses: actions/upload-artifact@v3
-        with:
-          name: taritools-windows
-          path: taritools-windows.zip
+        run: |
+          mkdir release_assets
+          cp README.md INSTALLATION.md SHOPIFY_INTEGRATION.md release_assets/
+          cp .env.sample release_assets/
+          cp -r taritools/scripts release_assets/
+          # Figure out how to get sqlx on windows
+          cp target/windows/release/taritools release_assets/
+          cp target/windows/release/tari_payment_server release_assets/
 
       - name: "Upload release assets: Tari Payment Server (Windows)"
         if: steps.win_build.outcome == 'success'
         continue-on-error: true
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tari_payment_server-windows
-          path: tari_payment_server-windows.zip
+          path: release_assets/*
 
       # Build and push docker containers
       - name: Log in to the Container registry
@@ -180,19 +175,18 @@ jobs:
       - name: Build binaries for MacOs
         run: cargo build --release
 
-      - name: Create MacOs zip files
+      - name: "Prepare release assets"
         run: |
-          zip -j taritools-macos.zip target/release/taritools .env.sample taritools/scripts/*
-          zip -j tari_payment_server-macos.zip target/release/tari_payment_server .env.sample README.md SHOPIFY_INTEGRATION.md
-
-      - name: "Upload release assets: Taritools (MacOs)"
-        uses: actions/upload-artifact@v3
-        with:
-          name: taritools-macos
-          path: taritools-macos.zip
+          mkdir release_assets
+          cp README.md INSTALLATION.md SHOPIFY_INTEGRATION.md release_assets/
+          cp .env.sample release_assets/
+          cp -r taritools/scripts release_assets/
+          cp $(which sqlx) release_assets/
+          cp target/release/taritools release_assets/
+          cp target/release/tari_payment_server release_assets/
 
       - name: "Upload release assets: Tari Payment Server (MacOs)"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tari_payment_server-macos
-          path: tari_payment_server-macos.zip
+          path: release_assets/*
