@@ -23,6 +23,14 @@ This guide will walk you through everything you need to do to set up a Tari Paym
 or you have a suggestion for improving this document, please submit an issue or a pull request.
             
 # Install the Tari Payment Server
+
+_This section provides information for a SysAdmin or DevOps engineer to aid in installing the Tari Payment Server._
+
+_If you want to run TPS in Kubernetes, there are also docker images of the Tari Payment Server available 
+on [ghcr]_.
+
+[ghcr]: https://github.com/CjS77/tari_payment_server/pkgs/container/tari_payment_server "Github container repository"
+
 [Tari payment server] is a REST API server that tracks orders, payments, and the links between them.
 
 It uses a database backend (only SQLite is supported at the moment) to store order and payment information.
@@ -46,15 +54,7 @@ On a Gnu/Linux system, you will need to install the following dependencies if yo
 sudo apt-get update && apt-get install -y build-essential ca-certificates gcc libssl-dev pkg-config libsqlite3-dev libpq-dev unzip
 ```
 
-**Do:** If you are simply using binaries, the only dependencies are:
-
-* libsqlite3
-* ca-certificates
-* libssl3
-
-```
-sudo apt-get update && apt-get install -y ca-certificates libssl3 libsqlite3
-```
+**Do:** If you are simply using binaries, you should not need to install any additional dependencies.
 
 ## The server binary
 
@@ -120,7 +120,15 @@ Orders that _have been claimed_ and are therefore associated with a wallet addre
 hours.
 
 `TPG_UNPAID_ORDER_TIMEOUT=48 # Expiry time for unpaid orders, in hours`
-  
+      
+## Execution permissions
+
+**Do:** Execution permissions get stripped when uploading the artifacts to Github. Run
+```bash
+chmod +x tari_payment_server taritools
+```
+to restore the permissions.
+
 ## Signing keys
 
 **This is the most important configuration step by some distance. Read this section carefully.** 
@@ -222,21 +230,87 @@ An example log output is
 [2024-05-29T08:42:21Z INFO  access_log] 2024-05-29T08:42:21.253659261Z 127.0.0.1 x-forwarded-for: - forwarded: - "GET /api/search/orders?customer_id=bob&since=2024-03-11T0:0:0Z HTTP/1.1" 200 ua:"-" auth:"-" access:"eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjE3MTcwNTg1NDAsImlhdCI6MTcxNjk3MjE0MCwiYWRkcmVzcyI6eyJuZXR3b3JrIjoibWFpbm5ldCIsInB1YmxpY19rZXkiOiJhYTNjMDc2MTUyYzFhZTQ0YWU4NjU4NWVlYmExZDM0OGJhZGI4NDVkMWNhYjVlZjEyZGI5OGZhZmI0ZmVhNTVkIn0sInJvbGVzIjpbInJlYWRfYWxsIl19.kmWQe-PCmwi-_lNjw4sS132YQ8ly_Xx5hgkKooysc3M79lXbTfv-q4hViSBi9lEEiLuKeLc4hLHS223X_QT5CQ" 9.396370 ms
 ```
            
-# Configuring the database
+## Configuring the database
 
-## Install SQLx
-
-Tari Payment Server uses the SQLxto manage the database migrations. You can install it using the following command 
-if you have a Rust toolchain installed:
+`taritools` contains an embedded instance of `sqlx` and all of the database migrations, so setting up the database is
+as simple as.
 
 ```bash
-cargo +stable install sqlx-cli --no-default-features --features sqlite
+taritools setup migrate
 ```
 
-Alternatively, the `sqlx` binary is also distributed in the 
-[release assets](https://github.com/CjS77/tari_payment_server/tags) on Github.
+The DB administrator _may_ also keep a copy of the migration files on the server 
+(`tari_payment_engine/src/sqlite/migrations/*`) and override the default migration set by providing the path to the
+migration files.
 
-## Run the database migrations
+```bash
+taritools setup migrate --path /path/to/migrations
+```
+
+## Assigning the Super Admin role
+
+The server administrator(s) do not need direct access to the server; they can access admin functions via the REST
+server. However, the `SuperAdmin` role needs to be configured directly in the database to bootstrap the system.
+
+To set up the `SuperAdmin` role, you need the Tari address of the Super Admin user. You can use the `taritools
+address` command to create a new address if needed.
+
+The Super Admin must keep their secret key secure, since the Super Admin has complete control over the payment server.
+
+```bash
+taritools setup add-user -a <tari-address-of-super-admin> -r super_admin
+```
+
+               
+## Setup complete!
+
+You can now run the server with the following command:
+
+```bash
+tari_payment_server
+```
+
+The rest of the server management can be done by the Super Admin user via the REST API.
+   
+# Super Administrator configuration
+
+All the steps in this section are done by the Super Admin user via the REST API. For these steps to run successfully,
+the server must be configured properly, and running as described in [Server configuration](#server-configuration).
+
+All the actions described in this section are executed via the REST API using the `taritools` CLI utility.
+To have `taritools` run properly, you must
+* set up your `.env` file,
+* create a super-admin profile
+
+## Add an admin profile
+
+Create or edit `~/.taritools/config.toml` and add a profile for the Super Admin user. The profile should look something
+
+```toml
+[[profiles]]
+name = "SuperAdmin"
+address = "super-admin-tari-address"
+secret_key = "super-admin-secret-key"
+roles = ["super_admin"]
+server = "http://172.17.0.2:4444"
+```
+
+If you don't want to store the secret key on disk, you can set the `secret_key_env` field to the name of an environment
+variable that contains the secret key, and populate that environment variable from a vault.
+
+```toml
+[[profiles]]
+name = "More secure SuperAdmin"
+address = "b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d"
+secret_key_envar = "TEST_KEY_SECRET"
+roles = ["super_admin"]
+server = "http://172.17.0.2:4444"
+```
+
+## Add an authorised wallet
+
+1. Run `taritools`
+2. Select `Admin | Add authorized wallet`
 
 
 # Tari console hot wallet
