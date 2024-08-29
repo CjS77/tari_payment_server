@@ -55,6 +55,15 @@ sudo apt-get update && apt-get install -y build-essential ca-certificates gcc li
 ```
 sudo apt-get update && apt-get install -y ca-certificates libssl3 libsqlite3
 ```
+
+## The server binary
+
+You can [build from source](README.md#building-from-source),
+or download a binary from the [releases page](https://github.com/CjS77/tari_payment_server/tags).
+
+Make sure that both `tari_payment_server` and `taritools` are in your `PATH`.
+
+[Tari payment server]: https://github.com/CjS77/tari_payment_server "Tari Payment Server on Github"
      
 ## Server configuration
 Tari Payment server is configured using environment variables. You can set the bulk of these in a `.env` file in the 
@@ -83,7 +92,9 @@ Storefront environment variables are explained in the relevant storefront integr
   logged, and the value will be set to an empty string.
   It's of the form `sqlite://<path to database file>` or `postgres://<username>:<password>@<host>/<database>`.
 
-    
+**Do:** Set `TPG_PAYMENT_WALLET_ADDRESS` to the public key of the wallet that will receive payments. 
+This key must be present in the Authorized Wallet list in the database. (Note: This envar will be deprecated in future)
+
 ### Forwarding remote IP addresses
                         
 To use the `X-Forwarded-For` or `Forwarded` headers to get the remote IP address, set the following environment variables:
@@ -210,15 +221,17 @@ An example log output is
 [2024-05-29T08:42:20Z INFO  access_log] 2024-05-29T08:42:20.388926978Z 127.0.0.1 x-forwarded-for: - forwarded: - "GET /api/unfulfilled_orders HTTP/1.1" 200 ua:"-" auth:"-" access:"eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjE3MTcwNTg1NDAsImlhdCI6MTcxNjk3MjE0MCwiYWRkcmVzcyI6eyJuZXR3b3JrIjoibWFpbm5ldCIsInB1YmxpY19rZXkiOiJiODk3MTU5OGE4NjViMjViNjUwOGQ0YmExNTRkYjIyOGUwNDRmMzY3YmQ5YTFlZjUwZGQ0MDUxZGI0MmI2MzE0In0sInJvbGVzIjpbInVzZXIiXX0.zrRjS_AeysZswQ3a5FhggXz8jAEZ2XGSwdu-Qfb9KVx9NvKfVZCVXOW8AyyJA4idcBr_N_wt1LYPchS0HghMBQ" 5.185608 ms
 [2024-05-29T08:42:21Z INFO  access_log] 2024-05-29T08:42:21.253659261Z 127.0.0.1 x-forwarded-for: - forwarded: - "GET /api/search/orders?customer_id=bob&since=2024-03-11T0:0:0Z HTTP/1.1" 200 ua:"-" auth:"-" access:"eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ.eyJleHAiOjE3MTcwNTg1NDAsImlhdCI6MTcxNjk3MjE0MCwiYWRkcmVzcyI6eyJuZXR3b3JrIjoibWFpbm5ldCIsInB1YmxpY19rZXkiOiJhYTNjMDc2MTUyYzFhZTQ0YWU4NjU4NWVlYmExZDM0OGJhZGI4NDVkMWNhYjVlZjEyZGI5OGZhZmI0ZmVhNTVkIn0sInJvbGVzIjpbInJlYWRfYWxsIl19.kmWQe-PCmwi-_lNjw4sS132YQ8ly_Xx5hgkKooysc3M79lXbTfv-q4hViSBi9lEEiLuKeLc4hLHS223X_QT5CQ" 9.396370 ms
 ```
+           
+# Configuring the database
 
-## The server binary
+## Install SQLx
 
-You can [build from source](README.md#building-from-source),
-or download a binary from the [releases page](https://github.com/CjS77/tari_payment_server/tags).
+Tari Payment Server uses the SQLxto manage the database migrations. You can install it using the following command 
+if you have a Rust toolchain installed:
 
-Make sure that both `tari_payment_server` and `taritools` are in your `PATH`.
-
-[Tari payment server]: https://github.com/CjS77/tari_payment_server "Tari Payment Server on Github"
+```bash
+cargo +stable install sqlx-cli --no-default-features --features sqlite
+```
 
 Alternatively, the `sqlx` binary is also distributed in the 
 [release assets](https://github.com/CjS77/tari_payment_server/tags) on Github.
