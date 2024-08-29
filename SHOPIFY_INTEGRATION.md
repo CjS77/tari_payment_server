@@ -109,6 +109,25 @@ something like this, but YMMV:
 [metafield]: https://shopify.dev/docs/api/functions/reference/fulfillment-constraints/graphql/common-objects/metafield "Shopify product metafields"
 [variant]: https://shopify.dev/docs/api/liquid/objects#variant "Shopify product variants"
 
+## Configure the .env file
+
+The Tari Payment Server uses environment variables to configure the server. You can set these in a `.env` file in the
+root of the same directory as the server binary. We strongly recommend using a vault or secret manager to store the
+secret keys and other sensitive information and set the environment variables in the shell to avoid having secrets
+stored on disk.
+
+TPS assumes that the following environment variables are set when making use of the Shopify API:
+
+- `TPG_SHOPIFY_SHOP`: Your Shopify shop name, e.g. `my-shop.myshopify.com`
+- `TPG_SHOPIFY_API_VERSION`: Optional. The API version to use. Default is `2024-04`.
+- `TPG_SHOPIFY_STOREFRONT_ACCESS_TOKEN`: 
+- `TPG_SHOPIFY_ADMIN_ACCESS_TOKEN`: Your Shopify admin access token. e.g. `shpat_xxxxxxxx`
+- `TPG_SHOPIFY_API_SECRET`: Your Shopify API secret. e.g. `aaaaaaaaaaaa`. This is the token you make a note of in 
+  [the setup step above](#enable-custom-app-development).
+- `TPG_SHOPIFY_API_KEY`: This variable is used to set the API key for your Shopify app. If not set, an error message will be logged, and the value will be set to an empty string.
+- `TPG_SHOPIFY_HMAC_CHECKS`. A flag to indicate whether to check the HMAC signature of incoming requests from Shopify.
+  Set to `1` to enable HMAC checks, and `0` to disable them. You **almost certainly want to enable this in production.**
+  
 ## Configure webhooks to interact with your server.
 
 ### Using the CLI utility (recommended)
