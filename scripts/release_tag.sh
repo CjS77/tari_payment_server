@@ -30,11 +30,11 @@ for f in ${CARGO_FILES[@]}; do
     done
     echo "Updated $f"
 done
-git checkout -b "release-${NEW_VER}"
-git commit -am "Updated version to $NEW_VER"
-echo "Tagging new release"
-git tag v${NEW_VER}
-git push origin "release-v${NEW_VER}"
-git push origin v${NEW_VER}
+REL_VER="v${NEW_VER}"
+git checkout -b "release-${REL_VER}"
+git commit -am "Updated version to $REL_VER"
+echo "Tagging new release: $REL_VER"
+git tag ${REL_VER}
+git push origin "release-${REL_VER}"
 echo "Release tag updated"
 
