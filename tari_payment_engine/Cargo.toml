@@ -1,11 +1,11 @@
 [package]
 name = "tari_payment_engine"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 description = "Database backend for Tari payment gateway"
 
 [dependencies]
-tpg_common = { version = "0.2.1", path = "../tpg_common" }
+tpg_common = { version = "0.2.2", path = "../tpg_common" }
 blake2 = "0.10.6"
 chrono = { version = "0.4.31", features = ["serde"] }
 dotenvy = {  version = "0.15.0", optional = true }

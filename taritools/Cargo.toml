@@ -1,13 +1,13 @@
 [package]
 name = "taritools"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 
 [dependencies]
-shopify_tools = { version = "0.2.1", path = "../shopify_tools" }
-tari_payment_server = { version = "0.2.1", path = "../tari_payment_server"}
-tari_payment_engine = { version = "0.2.1", path = "../tari_payment_engine"}
-tpg_common = { version = "0.2.1", path = "../tpg_common"}
+shopify_tools = { version = "0.2.2", path = "../shopify_tools" }
+tari_payment_server = { version = "0.2.2", path = "../tari_payment_server"}
+tari_payment_engine = { version = "0.2.2", path = "../tari_payment_engine"}
+tpg_common = { version = "0.2.2", path = "../tpg_common"}
 
 anyhow = "1.0.44"
 blake2 = "0.10.6"
