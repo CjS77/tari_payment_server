@@ -13,7 +13,9 @@ use tari_payment_server::{
 async fn main() {
     dotenv().ok();
     env_logger::init();
-    handle_command_line_args();
+    if handle_command_line_args() {
+        return;
+    }
     let config = ServerConfig::from_env_or_default();
     if !preflight_check(&config) {
         eprintln!("🚀️ Preflight check failed. Exiting. Check the logs for details.");

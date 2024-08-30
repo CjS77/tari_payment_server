@@ -77,10 +77,9 @@ jobs:
           cp README.md INSTALLATION.md SHOPIFY_INTEGRATION.md release_assets/
           cp .env.sample release_assets/
           cp -r taritools/scripts release_assets/
-          cp $(which sqlx) release_assets/
-          chmod +x release_assets/sqlx
           cp target/ubuntu/release/taritools release_assets/
           cp target/ubuntu/release/tari_payment_server release_assets/
+          cp -r tari_payment_engine/src/sqlite/migrations release_assets/
 
       - name: "Upload release assets: Tari Payment Server (Ubuntu)"
         if: steps.ubuntu_build.outcome == 'success'
@@ -97,9 +96,9 @@ jobs:
           cp README.md INSTALLATION.md SHOPIFY_INTEGRATION.md release_assets/
           cp .env.sample release_assets/
           cp -r taritools/scripts release_assets/
-          # Figure out how to get sqlx on windows
           cp target/windows/release/taritools release_assets/
           cp target/windows/release/tari_payment_server release_assets/
+          cp -r tari_payment_engine/src/sqlite/migrations release_assets/
 
       - name: "Upload release assets: Tari Payment Server (Windows)"
         if: steps.win_build.outcome == 'success'
@@ -181,9 +180,9 @@ jobs:
           cp README.md INSTALLATION.md SHOPIFY_INTEGRATION.md release_assets/
           cp .env.sample release_assets/
           cp -r taritools/scripts release_assets/
-          cp $(which sqlx) release_assets/
           cp target/release/taritools release_assets/
           cp target/release/tari_payment_server release_assets/
+          cp -r tari_payment_engine/src/sqlite/migrations release_assets/
 
       - name: "Upload release assets: Tari Payment Server (MacOs)"
         uses: actions/upload-artifact@v4

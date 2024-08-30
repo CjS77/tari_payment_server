@@ -21,8 +21,8 @@ pub mod wallet_auth;
 const SQLITE_DB_URL: &str = "sqlite://data/tari_store.db";
 
 pub fn db_url() -> String {
-    let result = env::var("SPG_DATABASE_URL").unwrap_or_else(|_| {
-        info!("SPG_DATABASE_URL is not set. Using the default.");
+    let result = env::var("TPG_DATABASE_URL").unwrap_or_else(|_| {
+        info!("TPG_DATABASE_URL is not set. Using the default.");
         SQLITE_DB_URL.to_string()
     });
     info!("Using database URL: {result}");

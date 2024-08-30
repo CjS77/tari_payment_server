@@ -9,6 +9,7 @@ mod profile_manager;
 
 mod memo;
 mod payments;
+mod setup;
 mod shopify;
 
 mod tari_payment_server;
@@ -22,6 +23,7 @@ use crate::{
     interactive::InteractiveApp,
     memo::print_memo_signature,
     payments::{print_payment_auth, print_tx_confirm, WalletCommand},
+    setup::{handle_setup_command, SetupCommand},
     shopify::{handle_shopify_command, ShopifyCommand},
     wallet::handle_wallet_command,
 };
@@ -96,6 +98,9 @@ pub enum Command {
     /// See `tps_notify.sh`.
     #[command(subcommand)]
     Wallet(WalletCommand),
+    #[command(subcommand)]
+    /// Commands for helping in setting up the Tari Payment Server.
+    Setup(SetupCommand),
 }
 
 #[derive(Debug, Args)]
@@ -180,6 +185,7 @@ async fn run_command(cli: Arguments) {
         Command::TxConfirm(params) => print_tx_confirm(params),
         Command::Shopify(shopify_command) => handle_shopify_command(shopify_command).await,
         Command::Wallet(wallet_command) => handle_wallet_command(wallet_command).await,
+        Command::Setup(setup_command) => handle_setup_command(setup_command).await,
     }
 }
 

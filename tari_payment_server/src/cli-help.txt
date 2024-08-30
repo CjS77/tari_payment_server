@@ -13,8 +13,47 @@ The server is run without command line parameters. But the following environment
 are read to configure the server:
 
 ENVIRONMENT VARIABLES:
+----------------------
 
-SPG_HOST: The host name to listen on. Defaults to 127.0.0.1
-SPG_PORT: The port to listen on. Defaults to 8360
-SPG_SHOPIFY_API_KEY: The Shopify API key to use. Defaults to an empty string
-RUST_LOG: The log level to use. Defaults to info
+- `TPG_HOST`: This variable is used to set the host of the server. If not set, the default value is `127.0.0.1`.
+- `TPG_PORT`: This variable is used to set the port on which the server will run. If not set or if the provided value is not a valid port, the default value is `8360`.
+- `RUST_LOG`: Sets the verbosity of the log messages. A good default that provides plenty of useful information without generating information overload is:
+  RUST_LOG=warn,access_log=info,tari_payment_server=info,tari_payment_engine=info,tpg_common=info,e2e_tests=info,sqlx=warn,shopify_tools=info
+  At the minimum, set `access_log=INFO` to use the access log middleware to log all incoming requests.
+- `TPG_DATABASE_URL`: This variable is used to set the URL for the TPG database. If not set, an error message will be logged, and the value will be set to an empty string. It's of the form `sqlite://<path to database file>` or `postgres://<username>:<password>@<host>/<database>`.
+
+- `TPG_PAYMENT_WALLET_ADDRESS`: The public key of the wallet that will receive payments. This key must be present in the Authorized Wallet list in the database. (Note: This envar will be deprecated in future)
+
+Forwarding remote IP addresses:
+-------------------------------
+
+To use the `X-Forwarded-For` or `Forwarded` headers to get the remote IP address, set the following environment variables:
+- `TPG_USE_X_FORWARDED_FOR=1`
+- `TPG_USE_FORWARDED=1`
+
+Unless you're behind a reverse proxy, you should not need to set these variables.
+
+Order expiry times:
+-------------------
+
+During the normal course of events, there will be many abandoned orders accumulating in the system. To prevent this becoming a long-term drain of performance and resources, unclaimed and unpaid orders are set to expire after a certain period.
+
+Unclaimed orders, which are a minor vector for a Sybil or DoS attack, should be set to expire after a relatively short period. The default is 2 hours.
+
+`TPG_UNCLAIMED_ORDER_TIMEOUT=2` # Expiry time for new, unclaimed orders, in hours
+
+Orders that have been claimed and are therefore associated with a wallet address have a longer default timeout of 48 hours.
+
+`TPG_UNPAID_ORDER_TIMEOUT=48` # Expiry time for unpaid orders, in hours
+
+Shopify environment variables:
+------------------------------
+
+See SHOPIFY_INTEGRATION.md for more information on how to set these environment variables.
+
+* `TPG_SHOPIFY_SHOP`
+* `TPG_SHOPIFY_API_VERSION`
+* `TPG_SHOPIFY_ADMIN_ACCESS_TOKEN`
+* `TPG_SHOPIFY_API_SECRET`
+
+

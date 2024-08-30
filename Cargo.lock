@@ -4567,6 +4567,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shopify_tools",
+ "sqlx",
  "tari-jwt",
  "tari_common 1.0.0-rc.5",
  "tari_common_types 1.0.0-rc.5",
