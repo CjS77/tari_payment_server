@@ -28,8 +28,8 @@ fn burst_transfers() {
         prepare_test_env(url).await;
         let db = SqliteDatabase::new_with_url(url, 5).await.expect("Error creating database");
         let api = OrderFlowApi::new(db, EventProducers::default());
-        let pk = TariAddress::from_str("6829578d62ddcba2191178287307a07dc8244af92b6bebc2b83ee41a40880e4897")
-            .expect("Not a valid Tari address");
+        let pk =
+            TariAddress::from_str("14s9vDTwrweZvWEgQ9gNhXXPX68DPXSSAHNFWYEPi5JsBQY").expect("Not a valid Tari address");
 
         let mut timer = tokio::time::interval(delay);
         for i in 0..NUM_TRANSFERS {

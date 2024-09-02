@@ -29,7 +29,7 @@ async fn fetch_my_account_no_headers() {
 #[actix_web::test]
 async fn fetch_my_account_expired_token() {
     let claims = JwtClaims {
-        address: TariAddress::from_hex("b4db54f75421a02b0d0056fb7203df23c742b25e41283976bdaa7fe63de1ad234d").unwrap(),
+        address: TariAddress::from_base58("14AYt2hhhn4VydAXNJ6i7ZfRNZGoGSp713dHjMYCoK5hYw2").unwrap(),
         roles: vec![Role::User],
     };
     let expired = Utc::now() - Days::new(1);
@@ -42,7 +42,7 @@ async fn fetch_my_account_expired_token() {
 #[actix_web::test]
 async fn fetch_my_account_valid_token() {
     let claims = JwtClaims {
-        address: TariAddress::from_hex("b4db54f75421a02b0d0056fb7203df23c742b25e41283976bdaa7fe63de1ad234d").unwrap(),
+        address: TariAddress::from_base58("14AYt2hhhn4VydAXNJ6i7ZfRNZGoGSp713dHjMYCoK5hYw2").unwrap(),
         roles: vec![Role::User],
     };
     let token = issue_token(claims, Utc::now() + Days::new(1));
@@ -57,14 +57,13 @@ async fn fetch_my_account_valid_token() {
 #[actix_web::test]
 async fn fetch_account_from_admin() {
     let claims = JwtClaims {
-        address: TariAddress::from_hex("b4db54f75421a02b0d0056fb7203df23c742b25e41283976bdaa7fe63de1ad234d").unwrap(),
+        address: TariAddress::from_base58("14AYt2hhhn4VydAXNJ6i7ZfRNZGoGSp713dHjMYCoK5hYw2").unwrap(),
         roles: vec![Role::ReadAll],
     };
     let token = issue_token(claims, Utc::now() + Days::new(1));
-    let (status, body) =
-        get_request(&token, "/account/fc899cd4395e86e9409fc892f5b0a064373a4300321650e205e446374f6b8f073d", configure)
-            .await
-            .expect("Failed to make request");
+    let (status, body) = get_request(&token, "/account/14hdm1NzAtAvzrtoLHp5ov925CLSbtkDrrWy7avU8QNguBL", configure)
+        .await
+        .expect("Failed to make request");
     assert_eq!(status, StatusCode::OK);
     let json = r#"
     {"id":1,"created_at":"2024-03-01T10:30:00Z","updated_at":"2024-03-01T10:30:00Z","total_received":1000000,"current_pending":0,"current_balance":1000000,"total_orders":0,"current_orders":0}
@@ -75,21 +74,20 @@ async fn fetch_account_from_admin() {
 #[actix_web::test]
 async fn fetch_account_from_user() {
     let claims = JwtClaims {
-        address: TariAddress::from_hex("b4db54f75421a02b0d0056fb7203df23c742b25e41283976bdaa7fe63de1ad234d").unwrap(),
+        address: TariAddress::from_base58("14AYt2hhhn4VydAXNJ6i7ZfRNZGoGSp713dHjMYCoK5hYw2").unwrap(),
         roles: vec![Role::User],
     };
     let token = issue_token(claims, Utc::now() + Days::new(1));
-    let err =
-        get_request(&token, "/account/fc899cd4395e86e9409fc892f5b0a064373a4300321650e205e446374f6b8f073d", configure)
-            .await
-            .expect_err("Request should have failed");
+    let err = get_request(&token, "/account/14hdm1NzAtAvzrtoLHp5ov925CLSbtkDrrWy7avU8QNguBL", configure)
+        .await
+        .expect_err("Request should have failed");
     assert_eq!(err, "Insufficient permissions.");
 }
 
 #[actix_web::test]
 async fn fetch_account_from_users_own_address() {
     let claims = JwtClaims {
-        address: TariAddress::from_hex("b4db54f75421a02b0d0056fb7203df23c742b25e41283976bdaa7fe63de1ad234d").unwrap(),
+        address: TariAddress::from_base58("14AYt2hhhn4VydAXNJ6i7ZfRNZGoGSp713dHjMYCoK5hYw2").unwrap(),
         roles: vec![Role::User],
     };
     let token = issue_token(claims, Utc::now() + Days::new(1));

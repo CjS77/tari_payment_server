@@ -88,7 +88,7 @@ impl MemoSignature {
 
     pub fn is_valid(&self) -> bool {
         let message = self.message();
-        let pubkey = self.address.as_address().public_key();
+        let pubkey = self.address.as_address().comms_public_key();
         self.signature.verify(pubkey, message)
     }
 
@@ -98,7 +98,7 @@ impl MemoSignature {
 }
 
 pub fn signature_message(address: &SerializedTariAddress, order_id: &str) -> String {
-    let addr = address.as_address().to_hex();
+    let addr = address.as_address().to_base58();
     format!("{addr}:{order_id}")
 }
 
@@ -170,17 +170,12 @@ mod test {
 
     #[test]
     fn create_memo_signature() {
-        let address = "a8d523755de41b9c14de709ca59d52bc1772658258962ef5bbefa8c59082e54733"
-            .parse()
-            .expect("Failed to parse TariAddress");
+        let address = "14s9vDTwrweZvWEgQ9gNhXXPX68DPXSSAHNFWYEPi5JsBQY".parse().expect("Failed to parse TariAddress");
         let sig =
             MemoSignature::create(address, "oid554432".into(), &secret_key()).expect("Failed to create memo signature");
         let msg = signature_message(&sig.address, &sig.order_id);
-        assert_eq!(msg, "a8d523755de41b9c14de709ca59d52bc1772658258962ef5bbefa8c59082e54733:oid554432");
-        assert_eq!(
-            sig.address.as_address().to_hex(),
-            "a8d523755de41b9c14de709ca59d52bc1772658258962ef5bbefa8c59082e54733"
-        );
+        assert_eq!(msg, "14s9vDTwrweZvWEgQ9gNhXXPX68DPXSSAHNFWYEPi5JsBQY:oid554432");
+        assert_eq!(sig.address.as_address().to_base58(), "14s9vDTwrweZvWEgQ9gNhXXPX68DPXSSAHNFWYEPi5JsBQY");
         assert_eq!(sig.order_id, "oid554432");
         assert!(sig.is_valid());
     }
@@ -188,15 +183,12 @@ mod test {
     #[test]
     fn verify_from_json() {
         let json = r#"{
-          "address": "a8d523755de41b9c14de709ca59d52bc1772658258962ef5bbefa8c59082e54733",
+          "address": "14s9vDTwrweZvWEgQ9gNhXXPX68DPXSSAHNFWYEPi5JsBQY",
           "order_id": "oid554432",
-          "signature": "2421e3c98522d7c5518f55ddb39f759ee9051dde8060679d48f257994372fb214e9024917a5befacb132fc9979527ff92daa2c5d42062b8a507dc4e3b6954c05"
+          "signature": "74236918f5815383ad7a889fa2c26037418b217f983575b5b5cfde21c7bcf3094ca6ff09c43fca8d4040a38e60b57fea622d5919979fae4ccfea93883df6bd00"
         }"#;
         let sig = serde_json::from_str::<MemoSignature>(json).expect("Failed to deserialize memo signature");
-        assert_eq!(
-            sig.address.as_address().to_hex(),
-            "a8d523755de41b9c14de709ca59d52bc1772658258962ef5bbefa8c59082e54733"
-        );
+        assert_eq!(sig.address.as_address().to_base58(), "14s9vDTwrweZvWEgQ9gNhXXPX68DPXSSAHNFWYEPi5JsBQY");
         assert_eq!(sig.order_id, "oid554432");
         assert!(sig.is_valid());
     }

@@ -25,7 +25,7 @@ fn seed_orders() -> [NewOrder; 5] {
             currency: "XTR".into(),
             customer_id: "alice".into(),
             memo: Some("Manually inserted by Keith".into()),
-            address: "b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d".parse().ok(),
+            address: "14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt".parse().ok(),
             total_price: MicroTari::from_tari(100),
             original_price: None,
             created_at: Utc.with_ymd_and_hms(2024, 3, 10, 15, 0, 0).unwrap(),
@@ -35,7 +35,7 @@ fn seed_orders() -> [NewOrder; 5] {
             currency: "XTR".into(),
             customer_id: "bob".into(),
             memo: Some("Manually inserted by Charlie".into()),
-            address: "680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b".parse().ok(),
+            address: "14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp".parse().ok(),
             total_price: MicroTari::from_tari(200),
             original_price: None,
             created_at: Utc.with_ymd_and_hms(2024, 3, 10, 15, 30, 0).unwrap(),
@@ -45,7 +45,7 @@ fn seed_orders() -> [NewOrder; 5] {
             currency: "XTR".into(),
             customer_id: "alice".into(),
             memo: Some("Manually inserted by Sam".into()),
-            address: "b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d".parse().ok(),
+            address: "14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt".parse().ok(),
             total_price: MicroTari::from_tari(65),
             original_price: None,
             created_at: Utc.with_ymd_and_hms(2024, 3, 11, 16, 0, 0).unwrap(),
@@ -55,7 +55,7 @@ fn seed_orders() -> [NewOrder; 5] {
             currency: "XTR".into(),
             customer_id: "bob".into(),
             memo: Some("Manually inserted by Ray".into()),
-            address: "680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b".parse().ok(),
+            address: "14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp".parse().ok(),
             total_price: MicroTari::from_tari(350),
             original_price: None,
             created_at: Utc.with_ymd_and_hms(2024, 3, 11, 17, 0, 0).unwrap(),
@@ -65,7 +65,7 @@ fn seed_orders() -> [NewOrder; 5] {
             currency: "XMR".into(),
             customer_id: "admin".into(),
             memo: Some("Manually inserted by Charlie".into()),
-            address: "aa3c076152c1ae44ae86585eeba1d348badb845d1cab5ef12db98fafb4fea55d6c".parse().ok(),
+            address: "14sa5AzjqqrzfiyqGkajoNcFrqkCK7syB4rvNNL65f2PjLD".parse().ok(),
             total_price: MicroTari::from_tari(25),
             original_price: None,
             created_at: Utc.with_ymd_and_hms(2024, 3, 12, 18, 0, 0).unwrap(),
@@ -76,35 +76,35 @@ fn seed_orders() -> [NewOrder; 5] {
 fn seed_payments() -> [NewPayment; 5] {
     [
         NewPayment {
-            sender: "b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d".parse().unwrap(), // Alice
+            sender: "14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt".parse().unwrap(), // Alice
             amount: MicroTari::from_tari(15),
             txid: "alicepayment001".to_string(),
             memo: None,
             order_id: None,
         },
         NewPayment {
-            sender: "b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d".parse().unwrap(), // Alice
+            sender: "14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt".parse().unwrap(), // Alice
             amount: MicroTari::from_tari(100),
             txid: "alicepayment002".to_string(),
             memo: None,
             order_id: None,
         },
         NewPayment {
-            sender: "680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b".parse().unwrap(), // Bob
+            sender: "14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp".parse().unwrap(), // Bob
             amount: MicroTari::from_tari(50),
             txid: "bobpayment001".to_string(),
             memo: None,
             order_id: None,
         },
         NewPayment {
-            sender: "680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b".parse().unwrap(), // Bob
+            sender: "14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp".parse().unwrap(), // Bob
             amount: MicroTari::from_tari(500),
             txid: "bobpayment002".to_string(),
             memo: None,
             order_id: None,
         },
         NewPayment {
-            sender: "c483a8f207d30d92633f4efc5e6a48a2e14aa45f94a4dd183749232e6bc39d64f7".parse().unwrap(), // Anon
+            sender: "142Eyn9FMCsBVRsFBc2zqfgBxPTTpX9dYjtrPABa9whREdia".parse().unwrap(), // Anon
             amount: MicroTari::from_tari(700),
             txid: "anonpayment001".to_string(),
             memo: None,
@@ -125,7 +125,7 @@ fn super_admin() -> UserInfo {
     UserInfo {
         username: "Super".into(),
         secret: PrivateKey::from_hex("5b1488f90c3385b0a4d3ab9f6992f2592d35f77a57655160a9236ffadb78260c").unwrap(),
-        address: TariAddress::from_hex("02f671c8294931a6395b51a1f32921f429d22c1e34def8f9f81892034fe2963cf7").unwrap(),
+        address: TariAddress::from_base58("14t3efXHQphjE8GdVhSzxZH8VWeVphfqjiXsUvVEpTJJBA").unwrap(),
         roles: vec![Role::SuperAdmin],
     }
 }
@@ -155,22 +155,19 @@ impl SeedUsers {
         users.insert("Admin", UserInfo {
             username: "Admin".into(),
             secret: PrivateKey::from_hex("6fd9d9a5836eaf71c396c9af1915fe990c4c396b0c6f57c19db968af9d9ffd04").unwrap(),
-            address: TariAddress::from_hex("aa3c076152c1ae44ae86585eeba1d348badb845d1cab5ef12db98fafb4fea55d6c")
-                .unwrap(),
+            address: TariAddress::from_base58("14sa5AzjqqrzfiyqGkajoNcFrqkCK7syB4rvNNL65f2PjLD").unwrap(),
             roles: vec![Role::User, Role::Write, Role::ReadAll],
         });
         users.insert("Alice", UserInfo {
             username: "Alice".into(),
             secret: PrivateKey::from_hex("c63b5b436d007bec0566bff2f3512f3f962a6d43161fe48616e8dad58fd2b80d").unwrap(),
-            address: TariAddress::from_hex("b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d")
-                .unwrap(),
+            address: TariAddress::from_base58("14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt").unwrap(),
             roles: vec![Role::User],
         });
         users.insert("Bob", UserInfo {
             username: "Bob".into(),
             secret: PrivateKey::from_hex("6ee8a6d1078755bfebd91751bd5d2fb76544ab49f23fe61d5c9a2857b7eea503").unwrap(),
-            address: TariAddress::from_hex("680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b")
-                .unwrap(),
+            address: TariAddress::from_base58("14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp").unwrap(),
             roles: vec![Role::User],
         });
         Self { users }

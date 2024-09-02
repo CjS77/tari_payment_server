@@ -14,7 +14,7 @@ use tpg_common::MicroTari;
 
 use crate::{
     helpers::{extract_and_verify_memo_signature, MemoSignature, MemoSignatureError},
-    tpe_api::order_objects::{address_to_hex, str_to_address},
+    tpe_api::order_objects::{address_to_base58, str_to_address},
 };
 
 //--------------------------------------     PublicKey       ---------------------------------------------------------
@@ -39,7 +39,7 @@ impl<S: Into<String>> From<S> for PublicKey {
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct SerializedTariAddress(
-    #[serde(serialize_with = "address_to_hex", deserialize_with = "str_to_address")] TariAddress,
+    #[serde(serialize_with = "address_to_base58", deserialize_with = "str_to_address")] TariAddress,
 );
 
 impl SerializedTariAddress {
@@ -51,8 +51,13 @@ impl SerializedTariAddress {
         &self.0
     }
 
+    #[deprecated(since = "0.3.0", note = "Use as_base58 instead")]
     pub fn as_hex(&self) -> String {
         self.0.to_hex()
+    }
+
+    pub fn as_base58(&self) -> String {
+        self.0.to_base58()
     }
 }
 
@@ -92,7 +97,7 @@ impl From<&TariAddress> for SerializedTariAddress {
 
 impl Display for SerializedTariAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_hex())
+        write!(f, "{}", self.as_base58())
     }
 }
 
@@ -127,7 +132,7 @@ impl Eq for SerializedTariAddress {}
 
 impl Hash for SerializedTariAddress {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_hex().hash(state);
+        self.as_base58().hash(state);
     }
 }
 
@@ -577,14 +582,14 @@ mod test {
     #[test]
     fn extract_order_id() {
         let mut payment = NewPayment::new(
-            TariAddress::from_str("a8d523755de41b9c14de709ca59d52bc1772658258962ef5bbefa8c59082e54733").unwrap(),
+            TariAddress::from_str("14s9vDTwrweZvWEgQ9gNhXXPX68DPXSSAHNFWYEPi5JsBQY").unwrap(),
             MicroTari::from_tari(100),
             "txid111111".to_string(),
         );
         payment.with_memo(json!({
-            "address": "a8d523755de41b9c14de709ca59d52bc1772658258962ef5bbefa8c59082e54733",
+            "address": "14s9vDTwrweZvWEgQ9gNhXXPX68DPXSSAHNFWYEPi5JsBQY",
             "order_id": "oid554432",
-            "signature": "2421e3c98522d7c5518f55ddb39f759ee9051dde8060679d48f257994372fb214e9024917a5befacb132fc9979527ff92daa2c5d42062b8a507dc4e3b6954c05"
+            "signature": "74236918f5815383ad7a889fa2c26037418b217f983575b5b5cfde21c7bcf3094ca6ff09c43fca8d4040a38e60b57fea622d5919979fae4ccfea93883df6bd00"
             }).to_string()
         );
         let result = payment.try_extract_order_id();

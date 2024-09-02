@@ -207,7 +207,8 @@ fn print_new_address(network: Network) {
     println!("Network: {}", info.network);
     println!("Secret key: {}", info.sk.reveal());
     println!("Public key: {:x}", info.pk);
-    println!("Address: {}", info.address_as_hex());
+    println!("Address (hex): {}", info.address_as_hex());
+    println!("Address      : {}", info.address_as_base58());
     println!("Emoji ID: {}", info.address_as_emoji_string());
     println!("------------------------------------------------------------------------");
 }

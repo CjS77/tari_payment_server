@@ -122,6 +122,7 @@ impl From<PaymentGatewayError> for ServerError {
             OrderModificationForbidden => ServerError::CannotCompleteRequest(e.to_string()),
             AccountShouldExistForOrder(_) | OrderNotFound(_) => ServerError::NoRecordFound(e.to_string()),
             UnsupportedAction(_) => ServerError::CannotCompleteRequest(e.to_string()),
+            InvalidSignature => ServerError::AuthenticationError(AuthError::ValidationError(e.to_string())),
             _ => ServerError::BackendError(e.to_string()),
         }
     }

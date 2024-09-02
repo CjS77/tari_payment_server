@@ -49,10 +49,9 @@ async fn fetch_my_orders_invalid_sig() {
 async fn try_fetch_another_users_orders_as_admin() {
     let _ = env_logger::try_init().ok();
     let token = valid_token(vec![Role::ReadAll]);
-    let (status, body) =
-        get_request(&token, "/orders/b4db54f75421a02b0d0056fb7203df23c742b25e41283976bdaa7fe63de1ad234d", configure)
-            .await
-            .expect("Request failed");
+    let (status, body) = get_request(&token, "/orders/14AYt2hhhn4VydAXNJ6i7ZfRNZGoGSp713dHjMYCoK5hYw2", configure)
+        .await
+        .expect("Request failed");
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body, ORDERS_JSON);
 }
@@ -71,8 +70,7 @@ async fn try_fetch_another_users_orders_as_normal_user() {
 fn valid_token(roles: Vec<Role>) -> String {
     issue_token(
         JwtClaims {
-            address: TariAddress::from_hex("b4db54f75421a02b0d0056fb7203df23c742b25e41283976bdaa7fe63de1ad234d")
-                .unwrap(),
+            address: TariAddress::from_base58("14AYt2hhhn4VydAXNJ6i7ZfRNZGoGSp713dHjMYCoK5hYw2").unwrap(),
             roles,
         },
         Utc::now() + Days::new(1),
@@ -121,4 +119,4 @@ fn orders_response() -> Vec<Order> {
     ]
 }
 
-const ORDERS_JSON: &str = r#"{"address":"b4db54f75421a02b0d0056fb7203df23c742b25e41283976bdaa7fe63de1ad234d","total_orders":0,"orders":[{"id":0,"order_id":"0000001","customer_id":"1","memo":null,"total_price":100,"original_price":null,"currency":"XTR","created_at":"2024-02-29T13:30:00Z","updated_at":"2024-02-29T13:30:00Z","status":"Paid"},{"id":1,"order_id":"0000002","customer_id":"1","memo":null,"total_price":150,"original_price":null,"currency":"XTR","created_at":"2024-03-15T18:30:00Z","updated_at":"2024-03-16T11:20:00Z","status":"Cancelled"}]}"#;
+const ORDERS_JSON: &str = r#"{"address":"14AYt2hhhn4VydAXNJ6i7ZfRNZGoGSp713dHjMYCoK5hYw2","total_orders":0,"orders":[{"id":0,"order_id":"0000001","customer_id":"1","memo":null,"total_price":100,"original_price":null,"currency":"XTR","created_at":"2024-02-29T13:30:00Z","updated_at":"2024-02-29T13:30:00Z","status":"Paid"},{"id":1,"order_id":"0000002","customer_id":"1","memo":null,"total_price":150,"original_price":null,"currency":"XTR","created_at":"2024-03-15T18:30:00Z","updated_at":"2024-03-16T11:20:00Z","status":"Cancelled"}]}"#;

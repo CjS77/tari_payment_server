@@ -26,15 +26,15 @@ Feature: Payment history endpoint
     And I receive a partial JSON response:
     """
     {
-      "address":"b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d",
+      "address":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
       "total_payments":115000000,
       "payments":[
         {"txid":"alicepayment001",
-         "sender":"b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d",
+         "sender":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
          "amount":15000000
         },
         {"txid":"alicepayment002",
-        "sender":"b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d",
+        "sender":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
         "amount":100000000
         }
       ]
@@ -43,25 +43,25 @@ Feature: Payment history endpoint
 
   Scenario: Authenticated user cannot see another user's payment history
     When Alice authenticates with nonce = 1 and roles = "user"
-    When Alice GETs to "/api/payments/680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b" with body
+    When Alice GETs to "/api/payments/14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp" with body
     Then I receive a 403 Forbidden response with the message 'Insufficient permissions.'
 
   Scenario: User with ReadAll Role can see another user's payment history
     When Admin authenticates with nonce = 1 and roles = "user,read_all"
-    When Admin GETs to "/api/payments/680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b" with body
+    When Admin GETs to "/api/payments/14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp" with body
     Then I receive a 200 Ok response
     And I receive a partial JSON response:
     """
     {
-      "address":"680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b",
+      "address":"14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp",
       "total_payments":550000000,
       "payments":[
         {"txid":"bobpayment001",
-         "sender":"680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b",
+         "sender":"14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp",
          "amount":50000000
         },
         {"txid":"bobpayment002",
-        "sender":"680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b",
+        "sender":"14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp",
         "amount":500000000
         }
       ]
@@ -71,20 +71,20 @@ Feature: Payment history endpoint
   Scenario: SuperAdmin can see another user's payment history
     Given a super-admin user (Super)
     When Super authenticates with nonce = 1
-    When Super GETs to "/api/payments/680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b" with body
+    When Super GETs to "/api/payments/14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp" with body
     Then I receive a 200 Ok response
     Then I receive a partial JSON response:
     """
     {
-      "address":"680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b",
+      "address":"14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp",
       "total_payments":550000000,
       "payments":[
         {"txid":"bobpayment001",
-         "sender":"680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b",
+         "sender":"14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp",
          "amount":50000000
         },
         {"txid":"bobpayment002",
-        "sender":"680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b",
+        "sender":"14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp",
         "amount":500000000
         }
       ]

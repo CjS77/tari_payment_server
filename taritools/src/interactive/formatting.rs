@@ -57,7 +57,7 @@ pub fn format_addresses(addresses: &[AccountAddress]) -> String {
     table.set_titles(row!["Hex", "Emoji Id", "Created At", "Updated At"]);
     addresses.iter().for_each(|address| {
         let a = address.address.as_address();
-        table.add_row(row![a.to_hex(), a.to_emoji_string(), address.created_at, address.updated_at]);
+        table.add_row(row![a.to_base58(), a.to_emoji_string(), address.created_at, address.updated_at]);
     });
     markdown_style(&mut table);
     table.to_string()
@@ -189,7 +189,7 @@ pub fn format_wallet_list(wallets: &[WalletInfo]) -> String {
 pub fn format_payments_result(payments: PaymentsResult) -> Result<String> {
     let mut f = String::new();
     writeln!(f, "===============================================================================")?;
-    writeln!(f, "Payments for {});", payments.address.as_hex())?;
+    writeln!(f, "Payments for {});", payments.address.as_base58())?;
     writeln!(
         f,
         "{count:<4} payments.                                          Total value: {value}",
@@ -216,7 +216,7 @@ pub fn payment_to_row(payment: &Payment) -> Row {
         Cell::new(&payment.txid),
         Cell::new(&payment.amount.to_string()),
         Cell::new(&payment.status.to_string()),
-        Cell::new(&payment.sender.as_hex()),
+        Cell::new(&payment.sender.as_base58()),
         Cell::new(&payment.order_id.clone().map(|id| id.to_string()).unwrap_or_default()),
         Cell::new(&payment.memo.clone().unwrap_or_default()),
         Cell::new(&payment.created_at.to_string()),
@@ -247,7 +247,7 @@ pub fn format_addresses_with_qr_code(addresses: &[TariAddress]) -> String {
 }
 
 pub fn format_address_with_qr_code(address: &TariAddress) -> (String, String, String) {
-    let qr_link = format!("tari://{}/transactions/send?tariAddress={}", address.network(), address.to_hex());
+    let qr_link = format!("tari://{}/transactions/send?tariAddress={}", address.network(), address.to_base58());
     let code = QrCode::new(qr_link)
         .map(|code| {
             code.render::<unicode::Dense1x2>()
@@ -257,7 +257,7 @@ pub fn format_address_with_qr_code(address: &TariAddress) -> (String, String, St
                 .build()
         })
         .unwrap_or_default();
-    (address.to_hex(), address.to_emoji_string(), code)
+    (address.to_base58(), address.to_emoji_string(), code)
 }
 
 pub fn format_claimed_order(order: &ClaimedOrder) -> Result<String> {

@@ -27,13 +27,13 @@ Feature: Accounts endpoint
     Given some role assignments
     When Alice authenticates with nonce = 1 and roles = "user"
     When Bob authenticates with nonce = 1 and roles = "user"
-    When Alice GETs to "/api/account/680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b" with body
+    When Alice GETs to "/api/account/14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp" with body
     Then I receive a 403 Forbidden response with the message 'Insufficient permissions.'
 
   Scenario: User with ReadAll role can access another account
     Given some role assignments
     When Admin authenticates with nonce = 1 and roles = "user,read_all"
-    When Admin GETs to "/api/account/680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b" with body
+    When Admin GETs to "/api/account/14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp" with body
     Then I receive a 200 Ok response
     Then I receive a partial JSON response:
     """
@@ -51,7 +51,7 @@ Feature: Accounts endpoint
     Given some role assignments
     Given a super-admin user (Super)
     When Super authenticates with nonce = 1
-    When Super GETs to "/api/account/680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b" with body
+    When Super GETs to "/api/account/14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp" with body
     Then I receive a 200 Ok response
     Then I receive a partial JSON response:
     """

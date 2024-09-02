@@ -3,7 +3,6 @@ Feature: Expire old orders
   Background:
     # For testing, the expiry limits are 2s for unclaimed and 4s for unpaid
 
-
   Scenario: Expire unclaimed orders
     Given a blank slate
     When Customer #1 ["Alex"] places order "order1" for 1 XTR, with memo

@@ -669,10 +669,10 @@ impl AccountManagement for SqliteDatabase {
 
     async fn fetch_user_account_for_address(
         &self,
-        pubkey: &TariAddress,
+        address: &TariAddress,
     ) -> Result<Option<UserAccount>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
-        user_accounts::user_account_for_address(pubkey, &mut conn).await
+        user_accounts::user_account_for_address(address, &mut conn).await
     }
 
     async fn fetch_orders_for_account(&self, account_id: i64) -> Result<Vec<Order>, AccountApiError> {
@@ -781,7 +781,7 @@ impl AuthManagement for SqliteDatabase {
         let mut tx = self.pool.begin().await.map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
         auth::assign_roles(address, roles, &mut tx).await?;
         tx.commit().await.map_err(|e| AuthApiError::DatabaseError(e.to_string()))?;
-        debug!("🔑️ Roles {roles:?} assigned to {}", address.to_hex());
+        debug!("🔑️ Roles {roles:?} assigned to {}", address.to_base58());
         Ok(())
     }
 

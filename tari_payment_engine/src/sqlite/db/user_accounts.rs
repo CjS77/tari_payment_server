@@ -147,7 +147,7 @@ pub async fn user_account_for_address(
     address: &TariAddress,
     conn: &mut SqliteConnection,
 ) -> Result<Option<UserAccount>, AccountApiError> {
-    let pk = address.to_hex();
+    let pk = address.to_base58();
     let result = sqlx::query_as!(
         UserAccount,
         r#"
@@ -179,7 +179,7 @@ pub async fn fetch_account_ids_for_address(
     addr: &TariAddress,
     conn: &mut SqliteConnection,
 ) -> Result<Vec<i64>, AccountApiError> {
-    let addr = addr.to_hex();
+    let addr = addr.to_base58();
     let ids = sqlx::query!(
         "SELECT user_account_id FROM user_account_address WHERE address = $1 ORDER BY created_at DESC",
         addr
@@ -201,7 +201,7 @@ pub async fn fetch_accounts_for_address(
     oldest_first: bool,
     conn: &mut SqliteConnection,
 ) -> Result<Vec<UserAccount>, AccountApiError> {
-    let addr = addr.to_hex();
+    let addr = addr.to_base58();
     let q = format!(
         "SELECT * FROM user_accounts WHERE id in (SELECT user_account_id from user_account_address WHERE address = \
          $1) ORDER BY created_at {}",
@@ -256,7 +256,7 @@ pub async fn link_accounts(
         debug!("🧑️ Linked user account #{acc_id} to customer_id {cid}");
     };
     if let Some(addr) = address {
-        let addr = addr.to_hex();
+        let addr = addr.to_base58();
         let result =
             sqlx::query!("INSERT INTO user_account_address (user_account_id, address) VALUES ($1, $2)", acc_id, addr,)
                 .execute(tx)
@@ -499,7 +499,7 @@ pub(crate) async fn addresses(
     conn: &mut SqliteConnection,
 ) -> Result<Vec<TariAddress>, AccountApiError> {
     let rows = with_pagination("SELECT address FROM user_account_address", pagination, conn).await?;
-    let addresses = rows.into_iter().filter_map(|r| TariAddress::from_hex(r.get("address")).ok()).collect();
+    let addresses = rows.into_iter().filter_map(|r| TariAddress::from_base58(r.get("address")).ok()).collect();
     Ok(addresses)
 }
 

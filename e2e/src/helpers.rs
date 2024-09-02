@@ -102,30 +102,30 @@ mod test {
     fn is_subset_complex_object_fail() {
         let complete = r#"
         {
-          "address":"680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b",
+          "address":"14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp",
           "total_orders":165000000,
           "orders":[
             {"id":1,"order_id":"1","customer_id":"alice",
-             "memo":"address: [680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b]",
+             "memo":"address: [14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp]",
              "total_price":100000000,
              "currency":"XTR",
              "status":"New"},
             {"id":3,"order_id":"3","customer_id":"alice",
-            "memo":"address: [680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b]",
+            "memo":"address: [14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp]",
             "total_price":65000000,"currency":"XTR",
             "status":"New"}
           ]}
         "#;
-        let part = r#"{ "address":"b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d" }"#;
+        let part = r#"{ "address":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt" }"#;
         assert!(!json_is_subset_of(part, complete));
         let part = r#"{
-          "address":"680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b",
+          "address":"14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp",
           "total_orders":165
         }"#;
         assert!(!json_is_subset_of(part, complete));
         let part = r#"
         {
-          "address":"680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b",
+          "address":"14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp",
           "total_orders":165000000,
           "orders":[]}
         "#;

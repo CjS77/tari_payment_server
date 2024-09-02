@@ -10,20 +10,26 @@ Feature: Order claiming
     """
     {
       "orderId": "1",
-      "address": "aa3c076152c1ae44ae86585eeba1d348badb845d1cab5ef12db98fafb4fea55d6c",
+      "address": "14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
       "signature": "foobar"
     }
     """
     Then I receive a 400 BadRequest response with the message 'Invalid signature'
 
+  # ----------------------------- Tari Address -----------------------------
+  # Network: mainnet
+  # Secret key: bf9da371add03729f9df1ab8f6356a7104868fe75de9d5235d33af28cfcae701
+  # Public key: 10c2e78e1bbbe58779eade51cf6d66f26288d934e9eda26fb20c8bcb88825d2a
+  # Address      : 145yntp6GHTuDuTVPtbyPdo8rVjRppjdfyoxZeY958kh1Mn
+  #------------------------------------------------------------------------
   Scenario: An unauthenticated user can claim an order with the correct signature, even if they already have a previous account
     When Customer #142 ["anon@example.com"] places order "order10256" for 2400 XTR, with memo
     When User POSTs to "/order/claim" with body
     """
     {
-      "address":"680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b",
+      "address":"145yntp6GHTuDuTVPtbyPdo8rVjRppjdfyoxZeY958kh1Mn",
       "order_id":"order10256",
-      "signature":"70cff86acc645b460cb4f1e0ffecfa11871d5d50ea349774964e851a451f3202ee4a39b038ddce19cb88b6ef57259bd9f6aa26cf2594f5b04ec14db05320f900"}
+      "signature":"6689435195fda30c9c3805b844b45adadac2d5b5ca647dca342531e50bd5ff658b0aa458d184e720a6fcd5c7be4efec65e7e7e78e1c86003bf00147962cb540d"}
     """
     Then I receive a 200 Ok response
     And I receive a partial JSON response:
@@ -34,27 +40,27 @@ Feature: Order claiming
     """
     {
       "order": { "order_id": "order10256", "total_price": 2400000000, "status": "New" },
-      "claimant": "680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b"
+      "claimant": "145yntp6GHTuDuTVPtbyPdo8rVjRppjdfyoxZeY958kh1Mn"
     }
     """
 
   # ----------------------------- Memo Signature -----------------------------
-  # Wallet address: 480487461530011b99563cb69a96f11719ddf08307459aee4d0cab15090bda7a88
+  # Wallet address: 14NPqUxFyJwbZ6wJ8hpuTuX5oWbQt7XeMJWXMZdMSiA19Fj
   # Public key    : 480487461530011b99563cb69a96f11719ddf08307459aee4d0cab15090bda7a
   # emoji id      : 🎢🌋🐲🎠🍄🍬🌂🍊👕🎳🍼💕👖👒🚒🍆🍈🔭🚑🐭🌝🎓👖🚂🎨🌴💀🍄🌟🌰🔪🐜🐳
   # Secret        : ac8bac66b8efc8f2055ba8dcd95ad5f7f9e791d876a50642d563426fc86de109
   # Network       : mainnet
-  # auth: {"address":"480487461530011b99563cb69a96f11719ddf08307459aee4d0cab15090bda7a88","order_id":"anon101","signature":"2ee4933f2a845e424a784d0c35d84bfb2836191aa5ffc4adc20de3b733da8478c0a0afcf941ed8a26d195eb1f748d2101ed6434af49823994334778385fc0b04"}
+  # auth:  {"address":"14NPqUxFyJwbZ6wJ8hpuTuX5oWbQt7XeMJWXMZdMSiA19Fj","order_id":"anon100","signature":"be215f32c4b7a9a7a4da600a53bfdc7ca735e64cf5f0ecac2b5904ac24a1fb04376c2c7f3d96ca95e0e16a124f80dc846702e14df6387ad744ad5737f14fa90c"}
   # ------------------------------------------------------------------------
   Scenario: Previously unlinked accounts can claim an order with the correct signature, and the order can be paid.
-    Given a payment of 100 XTR from address 480487461530011b99563cb69a96f11719ddf08307459aee4d0cab15090bda7a88 in tx tx4804forAnon100
+    Given a payment of 100 XTR from address 14NPqUxFyJwbZ6wJ8hpuTuX5oWbQt7XeMJWXMZdMSiA19Fj in tx tx4804forAnon100
     When Customer #999 ["who@example.com"] places order "anon100" for 60 XTR, with memo
     When User POSTs to "/order/claim" with body
     """
     {
-       "address":"480487461530011b99563cb69a96f11719ddf08307459aee4d0cab15090bda7a88",
+       "address":"14NPqUxFyJwbZ6wJ8hpuTuX5oWbQt7XeMJWXMZdMSiA19Fj",
        "order_id":"anon100",
-       "signature":"1295995d5698365ecc82ee7acf4acd11dfe678a9b860fd2054d1d3b5b9c14951daa3a09dd00fa9869fedf5e321b877a22ad3cc7291e93d3d320e2d4ac8134d05"
+       "signature":"72dcd2ff713f5f38c45f0f87426646eeac49a360613bf9d7195ce009dd23df392b908baa26206c129b975caa382cc0bad603f13e0c8f0cbf49809c3546a10105"
     }
     """
     Then I receive a 200 Ok response
@@ -62,7 +68,7 @@ Feature: Order claiming
     """
     {
       "order": { "order_id": "anon100", "total_price": 60000000, "status": "New" },
-      "claimant": "480487461530011b99563cb69a96f11719ddf08307459aee4d0cab15090bda7a88"
+      "claimant": "14NPqUxFyJwbZ6wJ8hpuTuX5oWbQt7XeMJWXMZdMSiA19Fj"
     }
     """
     Then the OrderPaid trigger fires with
@@ -78,9 +84,9 @@ Feature: Order claiming
     When User POSTs to "/order/claim" with body
     """
     {
-       "address":"480487461530011b99563cb69a96f11719ddf08307459aee4d0cab15090bda7a88",
+       "address":"14NPqUxFyJwbZ6wJ8hpuTuX5oWbQt7XeMJWXMZdMSiA19Fj",
        "order_id":"anon101",
-       "signature":"2ee4933f2a845e424a784d0c35d84bfb2836191aa5ffc4adc20de3b733da8478c0a0afcf941ed8a26d195eb1f748d2101ed6434af49823994334778385fc0b04"
+       "signature":"e88a14e2e1de92bc68cf982c0cfc9c3c39c3f4a7f712b6b0294961da6b9f70059f9025d635e3221e1b7c79ee33665881f8320243ae4a59b9226b45f86eb63d05"
     }
     """
     Then I receive a 200 Ok response
@@ -92,6 +98,6 @@ Feature: Order claiming
     """
     {
       "order": { "order_id": "anon101", "total_price": 28000000, "status": "New" },
-      "claimant": "480487461530011b99563cb69a96f11719ddf08307459aee4d0cab15090bda7a88"
+      "claimant": "14NPqUxFyJwbZ6wJ8hpuTuX5oWbQt7XeMJWXMZdMSiA19Fj"
     }
     """

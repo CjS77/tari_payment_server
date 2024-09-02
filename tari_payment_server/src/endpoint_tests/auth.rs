@@ -52,17 +52,17 @@ async fn login_with_invalid_signature() {
 
 #[actix_web::test]
 async fn login_with_valid_token() {
-    let token = "eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ.eyJhZGRyZXNzIjp7Im5ldHdvcmsiOiJtYWlubmV0IiwicHVibGljX2tleSI6IjEyYTI1MDRhNzhmMDg5MzBjMmQzMzU3MDhmYWU4MDY5NmIyMTdkMjNiZDJkNDczZTEyN2Q4ZjVhMzBlMjgxNjUifSwibm9uY2UiOjE3MTE0NDg2NDksImRlc2lyZWRfcm9sZXMiOlsidXNlciIsIndyaXRlIl19.gm2Z6FxNyMmLT_dcEGu_iH9_wBm029OY_eqw__hZ0yXpa0ccVeBbF1lTfYU5xEhmGtQXtwhOjC8l2SUm9QB8CQ";
+    let token = "eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ.eyJhZGRyZXNzIjp7IlNpbmdsZSI6eyJuZXR3b3JrIjoibWFpbm5ldCIsImZlYXR1cmVzIjozLCJwdWJsaWNfc3BlbmRfa2V5IjoiYzA4ZjEwOGUzZTQ1ZmZmNjhkYmNmOGJkYTlhMzZjOGUxYTEyMzA5NTlkNzdkNTdiM2RlNmEwYTVmNTE5NjM1NCJ9fSwibm9uY2UiOjE3MjUyOTg0NDUsImRlc2lyZWRfcm9sZXMiOlsidXNlciIsIndyaXRlIl19.Go2laadEE96JkkbO5ZN7Qcf3aULX0fRdph7gkIFudxRdg_jXCUxSmr5p2UKhuMqdD9K16_Zk8Xel1DFSqmrvBQ";
     let (status, s, config) = post_request(token, Ok(())).await;
     let token = validate_token(&s, &config.jwt_verification_key).unwrap();
     assert!(status.is_success());
-    assert_eq!(token.address.to_hex(), "12a2504a78f08930c2d335708fae80696b217d23bd2d473e127d8f5a30e28165de");
+    assert_eq!(token.address.to_base58(), "14zCiH6ybX18HCm3SfLfHSoT48vfzxWUtbNPMt7k61akqDv");
     assert_eq!(&token.roles, &[Role::User, Role::Write]);
 }
 
 #[actix_web::test]
 async fn login_with_disallowed_roles() {
-    let token = "eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ.eyJhZGRyZXNzIjp7Im5ldHdvcmsiOiJtYWlubmV0IiwicHVibGljX2tleSI6IjEyYTI1MDRhNzhmMDg5MzBjMmQzMzU3MDhmYWU4MDY5NmIyMTdkMjNiZDJkNDczZTEyN2Q4ZjVhMzBlMjgxNjUifSwibm9uY2UiOjE3MTE0NDg2NDksImRlc2lyZWRfcm9sZXMiOlsidXNlciIsIndyaXRlIl19.gm2Z6FxNyMmLT_dcEGu_iH9_wBm029OY_eqw__hZ0yXpa0ccVeBbF1lTfYU5xEhmGtQXtwhOjC8l2SUm9QB8CQ";
+    let token = "eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ.eyJhZGRyZXNzIjp7IlNpbmdsZSI6eyJuZXR3b3JrIjoibWFpbm5ldCIsImZlYXR1cmVzIjozLCJwdWJsaWNfc3BlbmRfa2V5IjoiYzA4ZjEwOGUzZTQ1ZmZmNjhkYmNmOGJkYTlhMzZjOGUxYTEyMzA5NTlkNzdkNTdiM2RlNmEwYTVmNTE5NjM1NCJ9fSwibm9uY2UiOjE3MjUyOTg1ODUsImRlc2lyZWRfcm9sZXMiOlsidXNlciIsIndyaXRlIiwicmVhZF9hbGwiXX0.CIF4QH5u4Z2MmTPUnorXU1LIl7qgxhZYPzUivmBxrTyu9KUjc3ly8D0csJgKM3xete_c8K_NH9cSSwkWZ-SXAg";
     let (status, body, _) = post_request(token, Err(AuthApiError::RoleNotAllowed(4))).await;
     assert_eq!(status.as_u16(), StatusCode::FORBIDDEN.as_u16());
     assert_eq!(
@@ -73,7 +73,7 @@ async fn login_with_disallowed_roles() {
 
 #[actix_web::test]
 async fn login_with_no_preexisting_user_account() {
-    let token = "eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ.eyJhZGRyZXNzIjp7Im5ldHdvcmsiOiJtYWlubmV0IiwicHVibGljX2tleSI6IjEyYTI1MDRhNzhmMDg5MzBjMmQzMzU3MDhmYWU4MDY5NmIyMTdkMjNiZDJkNDczZTEyN2Q4ZjVhMzBlMjgxNjUifSwibm9uY2UiOjE3MTE0NDg2NDksImRlc2lyZWRfcm9sZXMiOlsidXNlciIsIndyaXRlIl19.gm2Z6FxNyMmLT_dcEGu_iH9_wBm029OY_eqw__hZ0yXpa0ccVeBbF1lTfYU5xEhmGtQXtwhOjC8l2SUm9QB8CQ";
+    let token = "eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ.eyJhZGRyZXNzIjp7IlNpbmdsZSI6eyJuZXR3b3JrIjoibWFpbm5ldCIsImZlYXR1cmVzIjozLCJwdWJsaWNfc3BlbmRfa2V5IjoiYzA4ZjEwOGUzZTQ1ZmZmNjhkYmNmOGJkYTlhMzZjOGUxYTEyMzA5NTlkNzdkNTdiM2RlNmEwYTVmNTE5NjM1NCJ9fSwibm9uY2UiOjE3MjUyOTg1ODUsImRlc2lyZWRfcm9sZXMiOlsidXNlciIsIndyaXRlIiwicmVhZF9hbGwiXX0.CIF4QH5u4Z2MmTPUnorXU1LIl7qgxhZYPzUivmBxrTyu9KUjc3ly8D0csJgKM3xete_c8K_NH9cSSwkWZ-SXAg";
     let (status, body, _) = post_request(token, Err(AuthApiError::AddressNotFound)).await;
     assert_eq!(status.as_u16(), StatusCode::FORBIDDEN.as_u16());
     assert_eq!(body, r#"{"error":"Authentication Error. User account not found."}"#);
@@ -81,7 +81,7 @@ async fn login_with_no_preexisting_user_account() {
 
 #[actix_web::test]
 async fn login_with_invalid_nonce() {
-    let token = "eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ.eyJhZGRyZXNzIjp7Im5ldHdvcmsiOiJtYWlubmV0IiwicHVibGljX2tleSI6IjEyYTI1MDRhNzhmMDg5MzBjMmQzMzU3MDhmYWU4MDY5NmIyMTdkMjNiZDJkNDczZTEyN2Q4ZjVhMzBlMjgxNjUifSwibm9uY2UiOjE3MTE0NDg2NDksImRlc2lyZWRfcm9sZXMiOlsidXNlciIsIndyaXRlIl19.gm2Z6FxNyMmLT_dcEGu_iH9_wBm029OY_eqw__hZ0yXpa0ccVeBbF1lTfYU5xEhmGtQXtwhOjC8l2SUm9QB8CQ";
+    let token = "eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ.eyJhZGRyZXNzIjp7IlNpbmdsZSI6eyJuZXR3b3JrIjoibWFpbm5ldCIsImZlYXR1cmVzIjozLCJwdWJsaWNfc3BlbmRfa2V5IjoiYzA4ZjEwOGUzZTQ1ZmZmNjhkYmNmOGJkYTlhMzZjOGUxYTEyMzA5NTlkNzdkNTdiM2RlNmEwYTVmNTE5NjM1NCJ9fSwibm9uY2UiOjE3MjUyOTg1ODUsImRlc2lyZWRfcm9sZXMiOlsidXNlciIsIndyaXRlIiwicmVhZF9hbGwiXX0.CIF4QH5u4Z2MmTPUnorXU1LIl7qgxhZYPzUivmBxrTyu9KUjc3ly8D0csJgKM3xete_c8K_NH9cSSwkWZ-SXAg";
     let (status, body, _) = post_request(token, Err(AuthApiError::InvalidNonce)).await;
     assert_eq!(status.as_u16(), StatusCode::UNAUTHORIZED.as_u16());
     assert_eq!(

@@ -14,7 +14,7 @@ use crate::{db_types::Role, traits::AuthApiError};
 pub static DEFAULT_ROLES: &[Role] = &[Role::User];
 
 pub async fn auth_account_exists(address: &TariAddress, conn: &mut SqliteConnection) -> Result<bool, AuthApiError> {
-    let address = address.to_hex();
+    let address = address.to_base58();
     let row = sqlx::query!(r#"SELECT count(address) as "count" FROM auth_log WHERE address = ?"#, address)
         .fetch_one(conn)
         .await?;
@@ -35,7 +35,7 @@ pub async fn roles_for_address(
     address: &TariAddress,
     conn: &mut SqliteConnection,
 ) -> Result<HashSet<Role>, AuthApiError> {
-    let address = address.to_hex();
+    let address = address.to_base58();
     let result = sqlx::query!(
         r#"SELECT name FROM
             role_assignments LEFT JOIN roles ON role_assignments.role_id = roles.id
@@ -69,7 +69,7 @@ pub async fn address_has_roles(
         return Ok(());
     }
     let additional_roles = roles.iter().filter(|r| !DEFAULT_ROLES.contains(r)).collect::<Vec<_>>();
-    let address = address.to_hex();
+    let address = address.to_base58();
     let role_strings = additional_roles.iter().map(|r| format!("'{r}'")).collect::<Vec<String>>().join(",");
     let q = format!(
         r#"SELECT count(name) as "num_roles"
@@ -91,7 +91,7 @@ pub async fn upsert_nonce_for_address(
     nonce: u64,
     conn: &mut SqliteConnection,
 ) -> Result<(), AuthApiError> {
-    let address = address.to_hex();
+    let address = address.to_base58();
     #[allow(clippy::cast_possible_wrap)]
     let nonce = nonce as i64;
     let res = sqlx::query!(
@@ -142,7 +142,7 @@ pub async fn assign_roles(
         .iter()
         .map(|r| all_roles.get(r).ok_or(AuthApiError::RoleNotFound).copied())
         .collect::<Result<Vec<i64>, _>>()?;
-    let address = address.to_hex();
+    let address = address.to_base58();
 
     let mut qb = QueryBuilder::new("INSERT INTO role_assignments (address, role_id) VALUES ");
     let mut values = qb.separated(", ");
@@ -177,7 +177,7 @@ pub async fn remove_roles(
         .map(|r| all_roles.get(r).ok_or(AuthApiError::RoleNotFound).copied())
         .collect::<Result<Vec<i64>, _>>()?;
 
-    let address = address.to_hex();
+    let address = address.to_base58();
 
     let mut qb = QueryBuilder::new("DELETE FROM role_assignments WHERE address = ");
     qb.push_bind(address.clone());
