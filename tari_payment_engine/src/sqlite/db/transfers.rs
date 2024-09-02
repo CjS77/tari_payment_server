@@ -13,7 +13,7 @@ pub async fn idempotent_insert(
     conn: &mut SqliteConnection,
 ) -> Result<Payment, PaymentGatewayError> {
     let txid = transfer.txid.clone();
-    let address = transfer.sender.as_address().to_hex();
+    let address = transfer.sender.as_address().to_base58();
     let payment = sqlx::query_as(
         r#"
             INSERT INTO payments (txid, sender, amount, memo) VALUES ($1, $2, $3, $4)
@@ -41,7 +41,7 @@ pub async fn credit_note(note: CreditNote, conn: &mut SqliteConnection) -> Resul
     let timestamp = Utc::now().timestamp();
     let txid = format!("credit_note_{}:{}:{timestamp}", note.customer_id, note.amount);
     let address = create_dummy_address_for_cust_id(&note.customer_id);
-    let hex_addr = address.to_hex();
+    let base58_addr = address.to_base58();
     let memo = format!("Credit note: {}", note.reason.unwrap_or("No reason given".into()));
     let payment = sqlx::query_as(
         r#"
@@ -50,7 +50,7 @@ pub async fn credit_note(note: CreditNote, conn: &mut SqliteConnection) -> Resul
         "#,
     )
     .bind(txid.clone())
-    .bind(hex_addr)
+    .bind(base58_addr)
     .bind(note.amount)
     .bind(memo)
     .fetch_one(conn)
@@ -87,6 +87,6 @@ pub async fn fetch_payments_for_address(
     conn: &mut SqliteConnection,
 ) -> Result<Vec<Payment>, sqlx::Error> {
     let payments =
-        sqlx::query_as(r#"SELECT * FROM payments WHERE sender = ?"#).bind(address.to_hex()).fetch_all(conn).await?;
+        sqlx::query_as(r#"SELECT * FROM payments WHERE sender = ?"#).bind(address.to_base58()).fetch_all(conn).await?;
     Ok(payments)
 }

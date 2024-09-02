@@ -1,3 +1,4 @@
+@full_accounts
 Feature: Full accounts endpoint (/api/history)
   Background:
     Given a database with some accounts
@@ -23,7 +24,7 @@ Feature: Full accounts endpoint (/api/history)
       "total_orders":165000000,
       "current_orders":165000000
     },
-    "addresses":[ {"address":"b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d" } ],
+    "addresses":[ {"address":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt" } ],
     "customer_ids":[{"customer_id":"alice"}],
     "orders":[
       {"id":1,"order_id":"1","total_price":100000000,"status":"New"},
@@ -37,7 +38,7 @@ Feature: Full accounts endpoint (/api/history)
 
   Scenario: Standard user cannot access another user's account history with an address
     When Alice authenticates with nonce = 1 and roles = "user"
-    When Alice GETs to "/api/history/address/680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b" with body
+    When Alice GETs to "/api/history/address/14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp" with body
     Then I receive a 403 Forbidden response with the message 'Insufficient permissions.'
 
   Scenario: Standard user cannot access another user's account history with an account id
@@ -47,7 +48,7 @@ Feature: Full accounts endpoint (/api/history)
 
   Scenario: User with ReadAll role can access any account history with an address
     When Admin authenticates with nonce = 1 and roles = "user,read_all"
-    When Admin GETs to "/api/history/address/680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b" with body
+    When Admin GETs to "/api/history/address/14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp" with body
     Then I receive a 200 Ok response
     Then I receive a partial JSON response:
     """
@@ -60,7 +61,7 @@ Feature: Full accounts endpoint (/api/history)
         "total_orders":550000000,
         "current_orders":550000000
       },
-      "addresses":[ {"address":"680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b"}],
+      "addresses":[ {"address":"14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp"}],
       "customer_ids":[{"customer_id":"bob"}],
       "orders":[
         {"id":2,"order_id":"2","customer_id":"bob","total_price":200000000,"status":"New"},
@@ -88,7 +89,7 @@ Feature: Full accounts endpoint (/api/history)
         "total_orders":550000000,
         "current_orders":550000000
       },
-      "addresses":[ {"address":"680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b"}],
+      "addresses":[ {"address":"14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp"}],
       "customer_ids":[{"customer_id":"bob"}],
       "orders":[
         {"id":2,"order_id":"2","customer_id":"bob","total_price":200000000,"status":"New"},
@@ -104,7 +105,7 @@ Feature: Full accounts endpoint (/api/history)
   Scenario: SuperAdmin role can access another account
     Given a super-admin user (Super)
     When Super authenticates with nonce = 1
-    When Super GETs to "/api/history/address/680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b" with body
+    When Super GETs to "/api/history/address/14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp" with body
     Then I receive a 200 Ok response
     Then I receive a partial JSON response:
     """
@@ -117,7 +118,7 @@ Feature: Full accounts endpoint (/api/history)
         "total_orders":550000000,
         "current_orders":550000000
       },
-      "addresses":[ {"address":"680ac255be13e424dd305c2ed93f58aee73670fadb97d733ad627efc9bb165510b"}],
+      "addresses":[ {"address":"14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp"}],
       "customer_ids":[{"customer_id":"bob"}],
       "orders":[
         {"id":2,"order_id":"2","customer_id":"bob","total_price":200000000,"status":"New"},

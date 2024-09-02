@@ -71,7 +71,7 @@ impl WalletSignature {
         let Ok(message) = Self::signature_message(&self.address, self.nonce, payload) else {
             return false;
         };
-        let pubkey = self.address.as_address().public_key();
+        let pubkey = self.address.as_address().comms_public_key();
         self.signature.verify(pubkey, message)
     }
 

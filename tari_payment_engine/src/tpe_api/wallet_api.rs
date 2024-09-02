@@ -56,7 +56,7 @@ where B: WalletAuth
         if !sig.is_valid(payload) {
             return Err(WalletAuthApiError::InvalidSignature);
         }
-        trace!("Wallet signature for {} is valid", sig.address.as_hex());
+        trace!("Wallet signature for {} is valid", sig.address.as_base58());
         let address = sig.address.as_address();
         let wallet_info = self.db.get_wallet_info(address).await?;
         if wallet_info.address != sig.address {

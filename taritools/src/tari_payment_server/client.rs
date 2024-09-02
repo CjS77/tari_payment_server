@@ -121,7 +121,7 @@ impl PaymentServerClient {
     }
 
     pub async fn remove_authorized_wallet(&self, address: &TariAddress) -> Result<()> {
-        let url = self.url(&format!("/api/wallets/{}", address.to_hex()))?;
+        let url = self.url(&format!("/api/wallets/{}", address.to_base58()))?;
         let res = self.client.delete(url).header("tpg_access_token", self.access_token.clone()).send().await?;
         if !res.status().is_success() {
             let msg = res.text().await?;
@@ -215,7 +215,7 @@ impl PaymentServerClient {
     }
 
     pub async fn history_for_address(&self, address: &TariAddress) -> Result<FullAccount> {
-        self.auth_get_request(&format!("/api/history/address/{}", address.to_hex())).await
+        self.auth_get_request(&format!("/api/history/address/{}", address.to_base58())).await
     }
 
     pub async fn history_for_id(&self, account_id: i64) -> Result<FullAccount> {
@@ -248,7 +248,7 @@ impl PaymentServerClient {
     }
 
     pub async fn orders_for_address(&self, address: TariAddress) -> Result<OrderResult> {
-        self.auth_get_request(&format!("/api/orders/{}", address.to_hex())).await
+        self.auth_get_request(&format!("/api/orders/{}", address.to_base58())).await
     }
 
     pub async fn order_by_id(&self, order_id: &OrderId) -> Result<Option<Order>> {
@@ -293,7 +293,7 @@ impl PaymentServerClient {
     }
 
     pub async fn payments_for_address(&self, address: TariAddress) -> Result<PaymentsResult> {
-        self.auth_get_request(&format!("/api/payments/{}", address.to_hex())).await
+        self.auth_get_request(&format!("/api/payments/{}", address.to_base58())).await
     }
 
     pub async fn issue_credit(&self, customer_id: &str, amount: MicroTari, reason: String) -> Result<Vec<Order>> {

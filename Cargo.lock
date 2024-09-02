@@ -567,6 +567,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "771fe0050b883fcc3ea2359b1a96bcfbc090b7116eae7c3c512c7a083fdf23d3"
 
 [[package]]
+name = "bs58"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf88ba1141d185c399bee5288d850d63b8369520c1eafc32a0430b5b6c287bf4"
+dependencies = [
+ "tinyvec",
+]
+
+[[package]]
 name = "bstr"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -815,20 +824,6 @@ dependencies = [
  "either",
  "memchr",
  "unreachable",
-]
-
-[[package]]
-name = "config"
-version = "0.13.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23738e11972c7643e4ec947840fc463b6a571afcd3e735bdfce7d03c7a784aca"
-dependencies = [
- "async-trait",
- "lazy_static",
- "nom",
- "pathdiff",
- "serde",
- "toml 0.5.11",
 ]
 
 [[package]]
@@ -1439,7 +1434,7 @@ dependencies = [
 
 [[package]]
 name = "e2e"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "actix-web",
  "chrono",
@@ -1454,7 +1449,7 @@ dependencies = [
  "serde_json",
  "shopify_tools",
  "tari-jwt",
- "tari_common_types 1.0.0-rc.5",
+ "tari_common_types",
  "tari_payment_engine",
  "tari_payment_server",
  "tokio",
@@ -1861,7 +1856,7 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "http 0.2.12",
- "indexmap 2.3.0",
+ "indexmap",
  "slab",
  "tokio",
  "tokio-util",
@@ -1880,7 +1875,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "http 1.1.0",
- "indexmap 2.3.0",
+ "indexmap",
  "slab",
  "tokio",
  "tokio-util",
@@ -1899,12 +1894,6 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.12.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
-
-[[package]]
-name = "hashbrown"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
@@ -1919,7 +1908,7 @@ version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8094feaf31ff591f651a2664fb9cfd92bba7a60ce3197265e9482ebe753c8f7"
 dependencies = [
- "hashbrown 0.14.5",
+ "hashbrown",
 ]
 
 [[package]]
@@ -2218,22 +2207,12 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "1.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd070e393353796e801d209ad339e89596eb4c8d430d18ede6a1cced8fafbd99"
-dependencies = [
- "autocfg",
- "hashbrown 0.12.3",
-]
-
-[[package]]
-name = "indexmap"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "de3fc2e30ba82dd1b3911c8de1ffc143c74a914a14e99514d7637e3099df5ea0"
 dependencies = [
  "equivalent",
- "hashbrown 0.14.5",
+ "hashbrown",
 ]
 
 [[package]]
@@ -2498,7 +2477,7 @@ dependencies = [
  "once_cell",
  "serde",
  "serde-value",
- "serde_yaml 0.9.34+deprecated",
+ "serde_yaml",
  "thiserror",
  "typemap-ors",
 ]
@@ -2574,6 +2553,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "minotari_ledger_wallet_common"
+version = "1.3.1-pre.1"
+source = "git+https://github.com/tari-project/tari.git?tag=v1.3.1-pre.1#c1b5c0220774a0adfc56b273537a2b50973a0724"
+dependencies = [
+ "bs58 0.5.1",
+]
+
+[[package]]
 name = "mio"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2631,7 +2618,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c580bfdd8803cce319b047d239559a22f809094aaea4ac13902a1fdcfcd4261"
 dependencies = [
  "arrayref",
- "bs58",
+ "bs58 0.4.0",
  "byteorder",
  "data-encoding",
  "multihash",
@@ -3638,23 +3625,11 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml"
-version = "0.8.26"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "578a7433b776b56a35785ed5ce9a7e777ac0598aac5a6dd1b4b18a307c7fc71b"
-dependencies = [
- "indexmap 1.9.3",
- "ryu",
- "serde",
- "yaml-rust",
-]
-
-[[package]]
-name = "serde_yaml"
 version = "0.9.34+deprecated"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a8b1a1a2ebf674015cc02edccce75287f1a0130d394307b36743c2f5d504b47"
 dependencies = [
- "indexmap 2.3.0",
+ "indexmap",
  "itoa",
  "ryu",
  "serde",
@@ -3701,7 +3676,7 @@ checksum = "24188a676b6ae68c3b2cb3a01be17fbf7240ce009799bb56d5b1409051e78fde"
 
 [[package]]
 name = "shopify_tools"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "graphql-parser",
@@ -3861,7 +3836,7 @@ dependencies = [
  "futures-util",
  "hashlink",
  "hex",
- "indexmap 2.3.0",
+ "indexmap",
  "log",
  "memchr",
  "once_cell",
@@ -4228,25 +4203,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tari-log4rs"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18f387ee6565d938a07b5d217637adfb6d359f79e04b54e5e6a508513271d45f"
-dependencies = [
- "anyhow",
- "arc-swap",
- "derivative",
- "fnv",
- "humantime",
- "log",
- "serde",
- "serde-value",
- "serde_yaml 0.8.26",
- "thiserror",
- "typemap-ors",
-]
-
-[[package]]
 name = "tari_bulletproofs_plus"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4269,37 +4225,11 @@ dependencies = [
 
 [[package]]
 name = "tari_common"
-version = "1.0.0-rc.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "020ded359b26a2462827a8934d5b2c8ce46985b2b9455d9ba1dd9e1796e21995"
+version = "1.3.1-pre.1"
+source = "git+https://github.com/tari-project/tari.git?tag=v1.3.1-pre.1#c1b5c0220774a0adfc56b273537a2b50973a0724"
 dependencies = [
  "anyhow",
- "blake2",
- "config 0.13.4",
- "dirs-next 1.0.2",
- "log",
- "multiaddr",
- "path-clean",
- "serde",
- "serde_json",
- "serde_yaml 0.9.34+deprecated",
- "sha2",
- "structopt",
- "tari-log4rs",
- "tari_crypto",
- "tari_features 1.0.0-rc.5",
- "tempfile",
- "thiserror",
-]
-
-[[package]]
-name = "tari_common"
-version = "1.0.0-rc.8"
-source = "git+https://github.com/tari-project/tari.git?branch=nextnet#07131ad6091639dc46d22dd54bfc348ba93bdce0"
-dependencies = [
- "anyhow",
- "blake2",
- "config 0.14.0",
+ "config",
  "dirs-next 1.0.2",
  "log",
  "log4rs",
@@ -4307,19 +4237,18 @@ dependencies = [
  "path-clean",
  "serde",
  "serde_json",
- "serde_yaml 0.9.34+deprecated",
+ "serde_yaml",
  "sha2",
  "structopt",
- "tari_crypto",
- "tari_features 1.0.0-rc.8",
+ "tari_features",
  "tempfile",
  "thiserror",
 ]
 
 [[package]]
 name = "tari_common_sqlite"
-version = "1.0.0-rc.8"
-source = "git+https://github.com/tari-project/tari.git?branch=nextnet#07131ad6091639dc46d22dd54bfc348ba93bdce0"
+version = "1.3.1-pre.1"
+source = "git+https://github.com/tari-project/tari.git?tag=v1.3.1-pre.1#c1b5c0220774a0adfc56b273537a2b50973a0724"
 dependencies = [
  "diesel",
  "diesel_migrations",
@@ -4332,37 +4261,17 @@ dependencies = [
 
 [[package]]
 name = "tari_common_types"
-version = "1.0.0-rc.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4548daa4a6ed350d8de1f37e137d669b15b679f514a589d5076aafa41fc5785a"
+version = "1.3.1-pre.1"
+source = "git+https://github.com/tari-project/tari.git?tag=v1.3.1-pre.1#c1b5c0220774a0adfc56b273537a2b50973a0724"
 dependencies = [
  "base64 0.21.7",
+ "bitflags 2.6.0",
  "blake2",
  "borsh",
+ "bs58 0.5.1",
  "chacha20poly1305",
  "digest",
- "newtype-ops",
- "once_cell",
- "primitive-types",
- "rand 0.8.5",
- "serde",
- "tari_common 1.0.0-rc.5",
- "tari_crypto",
- "tari_utilities",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "tari_common_types"
-version = "1.0.0-rc.8"
-source = "git+https://github.com/tari-project/tari.git?branch=nextnet#07131ad6091639dc46d22dd54bfc348ba93bdce0"
-dependencies = [
- "base64 0.21.7",
- "blake2",
- "borsh",
- "chacha20poly1305",
- "digest",
+ "minotari_ledger_wallet_common",
  "newtype-ops",
  "once_cell",
  "primitive-types",
@@ -4370,7 +4279,7 @@ dependencies = [
  "serde",
  "strum",
  "strum_macros",
- "tari_common 1.0.0-rc.8",
+ "tari_common",
  "tari_crypto",
  "tari_utilities",
  "thiserror",
@@ -4402,19 +4311,13 @@ dependencies = [
 
 [[package]]
 name = "tari_features"
-version = "1.0.0-rc.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2013efce6b8e00f0671534b9d444d12085f2e3778b7ebba3b1be297b7f9b86a"
-
-[[package]]
-name = "tari_features"
-version = "1.0.0-rc.8"
-source = "git+https://github.com/tari-project/tari.git?branch=nextnet#07131ad6091639dc46d22dd54bfc348ba93bdce0"
+version = "1.3.1-pre.1"
+source = "git+https://github.com/tari-project/tari.git?tag=v1.3.1-pre.1#c1b5c0220774a0adfc56b273537a2b50973a0724"
 
 [[package]]
 name = "tari_key_manager"
-version = "1.0.0-rc.8"
-source = "git+https://github.com/tari-project/tari.git?branch=nextnet#07131ad6091639dc46d22dd54bfc348ba93bdce0"
+version = "1.3.1-pre.1"
+source = "git+https://github.com/tari-project/tari.git?tag=v1.3.1-pre.1#c1b5c0220774a0adfc56b273537a2b50973a0724"
 dependencies = [
  "argon2",
  "async-trait",
@@ -4435,7 +4338,7 @@ dependencies = [
  "strum_macros",
  "subtle",
  "tari_common_sqlite",
- "tari_common_types 1.0.0-rc.8",
+ "tari_common_types",
  "tari_crypto",
  "tari_service_framework",
  "tari_utilities",
@@ -4446,7 +4349,7 @@ dependencies = [
 
 [[package]]
 name = "tari_payment_engine"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "blake2",
  "chrono",
@@ -4461,8 +4364,8 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
- "tari_common 1.0.0-rc.5",
- "tari_common_types 1.0.0-rc.5",
+ "tari_common",
+ "tari_common_types",
  "tari_crypto",
  "thiserror",
  "tokio",
@@ -4471,7 +4374,7 @@ dependencies = [
 
 [[package]]
 name = "tari_payment_server"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "actix-http",
  "actix-jwt-auth-middleware",
@@ -4494,7 +4397,7 @@ dependencies = [
  "sha2",
  "shopify_tools",
  "tari-jwt",
- "tari_common_types 1.0.0-rc.5",
+ "tari_common_types",
  "tari_payment_engine",
  "tempfile",
  "thiserror",
@@ -4504,8 +4407,8 @@ dependencies = [
 
 [[package]]
 name = "tari_service_framework"
-version = "1.0.0-rc.8"
-source = "git+https://github.com/tari-project/tari.git?branch=nextnet#07131ad6091639dc46d22dd54bfc348ba93bdce0"
+version = "1.3.1-pre.1"
+source = "git+https://github.com/tari-project/tari.git?tag=v1.3.1-pre.1#c1b5c0220774a0adfc56b273537a2b50973a0724"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4519,8 +4422,8 @@ dependencies = [
 
 [[package]]
 name = "tari_shutdown"
-version = "1.0.0-rc.8"
-source = "git+https://github.com/tari-project/tari.git?branch=nextnet#07131ad6091639dc46d22dd54bfc348ba93bdce0"
+version = "1.3.1-pre.1"
+source = "git+https://github.com/tari-project/tari.git?tag=v1.3.1-pre.1#c1b5c0220774a0adfc56b273537a2b50973a0724"
 dependencies = [
  "futures 0.3.30",
 ]
@@ -4545,7 +4448,7 @@ dependencies = [
 
 [[package]]
 name = "taritools"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "blake2",
@@ -4569,8 +4472,8 @@ dependencies = [
  "shopify_tools",
  "sqlx",
  "tari-jwt",
- "tari_common 1.0.0-rc.5",
- "tari_common_types 1.0.0-rc.5",
+ "tari_common",
+ "tari_common_types",
  "tari_crypto",
  "tari_key_manager",
  "tari_payment_engine",
@@ -4848,7 +4751,7 @@ version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a8534fd7f78b5405e860340ad6575217ce99f38d4d5c8f2442cb5ecb50090e1"
 dependencies = [
- "indexmap 2.3.0",
+ "indexmap",
  "toml_datetime",
  "winnow 0.5.40",
 ]
@@ -4859,7 +4762,7 @@ version = "0.22.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "583c44c02ad26b0c3f3066fe629275e50627026c51ac2e595cca4c230ce1ce1d"
 dependencies = [
- "indexmap 2.3.0",
+ "indexmap",
  "serde",
  "serde_spanned",
  "toml_datetime",
@@ -4895,7 +4798,7 @@ checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
 
 [[package]]
 name = "tpg_common"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "serde",
  "sqlx",
@@ -5463,15 +5366,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05f360fc0b24296329c78fda852a1e9ae82de9cf7b27dae4b7f62f118f77b9ed"
 dependencies = [
  "tap",
-]
-
-[[package]]
-name = "yaml-rust"
-version = "0.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56c1936c4cc7a1c9ab21a1ebb602eb942ba868cbd44a99cb7cdc5892335e1c85"
-dependencies = [
- "linked-hash-map",
 ]
 
 [[package]]

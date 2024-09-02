@@ -15,7 +15,7 @@ pub fn print_memo_signature(params: MemoSignatureParams) {
     match MemoSignature::create(key_info.address(), params.order_id, &key_info.sk) {
         Ok(signature) => {
             println!("----------------------------- Memo Signature -----------------------------");
-            println!("Wallet address: {}", key_info.address_as_hex());
+            println!("Wallet address: {}", key_info.address_as_base58());
             println!("Public key    : {:x}", &key_info.pk);
             println!("emoji id      : {}", key_info.address_as_emoji_string());
             println!("Secret        : {}", &key_info.sk.reveal().to_string());

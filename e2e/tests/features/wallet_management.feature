@@ -6,7 +6,7 @@ Feature: Wallet Management
     Given an authorized wallet with secret df158b8389c68aac01a91276b742d2527f951d3c7289e4ccdecfa0672947270e
     """
       {
-        "address": "c009584dac6ad9ca0964e3dc93892c607ca37e049b4c30637fa477d0d601174495",
+        "address": "14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG",
         "ip_address": "192.168.1.100"
       }
     """
@@ -16,7 +16,7 @@ Feature: Wallet Management
     Then I receive a 200 OK response
     And I receive a partial JSON response:
     """
-    ["c009584dac6ad9ca0964e3dc93892c607ca37e049b4c30637fa477d0d601174495"]
+    ["14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG"]
     """
 
   Scenario: SuperAdmin can add an authorized wallet
@@ -25,7 +25,7 @@ Feature: Wallet Management
     When Super POSTs to "/api/wallets" with body
     """
     {
-      "address": "7a83ef47b358bead8f2e595814146784014002a6aa124c9b31134e489d27617309",
+      "address": "14k2QoJQUdzwi1rGdTUBjhq4sELavZ3ikEuja8R5TPrq452",
       "ip_address": "100.50.60.70",
       "initial_nonce": 1
     }
@@ -36,7 +36,7 @@ Feature: Wallet Management
     When User POSTs to "/api/wallets" with body
     """
     {
-      "address": "7a83ef47b358bead8f2e595814146784014002a6aa124c9b31134e489d27617309",
+      "address": "14k2QoJQUdzwi1rGdTUBjhq4sELavZ3ikEuja8R5TPrq452",
       "ip_address": "100.50.60.70",
       "initial_nonce": 1
     }
@@ -48,7 +48,7 @@ Feature: Wallet Management
     When Alice POSTs to "/api/wallets" with body
     """
     {
-      "address": "7a83ef47b358bead8f2e595814146784014002a6aa124c9b31134e489d27617309",
+      "address": "14k2QoJQUdzwi1rGdTUBjhq4sELavZ3ikEuja8R5TPrq452",
       "ip_address": "100.50.60.70",
       "initial_nonce": 1
     }
@@ -60,7 +60,7 @@ Feature: Wallet Management
     When Admin POSTs to "/api/wallets" with body
     """
     {
-      "address": "7a83ef47b358bead8f2e595814146784014002a6aa124c9b31134e489d27617309",
+      "address": "14k2QoJQUdzwi1rGdTUBjhq4sELavZ3ikEuja8R5TPrq452",
       "ip_address": "100.50.60.70",
       "initial_nonce": 1
     }
@@ -72,7 +72,7 @@ Feature: Wallet Management
     When Admin POSTs to "/api/wallets" with body
     """
     {
-      "address": "7a83ef47b358bead8f2e595814146784014002a6aa124c9b31134e489d27617309",
+      "address": "14k2QoJQUdzwi1rGdTUBjhq4sELavZ3ikEuja8R5TPrq452",
       "ip_address": "100.50.60.70",
       "initial_nonce": 1
     }
@@ -88,7 +88,7 @@ Feature: Wallet Management
     """
     [
       {
-        "address": "c009584dac6ad9ca0964e3dc93892c607ca37e049b4c30637fa477d0d601174495",
+        "address": "14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG",
         "ip_address": "192.168.1.100",
         "last_nonce": 0
       }
@@ -112,7 +112,7 @@ Feature: Wallet Management
     """
     [
       {
-        "address": "c009584dac6ad9ca0964e3dc93892c607ca37e049b4c30637fa477d0d601174495",
+        "address": "14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG",
         "ip_address": "192.168.1.100",
         "last_nonce": 0
       }
@@ -122,7 +122,7 @@ Feature: Wallet Management
   Scenario: SuperAdmin user can remove an authorized addresses
     Given a super-admin user (Super)
     When Super authenticates with nonce = 1
-    When Super DELETEs to "/api/wallets/c009584dac6ad9ca0964e3dc93892c607ca37e049b4c30637fa477d0d601174495" with body
+    When Super DELETEs to "/api/wallets/14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG" with body
     Then I receive a 200 OK response
     When User GETs to "/wallet/send_to" with body
     Then I receive a 200 OK response
@@ -132,22 +132,22 @@ Feature: Wallet Management
     """
 
   Scenario: Unauthenticated user cannot remove an authorized addresses
-    When User DELETEs to "/api/wallets/c009584dac6ad9ca0964e3dc93892c607ca37e049b4c30637fa477d0d601174495" with body
+    When User DELETEs to "/api/wallets/14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG" with body
     Then I receive a 401 Unauthenticated response with the message 'An error occurred, no cookie containing a jwt was found in the request.'
 
   Scenario: Normal user cannot remove an authorized addresses
     When Alice authenticates with nonce = 1 and roles = "user"
-    When Alice DELETEs to "/api/wallets/c009584dac6ad9ca0964e3dc93892c607ca37e049b4c30637fa477d0d601174495" with body
+    When Alice DELETEs to "/api/wallets/14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG" with body
     Then I receive a 403 Forbidden response with the message 'Insufficient permissions.'
 
   Scenario: ReadAll admin cannot remove an authorized addresses
     When Admin authenticates with nonce = 1 and roles = "read_all"
-    When Admin DELETEs to "/api/wallets/c009584dac6ad9ca0964e3dc93892c607ca37e049b4c30637fa477d0d601174495" with body
+    When Admin DELETEs to "/api/wallets/14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG" with body
     Then I receive a 403 Forbidden response with the message 'Insufficient permissions.'
 
   Scenario: Write admin cannot remove an authorized addresses
     When Admin authenticates with nonce = 1 and roles = "write"
-    When Admin DELETEs to "/api/wallets/c009584dac6ad9ca0964e3dc93892c607ca37e049b4c30637fa477d0d601174495" with body
+    When Admin DELETEs to "/api/wallets/14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG" with body
     Then I receive a 403 Forbidden response with the message 'Insufficient permissions.'
 
 

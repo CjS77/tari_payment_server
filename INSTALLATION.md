@@ -301,7 +301,7 @@ variable that contains the secret key, and populate that environment variable fr
 ```toml
 [[profiles]]
 name = "More secure SuperAdmin"
-address = "b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d"
+address = "14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt"
 secret_key_envar = "TEST_KEY_SECRET"
 roles = ["super_admin"]
 server = "http://172.17.0.2:4444"
@@ -339,7 +339,7 @@ confirmed.
      ```toml
      [[profiles]]
      name="TPS Hot Wallet"
-     address="b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d"
+     address="14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt"
      # For security reasons, we suggest you don't store the secret key in the config file.
      secret_key=""
      # The secret key will be loaded from the specified enviroment variable instead.

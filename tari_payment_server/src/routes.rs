@@ -939,7 +939,7 @@ pub async fn add_authorized_wallet<W: WalletManagement>(
     body: web::Json<NewWalletInfo>,
 ) -> Result<HttpResponse, ServerError> {
     let wallet = body.into_inner();
-    debug!("💻️ POST authorize_new_wallet {}", wallet.address.as_hex());
+    debug!("💻️ POST authorize_new_wallet {}", wallet.address.as_base58());
     api.register_wallet(wallet).await.map_err(|e| {
         info!("💻️ Could not add wallet. {e}");
         ServerError::BackendError(e.to_string())

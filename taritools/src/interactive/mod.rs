@@ -9,7 +9,7 @@ use dialoguer::{console::Style, theme::ColorfulTheme, Confirm, FuzzySelect, Mult
 use indicatif::{ProgressBar, ProgressStyle};
 use menus::commands::*;
 use tari_common::configuration::Network;
-use tari_common_types::tari_address::TariAddress;
+use tari_common_types::tari_address::{TariAddress, TariAddressFeatures};
 use tari_crypto::{
     keys::PublicKey,
     ristretto::{RistrettoPublicKey, RistrettoSecretKey},
@@ -197,7 +197,7 @@ impl InteractiveApp {
         let _unused = self.login().await?;
         let address =
             dialoguer::Input::<String>::new().with_prompt("Tari address for new payment wallet:").interact()?;
-        let address = SerializedTariAddress::from(TariAddress::from_hex(&address)?);
+        let address = SerializedTariAddress::from(TariAddress::from_base58(&address)?);
         let ip_address =
             dialoguer::Input::<String>::new().with_prompt("IP address for new payment wallet:").interact()?;
         let ip_address = ip_address.parse::<IpAddr>()?;
@@ -212,7 +212,7 @@ impl InteractiveApp {
         let client = self.client().expect("User is logged in. Client should not be None");
         let addresses = client.payment_addresses().await?;
         let items =
-            addresses.iter().map(|a| format!("{} ({})", a.to_hex(), a.to_emoji_string())).collect::<Vec<String>>();
+            addresses.iter().map(|a| format!("{} ({})", a.to_base58(), a.to_emoji_string())).collect::<Vec<String>>();
         let idx = Select::new().with_prompt("Select wallet to remove").items(&items).interact()?;
         let address = &addresses[idx];
         client.remove_authorized_wallet(address).await?;
@@ -396,7 +396,7 @@ impl InteractiveApp {
         let client = &self.user.as_ref().expect("User is logged in. Client should not be None").client;
         self.addresses.update(client).await?;
         let idx = FuzzySelect::new().with_prompt("Select address").items(self.addresses.items()).interact()?;
-        let address = TariAddress::from_hex(&self.addresses.items()[idx])?;
+        let address = TariAddress::from_base58(&self.addresses.items()[idx])?;
         Ok(address)
     }
 
@@ -538,9 +538,9 @@ fn confirm_address(secret_key: &RistrettoSecretKey) -> Result<SerializedTariAddr
         _ => unreachable!(),
     };
     let pubkey = RistrettoPublicKey::from_secret_key(secret_key);
-    let address = TariAddress::new(pubkey, network);
+    let address = TariAddress::new_single_address(pubkey, network, TariAddressFeatures::default());
     let confirm = Confirm::new()
-        .with_prompt(format!("Use address {} ({})?", address.to_hex(), address.to_emoji_string()))
+        .with_prompt(format!("Use address {} ({})?", address.to_base58(), address.to_emoji_string()))
         .interact()?;
     if confirm {
         Ok(SerializedTariAddress::from(address))

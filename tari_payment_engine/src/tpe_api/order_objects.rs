@@ -18,11 +18,20 @@ pub struct OrderResult {
     pub orders: Vec<Order>,
 }
 
+#[deprecated(since = "0.3.0", note = "Use address_to_base58 instead")]
 pub fn address_to_hex<S>(address: &TariAddress, serializer: S) -> Result<S::Ok, S::Error>
 where S: serde::Serializer {
     serializer.serialize_str(&address.to_hex())
 }
 
+pub fn address_to_base58<S>(address: &TariAddress, serializer: S) -> Result<S::Ok, S::Error>
+where S: serde::Serializer {
+    serializer.serialize_str(&address.to_base58())
+}
+
+/// Deserialize a TariAddress from a string.
+///
+/// Emoji ID, hex, and base58 addresses are supported.
 pub fn str_to_address<'de, D>(deserializer: D) -> Result<TariAddress, D::Error>
 where D: serde::Deserializer<'de> {
     let s = String::deserialize(deserializer)?;

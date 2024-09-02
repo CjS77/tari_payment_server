@@ -1,6 +1,6 @@
 use rand::thread_rng;
 use tari_common::configuration::Network;
-use tari_common_types::tari_address::TariAddress;
+use tari_common_types::tari_address::{TariAddress, TariAddressFeatures};
 use tari_crypto::{
     keys::PublicKey,
     ristretto::{RistrettoPublicKey, RistrettoSecretKey},
@@ -24,11 +24,16 @@ impl KeyInfo {
     }
 
     pub fn address(&self) -> TariAddress {
-        TariAddress::new(self.pk.clone(), self.network)
+        TariAddress::new_single_address(self.pk.clone(), self.network, TariAddressFeatures::default())
     }
 
+    #[deprecated(since = "0.3.0", note = "Use as_base58 instead")]
     pub fn address_as_hex(&self) -> String {
         self.address().to_hex()
+    }
+
+    pub fn address_as_base58(&self) -> String {
+        self.address().to_base58()
     }
 
     pub fn address_as_emoji_string(&self) -> String {

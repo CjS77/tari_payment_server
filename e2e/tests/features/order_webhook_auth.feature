@@ -7,9 +7,9 @@ Feature: Order flow
     When Customer #1 ["alice"] places order "alice001" for 2500 XTR, with memo
     """
     {
-      "address":"b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d",
+      "address":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
       "order_id":"alice001",
-      "signature":"56e39d539f1865742b41993bdc771a2d0c16b35c83c57ca6173f8c1ced34140aeaf32bfdc0629e73f971344e7e45584cbbb778dc98564d0ec5c419e6f9ff5d06"
+      "signature":"601d2f88738b9aacdf75b62de9db23bb8d1aeb9fef8c7d127a05e9648729e64143adcee0a3d50665eb9c7817a0035ad9ac6248a8547bd6d5a4796b917bd57d09"
     }
     """
     Then Customer #1 has current orders worth 2500 XTR
@@ -20,7 +20,7 @@ Feature: Order flow
     When Customer #1 ["alice"] places order "alice002" for 2500 XTR, with memo
     """
     {
-      "address":"b8971598a865b25b6508d4ba154db228e044f367bd9a1ef50dd4051db42b63143d",
+      "address":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
       "order_id":"alice002",
       "signature":"56e39d539f1865742b41993bdc771a2d0c16b35c83c57ca6173f8c1ced34140aeaf32bfdc0629e73f971344e7e45584cbbb778dc98564d0ec5c419e6f9ff5d06"
     }
@@ -33,7 +33,7 @@ Feature: Order flow
     When Customer #1 ["alice"] places order "alice001" for 2500 XTR, with memo
     """
     {
-      "address":"aa3c076152c1ae44ae86585eeba1d348badb845d1cab5ef12db98fafb4fea55d6c",
+      "address":"14sa5AzjqqrzfiyqGkajoNcFrqkCK7syB4rvNNL65f2PjLD",
       "order_id":"alice001",
       "signature":"56e39d539f1865742b41993bdc771a2d0c16b35c83c57ca6173f8c1ced34140aeaf32bfdc0629e73f971344e7e45584cbbb778dc98564d0ec5c419e6f9ff5d06"
     }

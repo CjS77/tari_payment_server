@@ -87,7 +87,7 @@ pub fn print_payment_auth(params: PaymentAuthParams) {
     match build_auth(&params.secret, params.network, params.nonce, &payment) {
         Ok((wallet_signature, key_info)) => {
             println!("----------------------------- Wallet Auth -----------------------------");
-            println!("Wallet address: {}", key_info.address_as_hex());
+            println!("Wallet address: {}", key_info.address_as_base58());
             println!("Public key    : {:x}", &key_info.pk);
             println!("emoji id      : {}", key_info.address_as_emoji_string());
             println!("Secret        : {}", &key_info.sk.reveal().to_string());
@@ -138,7 +138,7 @@ pub fn print_tx_confirm(params: TxConfirmParams) {
     match build_auth(&params.secret, params.network, params.nonce, &confirmation) {
         Ok((wallet_signature, key_info)) => {
             println!("----------------------------- Wallet Auth -----------------------------");
-            println!("Wallet address: {}", key_info.address_as_hex());
+            println!("Wallet address: {}", key_info.address_as_base58());
             println!("Public key    : {:x}", &key_info.pk);
             println!("emoji id      : {}", key_info.address_as_emoji_string());
             println!("Secret        : {}", &key_info.sk.reveal().to_string());

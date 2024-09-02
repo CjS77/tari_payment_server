@@ -18,13 +18,12 @@ Feature: Users receive an access token when authenticating with a login token
   Scenario: User authenticates with an invalid signature
     When I authenticate with the auth header
       """
-      tpg_auth_token: eyJhbGciOiJSaXN0cmV0dG8yNTYifQ.\
-      eyJhZGRyZXNzIjp7Im5ldHdvcmsiOiJuZXh0bmV0IiwicHV\
-      ibGljX2tleSI6IjEyYTI1MDRhNzhmMDg5MzBjMmQzMzU3MD\
-      hmYWU4MDY5NmIyMTdkMjNiZDJkNDczZTEyN2Q4ZjVhMzBlM\
-      jgxNjUifSwibm9uY2UiOjE3MTE0NDUxMTgsImRlc2lyZWRf\
-      cm9sZXMiOlsidXNlciIsIndyaXRlIl19.\
-      bad_sig_Uip03HFi5q65zE-QBq8iyEuT-IkLy9KeSHmB3UGkPIJXSDrKDVU_lg6JfBY4ch7BxwyH5iLDEiDzAQ
+      tpg_auth_token: eyJhbGciOiJSaXN0cmV0dG8yNTYiLCJ0eXAiOiJKV1QifQ.\
+      eyJhZGRyZXNzIjp7IlNpbmdsZSI6eyJuZXR3b3JrIjoibWFpbm5ldCIsImZlYXR\
+      1cmVzIjozLCJwdWJsaWNfc3BlbmRfa2V5IjoiYzAwOTU4NGRhYzZhZDljYTA5Nj\
+      RlM2RjOTM4OTJjNjA3Y2EzN2UwNDliNGMzMDYzN2ZhNDc3ZDBkNjAxMTc0NCJ9f\
+      Swibm9uY2UiOjE3MjUzMDMyNTksImRlc2lyZWRfcm9sZXMiOlsidXNlciJdfQ.\
+      xxxxxxlx5ZXz-UKFIWIL6a6KmdQi9JkUdROLLfvlyx3_j5__qDpgF5MnDDky0ofDeW39EFdpeVMyDLK4I7bCDg
       """
     Then I receive a 401 Unauthorized response with the message 'Authentication Error. Login token signature is invalid. malformed token signature'
 
