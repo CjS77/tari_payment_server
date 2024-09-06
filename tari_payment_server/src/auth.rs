@@ -53,7 +53,7 @@ pub fn check_login_token_signature<S: AsRef<str>>(token: S) -> Result<LoginToken
         UntrustedToken::new(token.as_ref()).map_err(|e| AuthError::PoorlyFormattedToken(format!("{e:?}")))?;
     let claims: Claims<LoginToken> =
         untrusted_token.deserialize_claims_unchecked().map_err(|e| AuthError::ValidationError(format!("{e:?}")))?;
-    let pubkey = claims.custom.address.comms_public_key();
+    let pubkey = claims.custom.address.public_spend_key();
     let verifying_key = Ristretto256VerifyingKey(pubkey.clone());
     let (header, claims) = Ristretto256
         .validator(&verifying_key)

@@ -88,7 +88,7 @@ impl MemoSignature {
 
     pub fn is_valid(&self) -> bool {
         let message = self.message();
-        let pubkey = self.address.as_address().comms_public_key();
+        let pubkey = self.address.as_address().public_spend_key();
         self.signature.verify(pubkey, message)
     }
 

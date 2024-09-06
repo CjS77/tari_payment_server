@@ -530,11 +530,15 @@ fn handle_response<T: Display>(res: Result<T>) {
 }
 
 fn confirm_address(secret_key: &RistrettoSecretKey) -> Result<SerializedTariAddress> {
-    let network = Select::new().with_prompt("Select network").items(&["Mainnet", "Stagenet", "Nextnet"]).interact()?;
+    let network = Select::new()
+        .with_prompt("Select network")
+        .items(&["Mainnet", "Stagenet", "Nextnet", "Esmeralda"])
+        .interact()?;
     let network = match network {
         0 => Network::MainNet,
         1 => Network::StageNet,
         2 => Network::NextNet,
+        3 => Network::Esmeralda,
         _ => unreachable!(),
     };
     let pubkey = RistrettoPublicKey::from_secret_key(secret_key);

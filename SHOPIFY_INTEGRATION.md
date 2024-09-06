@@ -30,9 +30,11 @@
 7. Save the scopes.
 8. Select the `API credentials` tab, and store the API key and API secret key in a safe place. You'll also need to
    fill in these values in your `.env` file for the Tari Payment Server.
+   ![Shopify API keys](./assets/shopify_api_keys.png)
 9. Click `Install app` and follow the prompts to install the app in your store.
    * Save your Admin API token. **Warning**: You only get to see this once!
    * Save your Storefront API token.
+   * ![Shopify API keys](./assets/shopify_credentials.png)
 
 ## Configure the store to display prices in Tari.
 
@@ -46,7 +48,7 @@ configured XTR-USD exchange rate to set a [metafield] on every product [variant]
 rate is updated, as well as a global rate set in a metaobject variable in the odd instance where a product or 
 variant price has not been set yet. 
 
-### Inportant note!
+### Important note!
 
 The source of truth for the exchange rate is the value in the Tari Payment Server database, 
 _not the store_. If you update the exchange rate in the store, or alter the Tari price in the metafield for a 
@@ -56,9 +58,9 @@ the amount the payment server is expecting and the final order price on the cust
 You can use the [`taritools`]  CLI utility to update the exchange rate; this will reset all the [metafield] values in 
  the shopify product list. 
  
-You can freely update the USD price of products in the store. The payment server will detect this update and 
-update the [metafield] value for the product automatically (assuming your 
-[webhooks](#configure-webhooks-to-interact-with-your-server) have been set up correctly).
+Once your [webhooks](#configure-webhooks-to-interact-with-your-server) are correctly configured,
+you can freely update the USD price of products in the store. 
+The payment server will detect this update and update the [metafield] value for the product automatically.
 
 ### Another important note
 
@@ -67,6 +69,13 @@ and therefore any representation of the price in XTR **must** be divided by 1,00
                                    
 
 ### Updating the shopify templates
+
+#### Theme template code
+
+The code for your theme teplates is accessible from the Shopify admin console. Go to `Sales channels` | `Online Store`
+| `Themes` | `Actions` | `Edit code`.
+
+![Shopify theme editor](./assets/edit_theme.png)
 
   In `snippets/price.liquid` (or whatever your theme uses to display price) replace the content with:
  ```html
