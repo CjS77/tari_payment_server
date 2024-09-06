@@ -245,14 +245,15 @@ impl PaymentGatewayDatabase for SqliteDatabase {
                     continue;
                 }
                 trace!(
-                    "🗃️ Used {} in account {} to pay part of order {}",
+                    "🗃️ Used the {} in account {} to help pay for order {}",
                     used_acc.current_balance,
                     used_acc.id,
                     order.id
                 );
-                total_credit -= used_acc.current_balance;
-                outstanding_amount -= used_acc.current_balance;
-                used_accounts.push((used_acc.id, used_acc.current_balance));
+                let used_amount = used_acc.current_balance.min(outstanding_amount);
+                total_credit -= used_amount;
+                outstanding_amount -= used_amount;
+                used_accounts.push((used_acc.id, used_amount));
             }
             // This top account now has enough balance to pay for the order
             let Some(used_acc) = accounts.last_mut() else {
@@ -284,6 +285,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             user_accounts::adjust_balances(*acc_id, zero, zero, -(*amount), &mut tx).await?;
         }
         let result = MultiAccountPayment::new(address.clone().into(), paid_orders, &used_accounts);
+        tx.commit().await?;
         Ok(result)
     }
 
