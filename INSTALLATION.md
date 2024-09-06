@@ -350,6 +350,19 @@ confirmed.
 4. Restart your hot wallet, and you should be good to go. Watch the logs in the TPS to check that the wallet hits
    the `/wallet/incoming_payment` and `/wallet/tx_confirmation` endpoints.
 
+## Set the Tari price
+
+For storefronts that don't allow the use of custom currencies, including Shopify, you need to set the Tari Price.
+
+1. Run taritools.
+2. Select `Admin` | `Set Tari Price`.
+3. Enter the price (Tari per USD).
+4. Confirm the price.
+
+If you have a lot of products in your store, it may take a while to propagate the new price to the storefront server.
+
+
+
 # Tari tools
 
 ## Configuring `taritools`
