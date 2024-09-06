@@ -41,7 +41,7 @@ use crate::{
             print_order,
         },
         menus::{top_menu, Menu},
-        seed_phrase::{seed_words_to_comms_key, string_to_seed_words},
+        seed_phrase::{seed_words_to_keys, string_to_seed_words},
         selector::{AddressSelector, CustomerSelector},
     },
     profile_manager::{read_config, write_config, Profile},
@@ -455,7 +455,7 @@ impl InteractiveApp {
                 let secret_key =
                     dialoguer::Input::<String>::new().with_prompt("Enter secret key (in hex):").interact()?;
                 let key = RistrettoSecretKey::from_hex(&secret_key)?;
-                let address = confirm_address(&key)?;
+                let address = confirm_address(&key, None)?;
                 let secret_key = Some(key);
                 (address, secret_key, None)
             },
@@ -463,8 +463,8 @@ impl InteractiveApp {
                 let seed_phrase =
                     dialoguer::Input::<String>::new().with_prompt("Enter seed phrase (space separated):").interact()?;
                 let seed_words = string_to_seed_words(seed_phrase)?;
-                let key = seed_words_to_comms_key(seed_words)?;
-                let address = confirm_address(&key)?;
+                let (key, view_key) = seed_words_to_keys(seed_words)?;
+                let address = confirm_address(&key, Some(view_key))?;
                 let secret_key = Some(key);
                 (address, secret_key, None)
             },
@@ -473,7 +473,7 @@ impl InteractiveApp {
                     dialoguer::Input::<String>::new().with_prompt("Enter environment variable name").interact()?;
                 let key = std::env::var(&envar)?;
                 let mut key = RistrettoSecretKey::from_hex(&key)?;
-                let address = confirm_address(&key)?;
+                let address = confirm_address(&key, None)?;
                 key.zeroize();
                 let secret_key_envar = Some(envar);
                 (address, None, secret_key_envar)
@@ -529,7 +529,10 @@ fn handle_response<T: Display>(res: Result<T>) {
     }
 }
 
-fn confirm_address(secret_key: &RistrettoSecretKey) -> Result<SerializedTariAddress> {
+fn confirm_address(
+    secret_key: &RistrettoSecretKey,
+    view_key: Option<RistrettoPublicKey>,
+) -> Result<SerializedTariAddress> {
     let network = Select::new()
         .with_prompt("Select network")
         .items(&["Mainnet", "Stagenet", "Nextnet", "Esmeralda"])
@@ -542,7 +545,10 @@ fn confirm_address(secret_key: &RistrettoSecretKey) -> Result<SerializedTariAddr
         _ => unreachable!(),
     };
     let pubkey = RistrettoPublicKey::from_secret_key(secret_key);
-    let address = TariAddress::new_single_address(pubkey, network, TariAddressFeatures::default());
+    let address = match view_key {
+        None => TariAddress::new_single_address(pubkey, network, TariAddressFeatures::default()),
+        Some(vk) => TariAddress::new_dual_address_with_default_features(vk, pubkey, network),
+    };
     let confirm = Confirm::new()
         .with_prompt(format!("Use address {} ({})?", address.to_base58(), address.to_emoji_string()))
         .interact()?;
