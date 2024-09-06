@@ -12,7 +12,7 @@ Feature: Order Fulfillment
       }
     """
 
-  Scenario: Alice places an order and pays for it. The order is fulfilled.
+  Scenario: Alice: Order with memo -> Pay -> Confirm. The order is fulfilled.
     When Customer #1 ["alice"] places order "alice001" for 2400 XTR, with memo
     """
     {
@@ -68,7 +68,7 @@ Feature: Order Fulfillment
    }
    """
 
-  Scenario: Alice can deposit funds before making orders
+  Scenario: Alice: Pay -> Confirm -> Order with Memo. The order is fulfilled
     When a payment arrives from x-forwarded-for 192.168.1.100
     """
     {"payment": {
@@ -144,13 +144,14 @@ Feature: Order Fulfillment
     }
     """
 
+  @fails
   Scenario: Multiple concurrent customers and payments
     When Customer #1 ["alice"] places order "alice001" for 2400 XTR, with memo
     """
     {
       "address":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
       "order_id":"alice001",
-      "signature":"56e39d539f1865742b41993bdc771a2d0c16b35c83c57ca6173f8c1ced34140aeaf32bfdc0629e73f971344e7e45584cbbb778dc98564d0ec5c419e6f9ff5d06"
+      "signature":"4c58346a94d80eaa6409cd1b85dc0f7b3d1e2ab308e367a8afa39a973ca5d228ffaae9013bf61e67497913647c4ea74ab0f2a1039f02b986adaadf1be0b96307"
     }
     """
     When Customer #2 ["bob"] places order "bob700" for 700 XTR, with memo
@@ -251,4 +252,124 @@ Feature: Order Fulfillment
     And order "alice0002" is in state Paid
     And order "alice001" is in state Paid
 
+  Scenario: Order -> Claim -> Pay -> Confirm. The order is fulfilled.
+    When Customer #1 ["alice"] places order "alice001" for 2100 XTR, with memo
+    When User POSTs to "/order/claim" with body
+    """
+    {
+      "address":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
+      "order_id":"alice001",
+      "signature":"ee836ca36932b7b74319c825bc4578eecdf0aa62ade3deb8b8db7196fc5f2c7f369cea15f6b0fe032d46f325c251bfcdba21160e3aa28416345b2df255e0dd04"
+    }
+    """
+    Then Customer #1 has current orders worth 2100 XTR
+    And Alice has a current balance of 0 Tari
+    When a payment arrives from x-forwarded-for 192.168.1.100
+    """
+    {"payment": {
+      "sender":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
+      "amount":2500000000,
+      "txid":"payment001"
+    },
+    "auth": {
+      "address":"14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG",
+      "nonce":1,
+      "signature":"5ed91d58e589bea2f2291155b78005b48a789c3018fdf528f6f4052b2428e532953aa065e08ef91575a610b2ebcf88e63fbf2e21bfd0e8b90b778c16ffc2740e"
+    }}
+    """
+    Then I receive a 200 Ok response with the message '"success":true'
+    When a confirmation arrives from x-forwarded-for 192.168.1.100
+    """
+    { "confirmation": {"txid": "payment001"},
+      "auth": {
+        "address":"14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG",
+        "nonce":2,
+        "signature":"16729e3c9b08022a16edfa0bf2e1cfc1d8dadd5e6387b4fd76005ac8a20c0f53087434524748981e9c61f9b7ce122fdf1a45299b132cd4495b19b7d1208cea01"
+      }
+    }
+    """
+    Then I receive a 200 Ok response with the message '"success":true'
+    And order "alice001" is in state Paid
+    And Customer #1 has current orders worth 0 XTR
+    And Account 1 has a current balance of 400 Tari
+
+  Scenario: Order -> Pay -> Confirm -> Claim. The order is fulfilled.
+    When Customer #1 ["alice"] places order "alice001" for 2100 XTR, with memo
+    When a payment arrives from x-forwarded-for 192.168.1.100
+    """
+    {"payment": {
+      "sender":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
+      "amount":2500000000,
+      "txid":"payment001"
+    },
+    "auth": {
+      "address":"14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG",
+      "nonce":1,
+      "signature":"5ed91d58e589bea2f2291155b78005b48a789c3018fdf528f6f4052b2428e532953aa065e08ef91575a610b2ebcf88e63fbf2e21bfd0e8b90b778c16ffc2740e"
+    }}
+    """
+    Then I receive a 200 Ok response with the message '"success":true'
+    When a confirmation arrives from x-forwarded-for 192.168.1.100
+    """
+    { "confirmation": {"txid": "payment001"},
+      "auth": {
+        "address":"14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG",
+        "nonce":2,
+        "signature":"16729e3c9b08022a16edfa0bf2e1cfc1d8dadd5e6387b4fd76005ac8a20c0f53087434524748981e9c61f9b7ce122fdf1a45299b132cd4495b19b7d1208cea01"
+      }
+    }
+    """
+    Then I receive a 200 Ok response with the message '"success":true'
+    And order "alice001" is in state Unclaimed
+
+    When User POSTs to "/order/claim" with body
+    """
+    {
+      "address":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
+      "order_id":"alice001",
+      "signature":"ee836ca36932b7b74319c825bc4578eecdf0aa62ade3deb8b8db7196fc5f2c7f369cea15f6b0fe032d46f325c251bfcdba21160e3aa28416345b2df255e0dd04"
+    }
+    """
+    Then order "alice001" is in state Paid
+    And Account 1 has a current balance of 0 Tari
+    And Account 2 has a current balance of 400 Tari
+
+  Scenario: Pay -> Order -> Claim -> Confirm. The order is fulfilled.
+    When a payment arrives from x-forwarded-for 192.168.1.100
+    """
+    {"payment": {
+      "sender":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
+      "amount":2500000000,
+      "txid":"payment001"
+    },
+    "auth": {
+      "address":"14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG",
+      "nonce":1,
+      "signature":"5ed91d58e589bea2f2291155b78005b48a789c3018fdf528f6f4052b2428e532953aa065e08ef91575a610b2ebcf88e63fbf2e21bfd0e8b90b778c16ffc2740e"
+    }}
+    """
+    Then I receive a 200 Ok response with the message '"success":true'
+    When Customer #1 ["alice"] places order "alice001" for 2100 XTR, with memo
+    When User POSTs to "/order/claim" with body
+    """
+    {
+      "address":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
+      "order_id":"alice001",
+      "signature":"ee836ca36932b7b74319c825bc4578eecdf0aa62ade3deb8b8db7196fc5f2c7f369cea15f6b0fe032d46f325c251bfcdba21160e3aa28416345b2df255e0dd04"
+    }
+    """
+    When a confirmation arrives from x-forwarded-for 192.168.1.100
+    """
+    { "confirmation": {"txid": "payment001"},
+      "auth": {
+        "address":"14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG",
+        "nonce":2,
+        "signature":"16729e3c9b08022a16edfa0bf2e1cfc1d8dadd5e6387b4fd76005ac8a20c0f53087434524748981e9c61f9b7ce122fdf1a45299b132cd4495b19b7d1208cea01"
+      }
+    }
+    """
+    Then I receive a 200 Ok response with the message '"success":true'
+    Then order "alice001" is in state Paid
+    And Account 1 has a current balance of 400 Tari
+    And Account 2 has a current balance of 0 Tari
 

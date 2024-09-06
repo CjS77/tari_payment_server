@@ -183,6 +183,12 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         Ok(paid_orders)
     }
 
+    async fn fetch_payable_orders_for_address(&self, address: &TariAddress) -> Result<Vec<Order>, PaymentGatewayError> {
+        let mut conn = self.pool.acquire().await?;
+        let orders = orders::fetch_payable_orders_for_address(address, &mut conn).await?;
+        Ok(orders)
+    }
+
     async fn try_pay_orders(&self, account_id: i64, orders: &[Order]) -> Result<Vec<Order>, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
         let account = user_accounts::user_account_by_id(account_id, &mut tx)
@@ -337,6 +343,12 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         debug!("🗃️ Payment [{txid}] is now {status}. Balances have been updated.");
         tx.commit().await?;
         Ok((acc_id, payment))
+    }
+
+    async fn fetch_payment_by_tx_id(&self, tx_id: &str) -> Result<Payment, PaymentGatewayError> {
+        let mut conn = self.pool.acquire().await?;
+        let payment = transfers::fetch_payment(tx_id, &mut conn).await?;
+        payment.ok_or_else(|| PaymentGatewayError::PaymentNotFound(tx_id.into()))
     }
 
     /// A manual order status transition from `New` to `Paid` status.

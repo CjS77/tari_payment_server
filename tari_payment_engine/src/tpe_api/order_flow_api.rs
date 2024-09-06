@@ -203,7 +203,7 @@ where B: PaymentGatewayDatabase
     pub async fn confirm_payment(&self, txid: String) -> Result<Payment, PaymentGatewayError> {
         trace!("🔄️✅️ Payment {txid} is being marked as confirmed");
         let (account_id, payment) = self.db.update_payment_status(&txid, TransferStatus::Confirmed).await?;
-        let payable = self.db.fetch_payable_orders(account_id).await?;
+        let payable = self.db.fetch_payable_orders_for_address(payment.sender.as_address()).await?;
         trace!("🔄️✅️ {} fulfillable orders fetched for account #{account_id}", payable.len());
         let paid_orders = self.db.try_pay_orders(account_id, &payable).await?;
         debug!("🔄️✅️ [{txid}] confirmed. {} orders are paid for account #{account_id}", paid_orders.len());

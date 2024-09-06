@@ -101,3 +101,14 @@ Feature: Order claiming
       "claimant": "14NPqUxFyJwbZ6wJ8hpuTuX5oWbQt7XeMJWXMZdMSiA19Fj"
     }
     """
+
+  Scenario: Claiming an order before making the order fails
+    When User POSTs to "/order/claim" with body
+    """
+    {
+      "address":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
+      "order_id":"does-not-exist",
+      "signature":"1e06e8f1de61644ba380c8d82a124e0b288b86501b6283e93bc8094ddd6d980765c4edc2b73dca69847cb9f15e3685f67ed4431ee527e9ef63ae176d0c5f2a09"
+    }
+    """
+    Then I receive a 404 NotFound response with the message 'The requested order does-not-exist does not exist'
