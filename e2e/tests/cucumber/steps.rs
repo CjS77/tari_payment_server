@@ -292,6 +292,19 @@ async fn check_order_state(world: &mut TPGWorld, order_id: String, state: String
     assert_eq!(order.status, status);
 }
 
+#[then(regex = r#"^Account (\d+) has a (current|pending) balance of (\d+) Tari$"#)]
+async fn check_account_balance(world: &mut TPGWorld, acc_id: i64, bal_type: String, balance: i64) {
+    let db = world.db.as_ref().expect("No database connection");
+    let account = db.fetch_user_account(acc_id).await.expect("Failed to fetch account").expect("No account found");
+    let expected_balance = MicroTari::from_tari(balance);
+    let actual_balance = match bal_type.as_str() {
+        "current" => account.current_balance,
+        "pending" => account.current_pending,
+        _ => panic!("Invalid balance type: {bal_type}"),
+    };
+    assert_eq!(actual_balance, expected_balance);
+}
+
 #[then(regex = r#"^(\w+) has a (current|pending) balance of (\d+) Tari$"#)]
 async fn check_balance(world: &mut TPGWorld, user: String, bal_type: String, balance: i64) {
     let db = world.db.as_ref().expect("No database connection");

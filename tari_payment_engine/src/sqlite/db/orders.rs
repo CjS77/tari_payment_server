@@ -1,6 +1,7 @@
 use chrono::Duration;
 use log::{debug, trace};
 use sqlx::{sqlite::SqliteRow, FromRow, QueryBuilder, Row, SqliteConnection};
+use tari_common_types::tari_address::TariAddress;
 use tpg_common::MicroTari;
 
 use crate::{
@@ -251,4 +252,25 @@ pub(crate) async fn expire_orders(
     .fetch_all(conn)
     .await?;
     Ok(rows)
+}
+
+/// Fetches all payable orders for the given address. A payable order is one that is "New", i.e. it has not been paid
+/// and has been claimed by any account associated with the address.
+pub(crate) async fn fetch_payable_orders_for_address(
+    address: &TariAddress,
+    conn: &mut SqliteConnection,
+) -> Result<Vec<Order>, PaymentGatewayError> {
+    let result: Vec<Order> = sqlx::query_as(
+        r#"
+    WITH customer_ids AS (
+      SELECT customer_id FROM user_account_customer_ids
+      WHERE id in (SELECT id FROM user_account_address WHERE address = $1)
+    )
+    SELECT * FROM orders where status = 'New' and customer_id in (select customer_id from customer_ids);
+    "#,
+    )
+    .bind(address.to_base58())
+    .fetch_all(conn)
+    .await?;
+    Ok(result)
 }

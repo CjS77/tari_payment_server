@@ -12,6 +12,7 @@ use crate::{
         OrderId,
         OrderStatusType,
         Payment,
+        SerializedTariAddress,
         TransferStatus,
         UserAccount,
     },
@@ -77,6 +78,9 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// If no orders can be fulfilled, an empty vector is returned.
     async fn fetch_payable_orders(&self, account_id: i64) -> Result<Vec<Order>, PaymentGatewayError>;
 
+    /// Checks whether any orders associated with the given address can be fulfilled.
+    async fn fetch_payable_orders_for_address(&self, address: &TariAddress) -> Result<Vec<Order>, PaymentGatewayError>;
+
     /// Tries to fulfil the list of orders given from the given account.
     ///
     /// Any order that has enough credit in the account
@@ -110,6 +114,9 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
         tx_id: &str,
         status: TransferStatus,
     ) -> Result<(i64, Payment), PaymentGatewayError>;
+
+    /// Fetches the payment for the given transaction id.
+    async fn fetch_payment_by_tx_id(&self, tx_id: &str) -> Result<Payment, PaymentGatewayError>;
 
     /// A manual order status transition from `New` to `Paid` status.
     /// This method is called by the default implementation of [`modify_status_for_order`] when the new status is
@@ -274,6 +281,8 @@ pub enum PaymentGatewayError {
     UnsupportedAction(String),
     #[error("Cannot claim order because the signature is invalid.")]
     InvalidSignature,
+    #[error("The requested payment does not exist for txid {0}")]
+    PaymentNotFound(String),
 }
 
 impl From<sqlx::Error> for PaymentGatewayError {
