@@ -15,12 +15,25 @@ register_received_payment() {
 }
 
 register_confirmation() {
+  echo "Signalling payment (possibly again)"
+  ${BIN} wallet received --profile "$PROFILE" --amount "$2" --txid $3 --memo "$4" --sender $5 &>>$LOGFILE
+  sleep 2
   ${BIN} wallet confirmed --profile "$PROFILE" --txid $3 &>>$LOGFILE
   echo "Registering confirmation received is complete" >> $LOGFILE
 }
 
 # Log the event
-echo "$@" >> $LOGFILE
+escaped_args=""
+
+for arg in "$@"; do
+  # Surround the argument with single quotes and append to the variable
+  escaped_args+="'$arg' "
+done
+
+# Trim the trailing space
+escaped_args=$(echo "$escaped_args" | sed 's/ *$//')
+echo $escaped_args >> $LOGFILE
+
 if [ -n "${12}" ]; then
   if [ "$1" == "received" ]; then
     echo "Registering payment received" >> $LOGFILE

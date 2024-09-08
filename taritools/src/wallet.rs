@@ -37,7 +37,7 @@ fn load_profile(name: &str) -> Result<Profile> {
 }
 
 fn new_nonce() -> i64 {
-    Utc::now().timestamp()
+    Utc::now().timestamp_millis()
 }
 
 async fn notify_server_about_payment(params: ReceivedPaymentParams) -> Result<()> {
