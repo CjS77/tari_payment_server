@@ -42,10 +42,14 @@ Feature: The /api/unfulfilled_orders endpoint
     Then I receive a 200 Ok response
     Then I receive a partial JSON response:
     """
-    [
-      { "order_id": "alice001", "total_price": 250000000, "status": "New" },
-      { "order_id": "alice002", "total_price": 150000000, "status": "New" }
-    ]
+    {
+      "address": "14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
+      "total_orders": 400000000,
+      "orders": [
+        { "order_id": "alice001", "total_price": 250000000, "status": "New" },
+        { "order_id": "alice002", "total_price": 150000000, "status": "New" }
+      ]
+    }
     """
     When a payment arrives from x-forwarded-for 192.168.1.100
     """
@@ -75,7 +79,13 @@ Feature: The /api/unfulfilled_orders endpoint
     Then I receive a 200 Ok response
     Then I receive a partial JSON response:
     """
-    [ { "order_id": "alice002", "total_price": 150000000, "status": "New" } ]
+    {
+      "address": "14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
+      "total_orders": 150000000,
+      "orders": [
+        { "order_id": "alice002", "total_price": 150000000, "status": "New" }
+      ]
+    }
     """
 
   Scenario: Admin users with ReadAll role can access any unfulfilled orders

@@ -5,7 +5,7 @@ use sqlx::FromRow;
 use tpg_common::MicroTari;
 
 use crate::{
-    db_types::{Order, SerializedTariAddress},
+    db_types::{Order, SerializedTariAddress, SettlementJournalEntry},
     order_objects::OrderChanged,
 };
 
@@ -24,27 +24,27 @@ pub struct WalletInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateWalletInfo {
-    pub address: Option<SerializedTariAddress>,
-    pub ip_address: Option<IpAddr>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderMovedResult {
     pub orders: OrderChanged,
-    pub old_account_id: i64,
-    pub new_account_id: i64,
-    pub is_filled: bool,
+    pub settlements: Vec<SettlementJournalEntry>,
 }
 
 impl OrderMovedResult {
-    pub fn new(old_account_id: i64, new_account_id: i64, old_order: Order, new_order: Order, is_filled: bool) -> Self {
+    pub fn new(old_order: Order, new_order: Order, settlements: Vec<SettlementJournalEntry>) -> Self {
         let orders = OrderChanged::new(old_order, new_order);
-        Self { orders, old_account_id, new_account_id, is_filled }
+        Self { orders, settlements }
+    }
+
+    pub fn total_paid(&self) -> MicroTari {
+        self.settlements.iter().map(|s| s.amount).sum()
+    }
+
+    pub fn is_filled(&self) -> bool {
+        self.total_paid() >= self.orders.new_order.total_price
     }
 
     pub fn filled_order(&self) -> Option<Order> {
-        if self.is_filled {
+        if self.is_filled() {
             Some(self.orders.new_order.clone())
         } else {
             None
@@ -57,36 +57,36 @@ pub struct MultiAccountPayment {
     pub address: SerializedTariAddress,
     pub orders_paid: Vec<Order>,
     /// An array of account ids used to pay for the orders, as well as the amount paid from each account
-    pub wallet_accounts_used: Vec<(i64, MicroTari)>,
+    pub settlements: Vec<SettlementJournalEntry>,
 }
 
 impl MultiAccountPayment {
-    pub fn new(address: SerializedTariAddress, orders_paid: Vec<Order>, accounts: &[(i64, MicroTari)]) -> Self {
-        Self { address, orders_paid, wallet_accounts_used: accounts.to_vec() }
+    pub fn new(
+        address: SerializedTariAddress,
+        orders_paid: Vec<Order>,
+        settlements: Vec<SettlementJournalEntry>,
+    ) -> Self {
+        Self { address, orders_paid, settlements }
     }
 
     pub fn order_count(&self) -> usize {
         self.orders_paid.len()
     }
 
-    pub fn account_count(&self) -> usize {
-        self.wallet_accounts_used.len()
-    }
-
     pub fn total_paid(&self) -> MicroTari {
-        self.wallet_accounts_used.iter().map(|(_, amount)| *amount).sum()
+        self.settlements.iter().map(|s| s.amount).sum()
     }
 }
 
 impl Display for MultiAccountPayment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MultiAccountPayment from address {}:", self.address.as_address())?;
+        write!(f, "MultiAccountPayment from primary address {}:", self.address.as_address())?;
+        let n = self.settlements.len();
         writeln!(
             f,
-            "{} orders paid from {} accounts for a total of {}",
+            "{} orders paid from for a total of {} from {n} address(es).",
             self.order_count(),
-            self.account_count(),
-            self.total_paid()
+            self.total_paid(),
         )
     }
 }

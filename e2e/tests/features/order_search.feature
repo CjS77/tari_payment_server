@@ -1,8 +1,9 @@
+@order_search
 Feature: Admins can search orders by various criteria
   Background:
     Given a database with some accounts
     Given some role assignments
-    When Admin authenticates with nonce = 1 and roles = "read_all"
+    When Admin authenticates with nonce = 1 and roles = "read_all, write"
 
   Scenario: Admin can search for orders after a certain date
     When Admin GETs to "/api/search/orders?since=2024-03-11T0:0:0Z" with body
@@ -36,10 +37,61 @@ Feature: Admins can search orders by various criteria
     """
 
   Scenario: Admin can search for orders with a given status
-    When todo
+    When Admin GETs to "/api/search/orders?status=New" with body
+    Then I receive a 200 Ok response
+    And I receive a partial JSON response:
+    """
+    [ { "order_id": "1"}, { "order_id": "2"}, { "order_id": "3"}, { "order_id": "4"}, { "order_id": "5"} ]
+    """
+    When Admin POSTs to "/api/cancel" with body
+    """
+    {
+      "order_id": "2",
+      "reason": "For search"
+    }
+    """
+    When Admin POSTs to "/api/cancel" with body
+    """
+    {
+      "order_id": "4",
+      "reason": "For search"
+    }
+    """
+    When Admin GETs to "/api/search/orders?status=New" with body
+    Then I receive a 200 Ok response
+    And I receive a partial JSON response:
+    """
+    [ { "order_id": "1"}, { "order_id": "3"}, { "order_id": "5"} ]
+    """
+    When Admin GETs to "/api/search/orders?status=Cancelled" with body
+    Then I receive a 200 Ok response
+    And I receive a partial JSON response:
+    """
+    [ { "order_id": "2"}, { "order_id": "4"} ]
+    """
 
   Scenario: Admin can search for orders with two given statuses
-    When todo
+    When Admin POSTs to "/api/cancel" with body
+    """
+    {
+      "order_id": "2",
+      "reason": "Multi status"
+    }
+    """
+    When Admin POSTs to "/api/fulfill" with body
+    """
+    {
+      "order_id": "5",
+      "reason": "Multi status"
+    }
+    """
+    When Admin GETs to "/api/search/orders?status=Cancelled,Paid" with body
+    Then I receive a 200 Ok response
+    And I receive a partial JSON response:
+    """
+    [ { "order_id": "2", "status": "Cancelled"}, { "order_id": "5", "status": "Paid"} ]
+    """
+
 
   Scenario: Admin can search for orders with a matching memo field
     When Admin GETs to "/api/search/orders?memo=Charlie" with body

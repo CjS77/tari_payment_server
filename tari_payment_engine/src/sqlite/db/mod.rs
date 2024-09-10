@@ -10,12 +10,11 @@ use std::env;
 use log::info;
 use sqlx::{sqlite::SqlitePoolOptions, Error as SqlxError, SqlitePool};
 
+pub mod accounts;
 pub mod auth;
-
 pub mod exchange_rates;
 pub mod orders;
 pub mod transfers;
-pub mod user_accounts;
 pub mod wallet_auth;
 
 const SQLITE_DB_URL: &str = "sqlite://data/tari_store.db";

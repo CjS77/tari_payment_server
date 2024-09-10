@@ -1,77 +1,62 @@
--- The user accounts table
--- User accounts are indexed on wallet public keys (for credits).
--- Customer ids for debits.
--- Users can associate multiple public keys to an account.
--- Users can associate multiple shopify customer ids to an account.
--- The current balance is the credit balance of Tari currently linked to the account. This will be used to pay
--- for orders as they come in.
-
-
-CREATE TABLE IF NOT EXISTS user_accounts
+CREATE TABLE IF NOT EXISTS address_customer_id_link
 (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    address         TEXT NOT NULL,
+    customer_id     TEXT NOT NULL,
+    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (address, customer_id) ON CONFLICT IGNORE
+);
+
+
+
+CREATE INDEX IF NOT EXISTS address_links ON address_customer_id_link (address);
+CREATE INDEX IF NOT EXISTS custid_links ON address_customer_id_link (customer_id);
+CREATE INDEX IF NOT EXISTS join_links ON address_customer_id_link (address, customer_id);
+
+CREATE TABLE settlement_journal (
     id              INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-    -- The total amount of Tari received by the account in the account's history
-    total_received  INTEGER NOT NULL    DEFAULT 0,
-    -- The amount of Tari pending from unconfirmed deposits in the account
-    current_pending   INTEGER NOT NULL    DEFAULT 0,
-    -- The amount of Tari currently available for spending. i.e. the credit balance
-    current_balance INTEGER NOT NULL    DEFAULT 0,
-    -- The total amount of Tari spent by the account in the account's history
-    total_orders    INTEGER NOT NULL    DEFAULT 0,
-    -- The total value of orders currently waiting for payment
-    current_orders  INTEGER NOT NULL    DEFAULT 0
+    order_id        TEXT NOT NULL references orders (order_id),
+    payment_address TEXT NOT NULL,
+    settlement_type TEXT NOT NULL CHECK (settlement_type IN ('Multiple', 'Single')),
+    amount          INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS user_account_address
-(
-    id              INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    user_account_id INTEGER REFERENCES user_accounts (id) NOT NULL,
-    address         TEXT NOT NULL,
-    created_at      TIMESTAMP NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP NOT NULL  DEFAULT CURRENT_TIMESTAMP
-);
+CREATE VIEW IF NOT EXISTS address_pending_balance (address, status, balance) AS
+SELECT
+    sender,
+    status,
+    SUM(amount)
+FROM payments
+WHERE status = 'Received'
+GROUP BY sender;
 
-CREATE TABLE IF NOT EXISTS user_account_customer_ids
-(
-    id              INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    user_account_id INTEGER REFERENCES user_accounts (id) NOT NULL,
-    customer_id     TEXT UNIQUE NOT NULL,
-    created_at      TIMESTAMP NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP NOT NULL  DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS user_accounts_id ON user_accounts (id);
-CREATE INDEX IF NOT EXISTS user_account_address_user_account_id ON user_account_address (user_account_id);
-CREATE INDEX IF NOT EXISTS user_account_address_address ON user_account_address (address);
-
-CREATE INDEX IF NOT EXISTS user_account_customer_ids_customer_id ON user_account_customer_ids (customer_id);
-CREATE INDEX IF NOT EXISTS user_account_customer_ids_user_account_id ON user_account_customer_ids (user_account_id);
-
--- Adjust the total orders received total when an order amount is updated.
-CREATE TRIGGER order_updated_trigger AFTER UPDATE OF total_price ON orders
-BEGIN
-  UPDATE user_accounts
-  SET
-    total_orders = total_orders + (NEW.total_price - OLD.total_price),
-    current_orders = current_orders + (NEW.total_price - OLD.total_price)
-  WHERE id = (SELECT user_account_id FROM user_account_customer_ids WHERE customer_id = OLD.customer_id);
-END;
-
--- Adjust total orders received balance down if an order is expired or cancelled.
-CREATE TRIGGER order_cancelled_trigger AFTER UPDATE OF status ON orders
-WHEN (OLD.status = 'New' OR OLD.status = 'Unclaimed') AND NEW.status in ('Cancelled', 'Expired')
-BEGIN
-    UPDATE user_accounts
-    SET
-      total_orders = total_orders - OLD.total_price,
-      current_orders = current_orders - OLD.total_price
-    WHERE id = (SELECT user_account_id FROM user_account_customer_ids WHERE customer_id = OLD.customer_id);
-END;
-
--- CREATE TRIGGER order_created_trigger AFTER INSERT ON orders END..
--- We can't create this trigger in SQLite because we first need to try and associate/create an account for the customer
--- to the order. So the orders totals will be carried out in code.
+CREATE VIEW IF NOT EXISTS address_balance (address, total_confirmed, total_paid, current_balance, last_update) AS
+WITH
+    wallets AS (
+    SELECT sender, sum(amount) as total_confirmed, updated_at
+    FROM payments
+    WHERE status = 'Confirmed'
+    GROUP BY sender
+),
+    settlements AS (
+    SELECT sum(amount) as total, payment_address, created_at
+    FROM settlement_journal
+    GROUP BY payment_address
+)
+SELECT
+    wallets.sender as address,
+    wallets.total_confirmed as total_confirmed,
+    coalesce(settlements.total, 0) as total_paid,
+    wallets.total_confirmed - coalesce(settlements.total, 0) as current_balance,
+    coalesce(settlements.created_at, wallets.updated_at) as last_update
+FROM wallets
+LEFT OUTER JOIN settlements ON wallets.sender = settlements.payment_address;
 
 
+CREATE VIEW IF NOT EXISTS customer_order_balance (customer_id, status, total_orders) AS
+SELECT
+    customer_id,
+    status,
+    SUM(total_price)
+FROM orders group by customer_id, status;

@@ -27,11 +27,11 @@ use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
 use log::*;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
-    db_types::{CreditNote, OrderId, OrderStatusType, Role, SerializedTariAddress},
+    db_types::{CreditNote, Order, OrderId, OrderStatusType, Role, SerializedTariAddress},
     helpers::MemoSignature,
     order_objects::{OrderQueryFilter, OrderResult},
     tpe_api::{
-        account_objects::{FullAccount, Pagination},
+        account_objects::{AddressHistory, CustomerHistory, Pagination},
         exchange_rate_api::ExchangeRateApi,
         wallet_api::WalletManagementApi,
     },
@@ -214,37 +214,37 @@ pub async fn history_for_address<B: AccountManagement>(
     Ok(HttpResponse::Ok().json(history))
 }
 
-route!(history_for_id => Get "/history/id/{id}" impl AccountManagement where requires [Role::ReadAll]);
-pub async fn history_for_id<B: AccountManagement>(
-    path: web::Path<i64>,
+route!(history_for_customer => Get "/history/customer/{id}" impl AccountManagement where requires [Role::ReadAll]);
+pub async fn history_for_customer<B: AccountManagement>(
+    path: web::Path<String>,
     api: web::Data<AccountApi<B>>,
 ) -> Result<HttpResponse, ServerError> {
     let id = path.into_inner();
     debug!("💻️ GET history for id {id}");
-    let history = get_history_for_account_id(id, api.as_ref()).await?;
+    let history = get_history_for_customer(&id, api.as_ref()).await?;
     Ok(HttpResponse::Ok().json(history))
 }
 
 pub async fn get_history_for_address<B: AccountManagement>(
     address: &TariAddress,
     api: &AccountApi<B>,
-) -> Result<FullAccount, ServerError> {
+) -> Result<AddressHistory, ServerError> {
     let history = api.history_for_address(address).await.map_err(|e| {
         debug!("💻️ Could not fetch account history for {address}. {e}");
         ServerError::BackendError(e.to_string())
     })?;
-    history.ok_or_else(|| ServerError::NoRecordFound(format!("No account found for {address}")))
+    Ok(history)
 }
 
-pub async fn get_history_for_account_id<B: AccountManagement>(
-    id: i64,
+pub async fn get_history_for_customer<B: AccountManagement>(
+    id: &str,
     api: &AccountApi<B>,
-) -> Result<FullAccount, ServerError> {
-    let history = api.history_for_id(id).await.map_err(|e| {
+) -> Result<CustomerHistory, ServerError> {
+    let history = api.history_for_customer(id).await.map_err(|e| {
         debug!("💻️ Could not fetch account history for account id {id}. {e}");
         ServerError::BackendError(e.to_string())
     })?;
-    history.ok_or_else(|| ServerError::NoRecordFound(format!("No account found for id {id}")))
+    Ok(history)
 }
 
 //----------------------------------------------   Account  ----------------------------------------------------
@@ -313,14 +313,11 @@ pub async fn get_account<B: AccountManagement>(
     address: &TariAddress,
     api: &AccountApi<B>,
 ) -> Result<HttpResponse, ServerError> {
-    let account = api.account_by_address(address).await.map_err(|e| {
+    let account = api.fetch_address_balance(address).await.map_err(|e| {
         debug!("💻️ Could not fetch account. {e}");
         ServerError::BackendError(e.to_string())
     })?;
-    match account {
-        Some(acc) => Ok(HttpResponse::Ok().json(acc)),
-        None => Ok(HttpResponse::NotFound().finish()),
-    }
+    Ok(HttpResponse::Ok().json(account))
 }
 
 //----------------------------------------------   Orders  ----------------------------------------------------
@@ -353,13 +350,30 @@ pub async fn my_unfulfilled_orders<B: AccountManagement>(
     api: web::Data<AccountApi<B>>,
 ) -> Result<HttpResponse, ServerError> {
     debug!("💻️ GET my_unfulfilled_orders for {}", claims.address);
-    let query = OrderQueryFilter::default().with_status(OrderStatusType::New);
     let address = claims.address;
-    let orders = api.search_orders(query, Some(address)).await.map_err(|e| {
+    let unfulfilled_orders = unfulfilled_orders_for_address(&api, &address).await?;
+    Ok(HttpResponse::Ok().json(unfulfilled_orders))
+}
+
+async fn unfulfilled_orders_for_address<B: AccountManagement>(
+    api: &AccountApi<B>,
+    address: &TariAddress,
+) -> Result<OrderResult, ServerError> {
+    let orders = api.orders_for_address(address).await.map_err(|e| {
         debug!("💻️ Could not fetch my unfulfilled orders. {e}");
         ServerError::BackendError(e.to_string())
     })?;
-    Ok(HttpResponse::Ok().json(orders))
+    let unfulfilled_orders: Vec<Order> = orders
+        .orders
+        .into_iter()
+        .filter(|o| [OrderStatusType::New, OrderStatusType::Unclaimed].contains(&o.status))
+        .collect();
+    let result = OrderResult {
+        address: address.into(),
+        total_orders: unfulfilled_orders.iter().map(|o| o.total_price).sum(),
+        orders: unfulfilled_orders,
+    };
+    Ok(result)
 }
 
 route!(unfulfilled_orders => Get "/unfulfilled_orders/{address}" impl AccountManagement where requires [Role::ReadAll]);
@@ -372,14 +386,8 @@ pub async fn unfulfilled_orders<B: AccountManagement>(
 ) -> Result<HttpResponse, ServerError> {
     let address = path.into_inner().to_address();
     debug!("💻️ GET unfulfilled_orders for {address}");
-    let query = OrderQueryFilter::default().with_status(OrderStatusType::New).with_status(OrderStatusType::Unclaimed);
-    let orders = api.search_orders(query, Some(address.clone())).await.map_err(|e| {
-        debug!("💻️ Could not fetch unfulfilled orders. {e}");
-        ServerError::BackendError(e.to_string())
-    })?;
-    let result =
-        OrderResult { address: address.into(), total_orders: orders.iter().map(|o| o.total_price).sum(), orders };
-    Ok(HttpResponse::Ok().json(result))
+    let unfulfilled_orders = unfulfilled_orders_for_address(&api, &address).await?;
+    Ok(HttpResponse::Ok().json(unfulfilled_orders))
 }
 
 route!(orders_search => Get "/search/orders" impl AccountManagement where requires [Role::ReadAll]);
@@ -389,7 +397,7 @@ pub async fn orders_search<B: AccountManagement>(
 ) -> Result<HttpResponse, ServerError> {
     debug!("💻️ GET orders search for [{query}]");
     let query = query.into_inner();
-    let orders = api.search_orders(query, None).await.map_err(|e| {
+    let orders = api.search_orders(query).await.map_err(|e| {
         debug!("💻️ Could not fetch orders. {e}");
         ServerError::BackendError(e.to_string())
     })?;
@@ -423,7 +431,7 @@ pub async fn order_by_id<B: AccountManagement>(
     api: web::Data<AccountApi<B>>,
 ) -> Result<HttpResponse, ServerError> {
     let order_id = path.into_inner();
-    debug!("💻️ GET order by id for {order_id}");
+    debug!("💻️ GET order_by_id({order_id})");
     let address = claims.address;
 
     // There's no particular ACL on this route, so check that the order belongs to the user,
@@ -441,7 +449,7 @@ pub async fn order_by_id<B: AccountManagement>(
         debug!("💻️ Could not fetch order. {e}");
         ServerError::BackendError(e.to_string())
     })?;
-    let result = orders.and_then(|orders| orders.orders.into_iter().find(|o| o.order_id == order_id));
+    let result = orders.orders.into_iter().find(|o| o.order_id == order_id);
     Ok(HttpResponse::Ok().json(result))
 }
 
@@ -474,8 +482,7 @@ pub async fn get_orders<B: AccountManagement>(
     api: &AccountApi<B>,
 ) -> Result<HttpResponse, ServerError> {
     match api.orders_for_address(address).await {
-        Ok(Some(orders)) => Ok(HttpResponse::Ok().json(orders)),
-        Ok(None) => Ok(HttpResponse::NotFound().finish()),
+        Ok(result) => Ok(HttpResponse::Ok().json(result)),
         Err(e) => {
             debug!("💻️ Could not fetch orders. {e}");
             Err(ServerError::BackendError(e.to_string()))
@@ -579,7 +586,7 @@ pub async fn issue_credit<B: PaymentGatewayDatabase>(
         debug!("💻️ Could not issue credit. {e}");
         ServerError::BackendError(e.to_string())
     })?;
-    Ok(HttpResponse::Ok().json(orders))
+    Ok(HttpResponse::Ok().json(orders.orders_paid))
 }
 
 route!(fulfil_order => Post "/fulfill" impl PaymentGatewayDatabase where requires [Role::Write]);
@@ -785,11 +792,10 @@ where
         None => debug!("💻️ Payment memo was empty and did thus did not contain a claim for an order"),
     }
     let result = match order_api.process_new_payment(payment).await {
-        Ok(orders) => {
-            let ids = orders.iter().map(|o| o.order_id.as_str()).collect::<Vec<_>>().join(", ");
-            let msg = format!("{} orders were paid. {}", orders.len(), ids);
-            info!("💻️ {msg}");
-            JsonResponse::success(msg)
+        Ok(payment) => {
+            info!("💻️ Incoming payment processed successfully for {}.", payment.sender);
+            let body = serde_json::to_string(&payment).unwrap_or_else(|e| format!("{e}"));
+            JsonResponse::success(body)
         },
         Err(PaymentGatewayError::DatabaseError(e)) => {
             warn!("💻️ Could not process payment. {e}");

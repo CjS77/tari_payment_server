@@ -47,7 +47,7 @@ Feature: Admins can update the price field of an order
     }
     """
     Then I receive a 200 OK response
-    And Alice has a current balance of 45 Tari
+    And account for customer alice has a current balance of 45 XTR
     # Reduce the price, but still not enough for the order to be filled
     When Admin PATCHs to "/api/order_price" with body
     """
@@ -71,7 +71,7 @@ Feature: Admins can update the price field of an order
       }
     }
     """
-    And Alice has a current balance of 45 Tari
+    And account for customer alice has a current balance of 45 XTR
     And order "1" is in state New
     # Reduce the price again, but this time, the order will be filled
     When Admin PATCHs to "/api/order_price" with body
@@ -105,7 +105,7 @@ Feature: Admins can update the price field of an order
       }
     }
     """
-    And Alice has a current balance of 20 Tari
+    And account for customer alice has a current balance of 20 XTR
     And order "1" is in state Paid
     # Reduce the other order's price, and fill the order
     When Admin PATCHs to "/api/order_price" with body
@@ -139,10 +139,10 @@ Feature: Admins can update the price field of an order
       }
     }
     """
-    And Alice has a current balance of 20 Tari
+    And account for customer alice has a current balance of 20 XTR
     And order "3" is in state Paid
-    And account for alice has current orders worth 0 XTR
-    And account for alice has total orders worth 25 XTR
+    And customer id alice has current orders worth 0 XTR
+    And customer id alice has paid orders worth 25 XTR
 
   Scenario: The price must be positive
     When Admin authenticates with nonce = 1 and roles = "write"

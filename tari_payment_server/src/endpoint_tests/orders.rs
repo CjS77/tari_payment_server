@@ -3,7 +3,8 @@ use chrono::{Days, TimeZone, Utc};
 use log::debug;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
-    db_types::{Order, OrderId, OrderStatusType, Role, UserAccount},
+    db_types::{Order, OrderId, OrderStatusType, Role},
+    traits::AccountApiError,
     AccountApi,
 };
 use tpg_common::MicroTari;
@@ -79,10 +80,7 @@ fn valid_token(roles: Vec<Role>) -> String {
 
 fn configure(cfg: &mut ServiceConfig) {
     let mut account_manager = MockAccountManager::new();
-    account_manager.expect_fetch_orders_for_account().returning(move |_| Ok(orders_response()));
-    account_manager
-        .expect_fetch_user_account_for_address()
-        .returning(|_| Ok(Some(UserAccount { id: 1, ..UserAccount::default() })));
+    account_manager.expect_fetch_orders_for_address().returning(orders_response);
     let accounts_api = AccountApi::new(account_manager);
     cfg.service(MyOrdersRoute::<MockAccountManager>::new())
         .service(OrdersRoute::<MockAccountManager>::new())
@@ -90,8 +88,8 @@ fn configure(cfg: &mut ServiceConfig) {
 }
 
 // Mock response to `fetch_orders_for_account` call
-fn orders_response() -> Vec<Order> {
-    vec![
+fn orders_response(_: &TariAddress) -> Result<Vec<Order>, AccountApiError> {
+    Ok(vec![
         Order {
             id: 0,
             order_id: OrderId("0000001".into()),
@@ -116,7 +114,7 @@ fn orders_response() -> Vec<Order> {
             updated_at: Utc.with_ymd_and_hms(2024, 3, 16, 11, 20, 0).unwrap(),
             status: OrderStatusType::Cancelled,
         },
-    ]
+    ])
 }
 
-const ORDERS_JSON: &str = r#"{"address":"14AYt2hhhn4VydAXNJ6i7ZfRNZGoGSp713dHjMYCoK5hYw2","total_orders":0,"orders":[{"id":0,"order_id":"0000001","customer_id":"1","memo":null,"total_price":100,"original_price":null,"currency":"XTR","created_at":"2024-02-29T13:30:00Z","updated_at":"2024-02-29T13:30:00Z","status":"Paid"},{"id":1,"order_id":"0000002","customer_id":"1","memo":null,"total_price":150,"original_price":null,"currency":"XTR","created_at":"2024-03-15T18:30:00Z","updated_at":"2024-03-16T11:20:00Z","status":"Cancelled"}]}"#;
+const ORDERS_JSON: &str = r#"{"address":"14AYt2hhhn4VydAXNJ6i7ZfRNZGoGSp713dHjMYCoK5hYw2","total_orders":250,"orders":[{"id":0,"order_id":"0000001","customer_id":"1","memo":null,"total_price":100,"original_price":null,"currency":"XTR","created_at":"2024-02-29T13:30:00Z","updated_at":"2024-02-29T13:30:00Z","status":"Paid"},{"id":1,"order_id":"0000002","customer_id":"1","memo":null,"total_price":150,"original_price":null,"currency":"XTR","created_at":"2024-03-15T18:30:00Z","updated_at":"2024-03-16T11:20:00Z","status":"Cancelled"}]}"#;

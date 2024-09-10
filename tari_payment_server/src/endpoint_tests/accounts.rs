@@ -1,12 +1,8 @@
-use actix_web::{http::StatusCode, web, web::ServiceConfig};
-use chrono::{Days, TimeZone, Utc};
+use actix_web::{web, web::ServiceConfig};
+use chrono::{Days, Utc};
 use log::debug;
 use tari_common_types::tari_address::TariAddress;
-use tari_payment_engine::{
-    db_types::{Role, UserAccount},
-    AccountApi,
-};
-use tpg_common::MicroTari;
+use tari_payment_engine::{db_types::Role, AccountApi};
 
 use super::helpers::{get_request, issue_token};
 use crate::{
@@ -39,79 +35,8 @@ async fn fetch_my_account_expired_token() {
     assert_eq!(err, "An error occurred validating the jwt.\n\t Error: \"token has expired\"");
 }
 
-#[actix_web::test]
-async fn fetch_my_account_valid_token() {
-    let claims = JwtClaims {
-        address: TariAddress::from_base58("14AYt2hhhn4VydAXNJ6i7ZfRNZGoGSp713dHjMYCoK5hYw2").unwrap(),
-        roles: vec![Role::User],
-    };
-    let token = issue_token(claims, Utc::now() + Days::new(1));
-    let (status, body) = get_request(&token, "/account", configure).await.expect("Failed to make request");
-    assert_eq!(status, StatusCode::OK);
-    let json = r#"
-    {"id":1,"created_at":"2024-03-01T10:30:00Z","updated_at":"2024-03-01T10:30:00Z","total_received":1000000,"current_pending":0,"current_balance":1000000,"total_orders":0,"current_orders":0}
-    "#;
-    assert_eq!(body, json.trim());
-}
-
-#[actix_web::test]
-async fn fetch_account_from_admin() {
-    let claims = JwtClaims {
-        address: TariAddress::from_base58("14AYt2hhhn4VydAXNJ6i7ZfRNZGoGSp713dHjMYCoK5hYw2").unwrap(),
-        roles: vec![Role::ReadAll],
-    };
-    let token = issue_token(claims, Utc::now() + Days::new(1));
-    let (status, body) = get_request(&token, "/account/14hdm1NzAtAvzrtoLHp5ov925CLSbtkDrrWy7avU8QNguBL", configure)
-        .await
-        .expect("Failed to make request");
-    assert_eq!(status, StatusCode::OK);
-    let json = r#"
-    {"id":1,"created_at":"2024-03-01T10:30:00Z","updated_at":"2024-03-01T10:30:00Z","total_received":1000000,"current_pending":0,"current_balance":1000000,"total_orders":0,"current_orders":0}
-    "#;
-    assert_eq!(body, json.trim());
-}
-
-#[actix_web::test]
-async fn fetch_account_from_user() {
-    let claims = JwtClaims {
-        address: TariAddress::from_base58("14AYt2hhhn4VydAXNJ6i7ZfRNZGoGSp713dHjMYCoK5hYw2").unwrap(),
-        roles: vec![Role::User],
-    };
-    let token = issue_token(claims, Utc::now() + Days::new(1));
-    let err = get_request(&token, "/account/14hdm1NzAtAvzrtoLHp5ov925CLSbtkDrrWy7avU8QNguBL", configure)
-        .await
-        .expect_err("Request should have failed");
-    assert_eq!(err, "Insufficient permissions.");
-}
-
-#[actix_web::test]
-async fn fetch_account_from_users_own_address() {
-    let claims = JwtClaims {
-        address: TariAddress::from_base58("14AYt2hhhn4VydAXNJ6i7ZfRNZGoGSp713dHjMYCoK5hYw2").unwrap(),
-        roles: vec![Role::User],
-    };
-    let token = issue_token(claims, Utc::now() + Days::new(1));
-    let (status, body) = get_request(&token, "/account", configure).await.expect("Request should have succeeded");
-    assert_eq!(status, StatusCode::OK);
-    let json = r#"
-    {"id":1,"created_at":"2024-03-01T10:30:00Z","updated_at":"2024-03-01T10:30:00Z","total_received":1000000,"current_pending":0,"current_balance":1000000,"total_orders":0,"current_orders":0}
-    "#;
-    assert_eq!(body, json.trim());
-}
-
 fn configure(cfg: &mut ServiceConfig) {
-    let account = UserAccount {
-        id: 1,
-        created_at: Utc.with_ymd_and_hms(2024, 3, 1, 10, 30, 0).unwrap(),
-        updated_at: Utc.with_ymd_and_hms(2024, 3, 1, 10, 30, 0).unwrap(),
-        total_received: MicroTari::from(1_000_000),
-        current_pending: Default::default(),
-        current_balance: MicroTari::from(1_000_000),
-        current_orders: Default::default(),
-        total_orders: Default::default(),
-    };
-    let mut account_manager = MockAccountManager::new();
-    account_manager.expect_fetch_user_account_for_address().returning(move |_| Ok(Some(account.clone())));
+    let account_manager = MockAccountManager::new();
     let accounts_api = AccountApi::new(account_manager);
     cfg.service(MyAccountRoute::<MockAccountManager>::new())
         .service(AccountRoute::<MockAccountManager>::new())

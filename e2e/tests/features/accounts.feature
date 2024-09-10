@@ -1,3 +1,4 @@
+@accounts
 Feature: Accounts endpoint
   Background:
     Given a database with some accounts
@@ -14,12 +15,9 @@ Feature: Accounts endpoint
     Then I receive a partial JSON response:
     """
     {
-      "id": 1,
-      "total_received":0,
-      "current_pending":0,
-      "current_balance":0,
-      "total_orders":165000000,
-      "current_orders":165000000
+      "address":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
+      "total_confirmed":0,"total_paid":0,
+      "current_balance":0
     }
     """
 
@@ -38,12 +36,9 @@ Feature: Accounts endpoint
     Then I receive a partial JSON response:
     """
     {
-      "id": 2,
-      "total_received":0,
-      "current_pending":0,
-      "current_balance":0,
-      "total_orders":550000000,
-      "current_orders":550000000
+      "address":"14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp",
+      "total_confirmed":0,"total_paid":0,
+      "current_balance":0
     }
     """
 
@@ -56,11 +51,8 @@ Feature: Accounts endpoint
     Then I receive a partial JSON response:
     """
     {
-      "id": 2,
-      "total_received":0,
-      "current_pending":0,
-      "current_balance":0,
-      "current_orders":550000000,
-      "total_orders":550000000
+      "address":"14XubwVbMhtp18SHrjfVKk7TRCx2yk7gZBbsjTPRWCXkCEp",
+      "total_confirmed":0,"total_paid":0,
+      "current_balance":0
     }
     """

@@ -37,7 +37,7 @@ fn burst_orders() {
             let price = MicroTari::from(1_000_000 * (i + 1) as i64);
             let order_id = OrderId::from(format!("oid-2024/{}-burstorder", i * 100));
             let new_order = NewOrder::new(order_id, cid, price);
-            if let Err(e) = api.process_new_order(new_order).await {
+            if let Err(e) = api.process_new_order(new_order, true).await {
                 panic!("Error processing order {i}: {e}");
             }
         }

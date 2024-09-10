@@ -46,7 +46,7 @@ use crate::{
         GetAuthorizedWalletsRoute,
         GetExchangeRateRoute,
         HistoryForAddressRoute,
-        HistoryForIdRoute,
+        HistoryForCustomerRoute,
         IncomingPaymentNotificationRoute,
         IssueCreditRoute,
         MyAccountRoute,
@@ -149,7 +149,7 @@ pub fn create_server_instance(
             .service(AccountRoute::<SqliteDatabase>::new())
             .service(MyHistoryRoute::<SqliteDatabase>::new())
             .service(HistoryForAddressRoute::<SqliteDatabase>::new())
-            .service(HistoryForIdRoute::<SqliteDatabase>::new())
+            .service(HistoryForCustomerRoute::<SqliteDatabase>::new())
             .service(MyOrdersRoute::<SqliteDatabase>::new())
             .service(MyUnfulfilledOrdersRoute::<SqliteDatabase>::new())
             .service(UnfulfilledOrdersRoute::<SqliteDatabase>::new())

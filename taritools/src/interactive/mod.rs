@@ -28,15 +28,16 @@ use zeroize::Zeroize;
 use crate::{
     interactive::{
         formatting::{
+            format_address_balance,
+            format_address_history,
             format_addresses_with_qr_code,
             format_claimed_order,
+            format_customer_history,
             format_exchange_rate,
-            format_full_account,
             format_order,
             format_order_result,
             format_orders,
             format_payments_result,
-            format_user_account,
             format_wallet_list,
             print_order,
         },
@@ -145,7 +146,7 @@ impl InteractiveApp {
                 ORDERS_FOR_ADDRESS => handle_response(self.orders_for_address().await),
                 PAYMENTS_FOR_ADDRESS => handle_response(self.payments_for_address().await),
                 HISTORY_FOR_ADDRESS => handle_response(self.history_for_address().await),
-                HISTORY_FOR_ACCOUNT_ID => handle_response(self.history_for_id().await),
+                HISTORY_FOR_ACCOUNT_ID => handle_response(self.history_for_customer().await),
                 EDIT_MEMO => handle_response(self.edit_memo().await),
                 REASSIGN_ORDER => handle_response(self.reassign_order().await),
                 LIST_PAYMENT_ADDRESSES => handle_response(self.get_payment_addresses().await),
@@ -227,7 +228,7 @@ impl InteractiveApp {
                 .expect("User is logged in. Client should not be None")
                 .my_account()
                 .await
-                .map(format_user_account);
+                .and_then(|a| format_address_balance(&a))
         }
         handle_response(res)
     }
@@ -287,7 +288,7 @@ impl InteractiveApp {
         let _unused = self.login().await?;
         let client = self.client().expect("User is logged in. Client should not be None");
         let history = client.my_history().await?;
-        format_full_account(history)
+        format_address_history(&history)
     }
 
     async fn history_for_address(&mut self) -> Result<String> {
@@ -295,15 +296,15 @@ impl InteractiveApp {
         let address = self.select_address().await?;
         let client = self.client().expect("User is logged in. Client should not be None");
         let history = client.history_for_address(&address).await?;
-        format_full_account(history)
+        format_address_history(&history)
     }
 
-    async fn history_for_id(&mut self) -> Result<String> {
+    async fn history_for_customer(&mut self) -> Result<String> {
         let _unused = self.login().await;
         let client = self.client().expect("User is logged in. Client should not be None");
-        let account_id = dialoguer::Input::<i64>::new().with_prompt("Enter account id (NOT customer id)").interact()?;
-        let history = client.history_for_id(account_id).await?;
-        format_full_account(history)
+        let cust_id = dialoguer::Input::<String>::new().with_prompt("Enter customer id").interact()?;
+        let history = client.history_for_id(&cust_id).await?;
+        format_customer_history(&history)
     }
 
     async fn fetch_tari_price(&mut self) {
@@ -433,8 +434,7 @@ impl InteractiveApp {
             "**Customer id** changed from {} to {}",
             result.orders.old_order.customer_id, result.orders.new_order.customer_id
         )?;
-        writeln!(msg, "*Account id** changed from {} to {}", result.old_account_id, result.new_account_id)?;
-        if result.is_filled {
+        if result.is_filled() {
             writeln!(msg, "The new account had sufficient credit to cover the order and it has been marked as PAID")?;
         }
         writeln!(msg, "\n## Old order")?;

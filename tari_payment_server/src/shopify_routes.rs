@@ -52,11 +52,12 @@ where
             info!("🛍️️ Unsupported currency in incoming order. {cur}");
             JsonResponse::failure(format!("Unsupported currency: {cur}"))
         },
-        Ok(new_order) => match api.process_new_order(new_order.clone()).await {
-            Ok(orders) => {
-                info!("🛍️️ Order {} processed successfully.", new_order.order_id);
-                let ids = orders.iter().map(|o| o.order_id.as_str()).collect::<Vec<_>>().join(", ");
-                info!("🛍️️ {} orders were paid. {}", orders.len(), ids);
+        Ok(new_order) => match api.process_new_order(new_order.clone(), true).await {
+            Ok(order) => {
+                info!(
+                    "🛍️️ Order {} for {} processed successfully. Current status is {}",
+                    order.order_id, order.total_price, order.status
+                );
                 JsonResponse::success("Order processed successfully.")
             },
             Err(PaymentGatewayError::DatabaseError(e)) => {
@@ -65,7 +66,7 @@ where
                 JsonResponse::failure(e)
             },
             Err(PaymentGatewayError::OrderAlreadyExists(id)) => {
-                info!("🛍️️ Order {} already exists with id {id}.", new_order.order_id);
+                info!("🛍️️ Order {id} already exists.");
                 JsonResponse::success("Order already exists.")
             },
             Err(e) => {

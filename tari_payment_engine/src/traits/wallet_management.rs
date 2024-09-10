@@ -1,7 +1,7 @@
 use tari_common_types::tari_address::TariAddress;
 use thiserror::Error;
 
-use crate::traits::data_objects::{NewWalletInfo, UpdateWalletInfo, WalletInfo};
+use crate::traits::data_objects::{NewWalletInfo, WalletInfo};
 
 #[allow(async_fn_in_trait)]
 pub trait WalletAuth {
@@ -18,9 +18,6 @@ pub trait WalletManagement {
 
     /// Removes the wallet with the given address from the wallet auth table in the database.
     async fn deregister_wallet(&self, wallet_address: &TariAddress) -> Result<(), WalletManagementError>;
-
-    /// Updates the wallet with the given address in the wallet auth table in the database.
-    async fn update_wallet_info(&self, wallet: UpdateWalletInfo) -> Result<(), WalletManagementError>;
 
     /// Retrieves all authorized wallets from the wallet auth table in the database.
     async fn fetch_authorized_wallets(&self) -> Result<Vec<WalletInfo>, WalletManagementError>;

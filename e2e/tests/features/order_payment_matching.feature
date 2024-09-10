@@ -21,8 +21,8 @@ Feature: Order Fulfillment
       "signature":"92e9d026e3a4e785ade1ab81e69204bf30c256966964f8f048ec9f06018f1c00ab7ff501a5e0bd7135f38d3e631bc57f851e6f0788f9edc0f908a42d16047701"
     }
     """
-    Then Customer #1 has current orders worth 2400 XTR
-    And Alice has a current balance of 0 Tari
+    Then customer id 1 has current orders worth 2400 XTR
+    And account for customer 1 has a current balance of 0 XTR
     And order "alice001" is in state New
     When a payment arrives from x-forwarded-for 192.168.1.100
     """
@@ -40,8 +40,8 @@ Feature: Order Fulfillment
     Then I receive a 200 Ok response with the message '"success":true'
     # Transaction is not confirmed yet
     Then order "alice001" is in state New
-    And Alice has a current balance of 0 Tari
-    And Alice has a pending balance of 2500 Tari
+    And account for customer 1 has a current balance of 0 XTR
+    And User Alice has a pending balance of 2500 XTR
     When a confirmation arrives from x-forwarded-for 192.168.1.100
     """
     { "confirmation": {"txid": "payment001"},
@@ -53,7 +53,7 @@ Feature: Order Fulfillment
     }
     """
     Then order "alice001" is in state Paid
-    And Alice has a current balance of 100 Tari
+    And account for customer 1 has a current balance of 100 XTR
     And the OrderPaid trigger fires with
     """
     {
@@ -83,8 +83,8 @@ Feature: Order Fulfillment
     }}
     """
     Then I receive a 200 Ok response with the message '"success":true'
-    And Alice has a current balance of 0 Tari
-    And Alice has a pending balance of 2500 Tari
+    And account for customer 1 has a current balance of 0 XTR
+    And User Alice has a pending balance of 2500 XTR
     And the PaymentReceived trigger fires with
     """
       {
@@ -106,8 +106,7 @@ Feature: Order Fulfillment
       }
     }
     """
-    Then Alice has a current balance of 2500 Tari
-    And Alice has a pending balance of 0 Tari
+    Then address 14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt has a current balance of 2500 XTR
     And the PaymentConfirmed trigger fires with
     """
       {
@@ -127,8 +126,8 @@ Feature: Order Fulfillment
       "signature":"92e9d026e3a4e785ade1ab81e69204bf30c256966964f8f048ec9f06018f1c00ab7ff501a5e0bd7135f38d3e631bc57f851e6f0788f9edc0f908a42d16047701"
     }
     """
-    Then Customer #1 has current orders worth 0 XTR
-    And Alice has a current balance of 100 Tari
+    Then customer id 1 has paid orders worth 2400 XTR
+    And account for customer 1 has a current balance of 100 XTR
     And order "alice001" is in state Paid
     And the OrderPaid trigger fires with
     """
@@ -144,7 +143,6 @@ Feature: Order Fulfillment
     }
     """
 
-  @fails
   Scenario: Multiple concurrent customers and payments
     When Customer #1 ["alice"] places order "alice001" for 2400 XTR, with memo
     """
@@ -210,7 +208,7 @@ Feature: Order Fulfillment
       }, "confirmation": {"txid":"a7o844001"}
     }
     """
-    Then Bob has a current balance of 400 Tari
+    Then account for customer 2 has a current balance of 400 XTR
     And order "bob700" is in state New
     When Customer #3 ["anon"] places order "anon0001" for 84 XTR, with memo
     """
@@ -220,7 +218,7 @@ Feature: Order Fulfillment
        "signature":"104baa540fa134d77dad4f1573238989be0d923f560b107e7938790d08e7cb73d3fa684865601b75b2cd6b747995327f194a0cfa96f7449cc449ed84f25f4a05"
     }
     """
-    Then account for customer 3 has a current balance of 1 Tari
+    Then account for customer 3 has a current balance of 1 XTR
     And order "anon0001" is in state Paid
     When Customer #1 ["alice"] places order "alice0002" for 3600 XTR, with memo
     """
@@ -248,7 +246,7 @@ Feature: Order Fulfillment
       }, "confirmation": {"txid":"alicebigpayment"}
     }
     """
-    Then Alice has a current balance of 42 Tari
+    Then account for customer 1 has a current balance of 42 XTR
     And order "alice0002" is in state Paid
     And order "alice001" is in state Paid
 
@@ -262,8 +260,8 @@ Feature: Order Fulfillment
       "signature":"ee836ca36932b7b74319c825bc4578eecdf0aa62ade3deb8b8db7196fc5f2c7f369cea15f6b0fe032d46f325c251bfcdba21160e3aa28416345b2df255e0dd04"
     }
     """
-    Then Customer #1 has current orders worth 2100 XTR
-    And Alice has a current balance of 0 Tari
+    Then customer id 1 has current orders worth 2100 XTR
+    And account for customer 1 has a current balance of 0 XTR
     When a payment arrives from x-forwarded-for 192.168.1.100
     """
     {"payment": {
@@ -290,8 +288,8 @@ Feature: Order Fulfillment
     """
     Then I receive a 200 Ok response with the message '"success":true'
     And order "alice001" is in state Paid
-    And Customer #1 has current orders worth 0 XTR
-    And Account 1 has a current balance of 400 Tari
+    And customer id 1 has current orders worth 0 XTR
+    And account for customer 1 has a current balance of 400 XTR
 
   Scenario: Order -> Pay -> Confirm -> Claim. The order is fulfilled.
     When Customer #1 ["alice"] places order "alice001" for 2100 XTR, with memo
@@ -331,8 +329,7 @@ Feature: Order Fulfillment
     }
     """
     Then order "alice001" is in state Paid
-    And Account 1 has a current balance of 0 Tari
-    And Account 2 has a current balance of 400 Tari
+    And account for customer 1 has a current balance of 400 XTR
 
   Scenario: Pay -> Order -> Claim -> Confirm. The order is fulfilled.
     When a payment arrives from x-forwarded-for 192.168.1.100
@@ -370,6 +367,6 @@ Feature: Order Fulfillment
     """
     Then I receive a 200 Ok response with the message '"success":true'
     Then order "alice001" is in state Paid
-    And Account 1 has a current balance of 400 Tari
-    And Account 2 has a current balance of 0 Tari
+    And account for customer 1 has a current balance of 400 XTR
+    And account for customer 2 has a current balance of 0 XTR
 

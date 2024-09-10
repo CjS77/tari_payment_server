@@ -1,3 +1,4 @@
+@auth
 Feature: Users receive an access token when authenticating with a login token
   Background:
     Given a blank slate

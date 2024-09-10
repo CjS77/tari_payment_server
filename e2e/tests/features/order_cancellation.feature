@@ -1,3 +1,4 @@
+@cancellation
 Feature: Admins can cancel an order
   Background:
     Given a database with some accounts
@@ -36,7 +37,7 @@ Feature: Admins can cancel an order
     Then I receive a 403 Forbidden response with the message 'Insufficient permissions.'
 
   Scenario: An admin can cancel an order on behalf of a user
-    When account for alice has total orders worth 65 XTR
+    Then customer id alice has current orders worth 165 XTR
     When Admin authenticates with nonce = 1 and roles = "write"
     When Admin POSTs to "/api/cancel" with body
         """
@@ -51,9 +52,9 @@ Feature: Admins can cancel an order
     {"order_id": "1", "customer_id":"alice", "total_price": 100000000, "status": "Cancelled"}
     """
     Then order "1" is in state Cancelled
-    Then account for alice has total orders worth 65 XTR
-    Then account for alice has current orders worth 65 XTR
-    Then Alice has a current balance of 0 Tari
+    Then customer id alice has current orders worth 65 XTR
+    Then customer id alice has cancelled orders worth 100 XTR
+    Then account for customer alice has a current balance of 0 XTR
     Then the OrderAnnulled trigger fires with
     """
     { "status": "Cancelled",
@@ -85,9 +86,9 @@ Feature: Admins can cancel an order
     {"error": "Cannot complete this request. The requested order change is forbidden."}
     """
     Then order "1" is in state Cancelled
-    Then account for alice has total orders worth 65 XTR
-    Then account for alice has current orders worth 65 XTR
-    Then Alice has a current balance of 0 Tari
+    And customer id alice has cancelled orders worth 100 XTR
+    And customer id alice has current orders worth 65 XTR
+    And account for customer alice has a current balance of 0 XTR
 
   Scenario: You cannot cancel a completed order
     When Admin authenticates with nonce = 1 and roles = "write"

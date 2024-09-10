@@ -10,7 +10,14 @@ use crate::{
     events::{EventProducers, OrderAnnulledEvent, OrderClaimedEvent, OrderEvent, OrderModifiedEvent, PaymentEvent},
     helpers::MemoSignature,
     order_objects::{ClaimedOrder, OrderChanged},
-    traits::{ExpiryResult, MultiAccountPayment, OrderMovedResult, PaymentGatewayDatabase, PaymentGatewayError},
+    traits::{
+        AccountApiError,
+        ExpiryResult,
+        MultiAccountPayment,
+        OrderMovedResult,
+        PaymentGatewayDatabase,
+        PaymentGatewayError,
+    },
 };
 
 /// `OrderFlowApi` is the primary API for handling order and payment flows in response to merchant order events and
@@ -42,47 +49,76 @@ where B: PaymentGatewayDatabase
     ///
     /// After the order is added, all the orders for the account are checked to see if any can be marked as paid.
     /// If any orders are marked as paid, they are returned.
-    pub async fn process_new_order(&self, order: NewOrder) -> Result<Vec<Order>, PaymentGatewayError> {
-        let account_id = self.db.process_new_order_for_customer(order.clone()).await?;
-        let order = self.db.fetch_order_by_order_id(&order.order_id).await?.ok_or_else(|| {
-            error!("🔄️📦️ Order [{}] was not found after being inserted. Race condition bug", order.order_id);
-            PaymentGatewayError::OrderNotFound(order.order_id.clone())
-        })?;
+    ///
+    /// If `auto_claim` is set to `true`, we will look for any existing wallets that are associated with the customer
+    /// id on the order and immediately claim the order.
+    pub async fn process_new_order(&self, order: NewOrder, auto_claim: bool) -> Result<Order, PaymentGatewayError> {
+        let address = order.address.clone();
+        let (mut order, inserted) = self.db.insert_order(order.clone()).await?;
+        let id = order.order_id.clone();
+        if !inserted {
+            info!("🔄️📦️ Order [{id}] has already been processed.");
+            return Err(PaymentGatewayError::OrderAlreadyExists(id.clone()));
+        }
+        if let Some(address) = &address {
+            debug!("🔄️📦️ Order [{id}] has an address attached. Claiming immediately.");
+            order = self.db.claim_order(&order.order_id, address).await?;
+            info!("🔄️📦️ Order [{id}] has been claimed immediately by address {}", address.to_base58());
+        }
         self.call_new_order_hook(&order).await;
-        let payable = self.db.fetch_payable_orders(account_id).await?;
-        let paid_orders = self.db.try_pay_orders(account_id, &payable).await?;
-        self.call_order_paid_hook(&paid_orders).await;
-        debug!(
-            "🔄️📦️ Order [{}] processing complete. {} orders are paid for account #{account_id}",
-            order.order_id,
-            payable.len()
-        );
-        Ok(paid_orders)
+        // If the address is already known, we can try pay for the order immediately
+        if let Some(address) = address {
+            debug!("🔄️📦️ Order [{id}] has an address attached. Trying to pay immediately.");
+            let result = self.try_pay_orders_from_address(&address, &[&order]).await?;
+            let maybe_paid = result.orders_paid.into_iter().find(|o| o.order_id == order.order_id);
+            if let Some(paid_order) = maybe_paid {
+                info!("🔄️📦️ Order [{id}] has been settled immediately by the address attached to the order.");
+                order = paid_order
+            }
+        }
+        if auto_claim && order.status == OrderStatusType::Unclaimed {
+            if let Some((address, updated_order)) = self.db.auto_claim_order(&order).await? {
+                info!("🔄️📦️ Order [{id}] has been auto-claimed by address {}", address.to_base58());
+                order = updated_order;
+                let result = self.try_pay_orders_from_address(&address, &[&order]).await?;
+                // I only pass one order to `try_pay_orders_from_address` so the order must always be the first one, if
+                // any
+                let paid = result.orders_paid.first().map(|o| o.order_id == order.order_id).unwrap_or(false);
+                if paid {
+                    let addresses =
+                        result.settlements.iter().map(|s| s.payment_address.as_base58()).collect::<Vec<_>>().join(", ");
+                    info!(
+                        "🔄️📦️ Order [{id}] has been settled immediately as a result of auto-claiming. Payment \
+                         addresses were {addresses}"
+                    );
+                    order = result.orders_paid.first().unwrap().clone();
+                }
+            } else {
+                debug!("🔄️📦️ Order [{id}] could not be auto-claimed. No addresses are linked to the customer yet.");
+            }
+        }
+        info!("🔄️📦️ Order [{id}] processing complete.");
+        Ok(order)
     }
 
     /// Claims an order for a Tari wallet address.
     ///
     /// This function:
     /// * Checks that the signature is valid,
-    /// * Checks that the order exists, and is in the `New` status,
+    /// * Checks that the order exists, and is in the `Unclaimed` status,
     ///
     /// If these checks pass, then
-    /// * an account for the wallet address is created, if necessary,
-    /// * the order associated with the address in the signature
+    /// * The wallet address is linked with the customer ID
+    /// * the order is `Claimed`
     /// * The OrderClaimed event is fired.
     pub async fn claim_order(&self, signature: &MemoSignature) -> Result<ClaimedOrder, PaymentGatewayError> {
         if !signature.is_valid() {
             return Err(PaymentGatewayError::InvalidSignature);
         }
         let order_id = OrderId(signature.order_id.clone());
-        let order = self
-            .db
-            .fetch_order_by_order_id(&order_id)
-            .await?
-            .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
         let address = signature.address.as_address();
-        let (account, order) = self.db.attach_order_to_address(&order.order_id, address).await?;
-        debug!("🖇️📦️ Order [{order_id}] is attached to account {}", account.id);
+        debug!("🖇️️ Claiming order [{order_id}] for address {}", address.to_base58());
+        let order = self.db.claim_order(&order_id, address).await?;
         self.call_order_claimed_hook(&order, address).await;
         // If payment is successful, order OrderPaid trigger will fire implicitly.
         trace!("🖇️📦️ Checking if order [{}] can be fulfilled immediately", order.order_id);
@@ -96,9 +132,14 @@ where B: PaymentGatewayDatabase
     }
 
     async fn call_order_paid_hook(&self, paid_orders: &[Order]) {
-        if !paid_orders.is_empty() {
-            debug!("🔄️📦️ Notifying {} OrderPaid hook subscribers", self.producers.order_paid_producer.len());
+        if paid_orders.is_empty() {
+            return;
         }
+        debug!(
+            "🔄️📦️ Notifying {} OrderPaid hook subscribers about {} paid orders",
+            self.producers.order_paid_producer.len(),
+            paid_orders.len()
+        );
         for emitter in &self.producers.order_paid_producer {
             for order in paid_orders {
                 let event = OrderEvent { order: order.clone() };
@@ -163,59 +204,57 @@ where B: PaymentGatewayDatabase
     /// To change the status of a payment, you should use the [`Self::confirm_payment`] or [`Self::cancel_payment`]
     /// methods.
     ///
-    /// After the payment is added, all the orders for the account are checked to see if any can be marked as paid.
-    /// If any orders are marked as paid, they are returned.
-    pub async fn process_new_payment(&self, payment: NewPayment) -> Result<Vec<Order>, PaymentGatewayError> {
+    /// New payments are always unconfirmed, so no orders can be paid at this point, so no checking of orders is done.
+    ///
+    /// The newly inserted payment record is returned.
+    pub async fn process_new_payment(&self, payment: NewPayment) -> Result<Payment, PaymentGatewayError> {
         let txid = payment.txid.clone();
-        let (account_id, payment) = self.db.process_new_payment_for_pubkey(payment.clone()).await?;
-        trace!("🔄️💰️ Payment [{txid}] for account #{account_id} processed.");
+        let payment = self.db.process_new_payment(payment.clone()).await?;
+        info!("🔄️💰️ Payment [{txid}] for {} processed.", payment.sender.as_base58());
         self.call_payment_received_hook(&payment).await;
-        let payable = self.db.fetch_payable_orders(account_id).await?;
-        trace!("🔄️💰️ {} fulfillable orders fetched for account #{account_id}", payable.len());
-        let paid_orders = self.db.try_pay_orders(account_id, &payable).await?;
-        self.call_order_paid_hook(&paid_orders).await;
-        debug!(
-            "🔄️💰️ Payment [{txid}] processing complete. {} orders are paid for account #{account_id}",
-            payable.len()
-        );
-        Ok(paid_orders)
+        Ok(payment)
     }
 
-    pub async fn issue_credit_note(&self, note: CreditNote) -> Result<Vec<Order>, PaymentGatewayError> {
+    pub async fn issue_credit_note(&self, note: CreditNote) -> Result<MultiAccountPayment, PaymentGatewayError> {
         let cust_id = note.customer_id.clone();
-        info!("🔄️💰️ Issuing credit note for customer {cust_id}");
-        let (account_id, payment) = self.db.process_credit_note_for_customer(note).await?;
-        info!("🔄️💰️ Credit note issued for customer {cust_id} with account id {account_id}");
+        debug!("🔄️💰️ Issuing credit note for customer {cust_id}");
+        let payment = self.db.process_credit_note_for_customer(note).await?;
+        info!("🔄️💰️ Credit note issued for customer {cust_id}");
         self.call_payment_received_hook(&payment).await;
-        let payable = self.db.fetch_payable_orders(account_id).await?;
-        trace!("🔄️💰️ {} fulfillable orders fetched for account #{account_id} after issuing credit note", payable.len());
-        let paid_orders = self.db.try_pay_orders(account_id, &payable).await?;
-        self.call_order_paid_hook(&paid_orders).await;
-        debug!(
-            "🔄️💰️ Credit note for {cust_id} processing complete. {} orders are paid for account #{account_id}",
-            payable.len()
-        );
-        Ok(paid_orders)
+        // A credit note is a confirmed payment so do the same things we would do for a confirmed payment
+        let payment = self.post_confirm(&payment).await?;
+        Ok(payment)
     }
 
     /// Update the status of a payment to "Confirmed". This happens when a transaction in the blockchain is deep enough
     /// in the chain that a re-org and invalidation of the payment is unlikely.
     pub async fn confirm_payment(&self, txid: String) -> Result<Payment, PaymentGatewayError> {
         trace!("🔄️✅️ Payment {txid} is being marked as confirmed");
-        let (account_id, payment) = self.db.update_payment_status(&txid, TransferStatus::Confirmed).await?;
-        let payable = self.db.fetch_payable_orders_for_address(payment.sender.as_address()).await?;
-        trace!("🔄️✅️ {} fulfillable orders fetched for account #{account_id}", payable.len());
-        let paid_orders = self.db.try_pay_orders(account_id, &payable).await?;
-        debug!("🔄️✅️ [{txid}] confirmed. {} orders are paid for account #{account_id}", paid_orders.len());
-        self.call_order_paid_hook(&paid_orders).await;
-        self.call_payment_confirmed_hook(&payment).await;
+        let payment = self.db.update_payment_status(&txid, TransferStatus::Confirmed).await?;
+        let paid_orders = self.post_confirm(&payment).await?;
+        let n = paid_orders.orders_paid.len();
+        info!("🔄️✅️ Payment {txid} was confirmed. {n} orders were paid as a result.");
         Ok(payment)
+    }
+
+    async fn post_confirm(&self, payment: &Payment) -> Result<MultiAccountPayment, PaymentGatewayError> {
+        debug!("🔄️✅️ Executing post-payment confirmation actions for {}", payment.txid);
+        let address = payment.sender.as_address();
+        let payable = self.db.fetch_payable_orders_for_address(address).await?;
+        let orders = payable.iter().collect::<Vec<&Order>>();
+        trace!("🔄️✅️ {} fulfillable orders fetched for {address}", payable.len());
+        let result = self.try_pay_orders_from_address(address, &orders).await?;
+        let txid = &payment.txid;
+        debug!("🔄️✅️ [{txid}] confirmed. {} orders are paid for address {address}", result.orders_paid.len());
+        self.call_payment_confirmed_hook(payment).await;
+        Ok(result)
     }
 
     /// Mark a payment as cancelled and update orders and accounts as necessary.
     pub async fn cancel_payment(&self, txid: String) -> Result<(), PaymentGatewayError> {
         trace!("🔄️❌️ Payment {txid} is being marked as cancelled");
         self.db.update_payment_status(&txid, TransferStatus::Cancelled).await?;
+        info!("🔄️❌️ Payment {txid} was cancelled");
         Ok(())
     }
 
@@ -232,8 +271,18 @@ where B: PaymentGatewayDatabase
             .fetch_order_by_order_id(order_id)
             .await?
             .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
+        // We don't call self.issue_credit_note() here because we want to force this specific order to get paid
+        // The former lets any valid order be paid once the credit is issued.
         let updated_order = self.db.mark_new_order_as_paid(order, reason).await?;
-        self.call_order_paid_hook(&[updated_order.clone()]).await;
+        if updated_order.status == OrderStatusType::Paid {
+            self.call_order_paid_hook(&[updated_order.clone()]).await;
+            info!(
+                "🔄️💲️ Order [{order_id}] was manually marked as paid and customer was credited with the full order \
+                 amount."
+            );
+        } else {
+            error!("🔄️💲️ Order [{order_id}] was not marked as paid. This almost certainly a bug.");
+        }
         Ok(updated_order)
     }
 
@@ -282,26 +331,20 @@ where B: PaymentGatewayDatabase
         Ok(changes)
     }
 
-    /// Tries to pay for an order using _only_ the account that is linked to the order via the customer id.
-    /// If a wallet that is linked to the customer id has another account entry with credit on it, this method will
-    /// not realise this.
+    /// Tries to pay for an order using any addresses associated with the customer id attached to this order.
+    /// If you've claimed an order, or otherwise know which address you want to pay from, use
+    /// [`try_pay_orders_from_address`] instead.
     pub async fn try_pay_order(&self, order: &Order) -> Result<Option<Order>, PaymentGatewayError> {
-        let account = self
-            .db
-            .fetch_user_account_for_order(&order.order_id)
-            .await?
-            .ok_or_else(|| PaymentGatewayError::AccountShouldExistForOrder(order.order_id.clone()))?;
-        let orders = [order.clone()];
-        let paid_orders = self.db.try_pay_orders(account.id, &orders).await?;
-        if paid_orders.len() > 1 {
-            error!(
-                "🔄️📦️ One order was supposed to be paid, but the set of paid orders was: {paid_orders:?}. This is \
-                 nota catastrophe, so I'm carrying on, but try and fix this ASAP."
-            );
+        match self.db.try_pay_order(order).await {
+            Ok(result) if result.orders_paid.is_empty() => Ok(None),
+            Ok(mut result) => {
+                self.call_order_paid_hook(&result.orders_paid).await;
+                let updated_order = Some(result.orders_paid.remove(0));
+                Ok(updated_order)
+            },
+            Err(PaymentGatewayError::AccountError(AccountApiError::InsufficientFunds)) => Ok(None),
+            Err(e) => Err(e),
         }
-        self.call_order_paid_hook(&paid_orders).await;
-        let updated_order = paid_orders.first().cloned();
-        Ok(updated_order)
     }
 
     /// Tries to pay for the given set of orders using _any_ account linked to the given address.
@@ -414,17 +457,10 @@ where B: PaymentGatewayDatabase
             "🔄️💲️ Price for order [{order_id}] {direction} from {} to {}",
             old_order.total_price, new_order.total_price
         );
-        let account_id = self
-            .db
-            .fetch_user_account_for_order(order_id)
-            .await?
-            .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
-        let order_arr = [new_order.clone()];
-        let paid_orders = self.db.try_pay_orders(account_id.id, &order_arr).await?;
-        if let Some(paid_order) = paid_orders.first() {
+        if let Some(paid_order) = self.try_pay_order(&new_order).await? {
             debug!("🔄️💲️ Price change has led to order {} being Paid", paid_order.order_id);
-            self.call_order_paid_hook(&paid_orders).await;
-            new_order = paid_order.clone();
+            self.call_order_paid_hook(&[paid_order.clone()]).await;
+            new_order = paid_order;
         }
         let changes = OrderChanged::new(old_order, new_order.clone());
         self.call_order_modified_hook("total_price", changes).await;

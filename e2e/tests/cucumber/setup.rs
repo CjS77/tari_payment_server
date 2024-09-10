@@ -191,7 +191,10 @@ async fn fresh_database(world: &mut TPGWorld) {
     world.start_database().await;
     let db = world.database();
     for order in seed_orders() {
-        db.process_new_order_for_customer(order).await.unwrap();
+        let id = order.order_id.clone();
+        let address = order.address.as_ref().unwrap().clone();
+        db.insert_order(order).await.unwrap();
+        db.claim_order(&id, &address).await.unwrap();
     }
     world.start_server().await;
 }
@@ -200,7 +203,7 @@ async fn fresh_database(world: &mut TPGWorld) {
 async fn payments_received(world: &mut TPGWorld) {
     let db = world.database();
     for payment in seed_payments() {
-        db.process_new_payment_for_pubkey(payment).await.expect("Error persisting payment");
+        db.process_new_payment(payment).await.expect("Error persisting payment");
     }
 }
 
