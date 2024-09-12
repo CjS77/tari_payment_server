@@ -11,10 +11,10 @@ use prettytable::{
 use qrcode::{render::unicode, QrCode};
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
-    db_types::{Order, Payment, UserAccount},
+    db_types::{AddressBalance, CustomerBalance, CustomerOrderBalance, Order, Payment, SettlementJournalEntry},
     order_objects::{ClaimedOrder, OrderResult},
     tpe_api::{
-        account_objects::{AccountAddress, CustomerId, FullAccount},
+        account_objects::{AddressHistory, CustomerHistory},
         payment_objects::PaymentsResult,
     },
     traits::WalletInfo,
@@ -35,57 +35,13 @@ fn markdown_style(table: &mut Table) {
     table.set_format(markdown_format());
 }
 
-pub fn format_user_account(account: UserAccount) -> String {
-    let mut table = Table::new();
-    table.set_titles(row!["Field", "Value"]);
-    table.add_row(Row::new(vec![Cell::new("ID"), Cell::new(&account.id.to_string())]));
-    table.add_row(Row::new(vec![Cell::new("Created At"), Cell::new(&account.created_at.to_string())]));
-    table.add_row(Row::new(vec![Cell::new("Updated At"), Cell::new(&account.updated_at.to_string())]));
-    table.add_row(Row::new(vec![Cell::new("Total Received"), Cell::new(&account.total_received.to_string())]));
-    table.add_row(Row::new(vec![Cell::new("Current Pending"), Cell::new(&account.current_pending.to_string())]));
-    table.add_row(Row::new(vec![Cell::new("Current Balance"), Cell::new(&account.current_balance.to_string())]));
-    table.add_row(Row::new(vec![Cell::new("Total Orders"), Cell::new(&account.total_orders.to_string())]));
-    table.add_row(Row::new(vec![Cell::new("Current Orders"), Cell::new(&account.current_orders.to_string())]));
-
-    // Format the table to a string
-    markdown_style(&mut table);
-    table.to_string()
-}
-
-pub fn format_addresses(addresses: &[AccountAddress]) -> String {
-    let mut table = Table::new();
-    table.set_titles(row!["Hex", "Emoji Id", "Created At", "Updated At"]);
-    addresses.iter().for_each(|address| {
-        let a = address.address.as_address();
-        table.add_row(row![a.to_base58(), a.to_emoji_string(), address.created_at, address.updated_at]);
-    });
-    markdown_style(&mut table);
-    table.to_string()
-}
-
-pub fn format_customer_ids(ids: &[CustomerId]) -> String {
-    let mut table = Table::new();
-    table.set_titles(row!["Customer id", "Created At", "Updated At"]);
-    ids.iter().for_each(|id| {
-        table.add_row(row![id.customer_id, id.created_at, id.updated_at]);
-    });
-    markdown_style(&mut table);
-    table.to_string()
-}
-
-pub fn format_full_account(account: FullAccount) -> Result<String> {
-    let mut s = String::new();
-    writeln!(s, "# Account Summary")?;
-    writeln!(s, "{}", format_user_account(account.account))?;
-    writeln!(s, "# Addresses")?;
-    writeln!(s, "{}\n", format_addresses(&account.addresses))?;
-    writeln!(s, "# Customer IDs")?;
-    writeln!(s, "{}\n", format_customer_ids(&account.customer_ids))?;
-    writeln!(s, "# Orders")?;
-    writeln!(s, "{}\n", format_orders(&account.orders))?;
-    writeln!(s, "# Payments")?;
-    writeln!(s, "{}\n", format_payments(&account.payments))?;
-    Ok(s)
+pub fn format_address_balance(balance: &AddressBalance) -> Result<String> {
+    let mut f = String::new();
+    writeln!(f, "Address: {}", balance.address())?;
+    writeln!(f, "Available: {}", balance.current_balance())?;
+    writeln!(f, "Total received: {}", balance.total_confirmed())?;
+    writeln!(f, "Total spent: {}", balance.total_paid())?;
+    Ok(f)
 }
 
 pub fn format_order_result(orders: OrderResult) -> Result<String> {
@@ -217,7 +173,6 @@ pub fn payment_to_row(payment: &Payment) -> Row {
         Cell::new(&payment.amount.to_string()),
         Cell::new(&payment.status.to_string()),
         Cell::new(&payment.sender.as_base58()),
-        Cell::new(&payment.order_id.clone().map(|id| id.to_string()).unwrap_or_default()),
         Cell::new(&payment.memo.clone().unwrap_or_default()),
         Cell::new(&payment.created_at.to_string()),
         Cell::new(&payment.updated_at.to_string()),
@@ -269,5 +224,73 @@ pub fn format_claimed_order(order: &ClaimedOrder) -> Result<String> {
     let (hex, emoji, qr) = format_address_with_qr_code(&order.send_to);
     writeln!(f, "Send Payment to: {hex} ({emoji})")?;
     writeln!(f, "{qr}")?;
+    Ok(f)
+}
+
+pub fn format_address_history(history: &AddressHistory) -> Result<String> {
+    let mut f = String::new();
+    writeln!(f, "## History for {}", history.address.as_base58())?;
+    let balances = format_address_balance(&history.balance)?;
+    writeln!(f, "### Balances\n\n{balances}\n")?;
+    let orders_str = format_orders(&history.orders);
+    writeln!(f, "### Associated orders\n\n{orders_str}\n")?;
+    let payments = format_payments(&history.payments);
+    writeln!(f, "### Payments\n\n{payments}\n")?;
+    let settlements = format_settlements(&history.settlements)?;
+    writeln!(f, "### Transactions: {settlements}")?;
+    Ok(f)
+}
+
+pub fn format_customer_balance(balance: &CustomerBalance) -> Result<String> {
+    let mut f = String::new();
+    writeln!(f, "Total transfers confirmed: {}", balance.total_confirmed())?;
+    writeln!(f, "Total paid: {}", balance.total_paid())?;
+    writeln!(f, "Available balance: {}", balance.current_balance())?;
+    writeln!(f, "Associated wallet addresses")?;
+    for address in balance.addresses() {
+        let balance = format_address_balance(address)?;
+        writeln!(f, "{balance}\n")?;
+    }
+    Ok(f)
+}
+
+pub fn format_customer_order_balance(order_balance: &CustomerOrderBalance) -> Result<String> {
+    let mut f = String::new();
+    writeln!(f, "Total current orders: {}", order_balance.total_current)?;
+    writeln!(f, "Total paid orders: {}", order_balance.total_paid)?;
+    writeln!(f, "Total expired orders: {}", order_balance.total_expired)?;
+    writeln!(f, "Total cancelled orders: {}", order_balance.total_cancelled)?;
+    Ok(f)
+}
+
+pub fn format_customer_history(history: &CustomerHistory) -> Result<String> {
+    let mut f = String::new();
+    writeln!(f, "## History for Customer [{}]", history.customer_id)?;
+    let balance = format_customer_balance(&history.balance)?;
+    writeln!(f, "### Balances\n\n{balance}\n")?;
+    let order_balance = format_customer_order_balance(&history.order_balance)?;
+    writeln!(f, "### Order Balances\n\n{order_balance}\n")?;
+    let orders = format_orders(&history.orders);
+    writeln!(f, "### Orders\n\n{orders}\n")?;
+    let settlements = format_settlements(&history.settlements)?;
+    writeln!(f, "### Transactions: {settlements}")?;
+    Ok(f)
+}
+
+pub fn format_settlements(settlements: &[SettlementJournalEntry]) -> Result<String> {
+    let mut f = String::new();
+    let mut table = Table::new();
+    table.set_titles(row!["Timestamp", "Order id", "Amount", "Type", "From Address"]);
+    settlements.iter().for_each(|settlement| {
+        table.add_row(row![
+            settlement.created_at,
+            settlement.order_id,
+            settlement.amount,
+            settlement.settlement_type,
+            settlement.payment_address.as_base58()
+        ]);
+    });
+    markdown_style(&mut table);
+    writeln!(f, "{table}")?;
     Ok(f)
 }

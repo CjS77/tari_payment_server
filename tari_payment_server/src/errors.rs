@@ -117,7 +117,7 @@ impl From<PaymentGatewayError> for ServerError {
     fn from(e: PaymentGatewayError) -> Self {
         use PaymentGatewayError::*;
         match &e {
-            UserAccountError(AccountApiError::InsufficientFunds) => ServerError::CannotCompleteRequest(e.to_string()),
+            AccountError(AccountApiError::InsufficientFunds) => ServerError::CannotCompleteRequest(e.to_string()),
             OrderModificationNoOp => ServerError::CannotCompleteRequest(e.to_string()),
             OrderModificationForbidden => ServerError::CannotCompleteRequest(e.to_string()),
             AccountShouldExistForOrder(_) | OrderNotFound(_) => ServerError::NoRecordFound(e.to_string()),

@@ -1,3 +1,4 @@
+@reset
 Feature: Admins can reset an order to the New state
   Background:
     Given a database with some accounts
@@ -28,14 +29,14 @@ Feature: Admins can reset an order to the New state
         """
     Then I receive a 200 OK response
     Then order "1" is in state Cancelled
-    Then account for alice has total orders worth 65 XTR
-    Then account for alice has current orders worth 65 XTR
+    Then customer id alice has cancelled orders worth 100 XTR
+    Then customer id alice has current orders worth 65 XTR
     When Admin PATCHs to "/api/reset_order/1" with body
     Then I receive a 200 OK response
     Then order "1" is in state New
-    Then account for alice has total orders worth 165 XTR
-    Then account for alice has current orders worth 165 XTR
-    Then Alice has a current balance of 0 Tari
+    Then customer id alice has cancelled orders worth 0 XTR
+    Then customer id alice has current orders worth 165 XTR
+    Then account for customer alice has a current balance of 0 XTR
 
   Scenario: Resetting a new order has no effect
     When Admin authenticates with nonce = 1 and roles = "write"
@@ -46,10 +47,10 @@ Feature: Admins can reset an order to the New state
     {"error": "Cannot complete this request. The requested order change is forbidden."}
     """
     Then order "1" is in state New
-    Then account for alice has total orders worth 165 XTR
-    Then account for alice has current orders worth 165 XTR
+    Then customer id alice has current orders worth 165 XTR
+    Then customer id alice has cancelled orders worth 0 XTR
 
-Scenario: If the user has credit after a reset, the order will be filled
+  Scenario: If the user has credit after a reset, the order will be filled
     When Admin authenticates with nonce = 1 and roles = "write"
     When Admin POSTs to "/api/cancel" with body
         """
@@ -60,8 +61,7 @@ Scenario: If the user has credit after a reset, the order will be filled
         """
     Then I receive a 200 OK response
     Then order "3" is in state Cancelled
-    Then account for alice has total orders worth 100 XTR
-    Then account for alice has current orders worth 100 XTR
+    Then customer id alice has current orders worth 100 XTR
     # Give Alice 70 Tari
     When Admin POSTs to "/api/credit" with body
         """
@@ -72,16 +72,15 @@ Scenario: If the user has credit after a reset, the order will be filled
         }
         """
     Then I receive a 200 OK response
-    Then account for alice has total orders worth 100 XTR
-    Then account for alice has current orders worth 100 XTR
-    Then Alice has a current balance of 70 Tari
+    Then customer id alice has current orders worth 100 XTR
+    Then account for customer alice has a current balance of 70 XTR
     # Ok, now reset the order
     When Admin PATCHs to "/api/reset_order/3" with body
     Then I receive a 200 OK response
     And order "3" is in state Paid
-    And account for alice has total orders worth 165 XTR
-    And account for alice has current orders worth 100 XTR
-    And Alice has a current balance of 5 Tari
+    And customer id alice has paid orders worth 65 XTR
+    And customer id alice has current orders worth 100 XTR
+    And account for customer alice has a current balance of 5 XTR
     And the NewOrder trigger fires with
     """
     {"order": {

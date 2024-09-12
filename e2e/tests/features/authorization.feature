@@ -1,3 +1,4 @@
+@auth
 Feature: users must supply an access token when accessing protected endpoints
   Background:
     Given a database with some accounts

@@ -1,3 +1,4 @@
+@admin
 Feature: super-admin
   Background:
     Given a database with some accounts

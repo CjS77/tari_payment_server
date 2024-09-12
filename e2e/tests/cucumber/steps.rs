@@ -257,30 +257,18 @@ async fn place_order(
     world.response = Some(res);
 }
 
-#[then(expr = "Customer #{int} has current orders worth {int} XTR")]
-async fn check_current_orders(world: &mut TPGWorld, account_id: i64, total: i64) {
-    let db = world.db.as_ref().expect("No database connection");
-    let account = db.fetch_user_account(account_id).await.expect("Failed to fetch account").expect("No account found");
-    trace!("User account: {account:?}");
-    let expected_current_orders = MicroTari::from_tari(total);
-    assert_eq!(account.current_orders, expected_current_orders);
-}
-
-#[then(regex = r"^account for (\w+) has (total|current) orders worth (-?\d+) XTR")]
+#[then(regex = r"^customer id (\w+) has (paid|current|expired|cancelled) orders worth (-?\d+) XTR")]
 async fn account_orders(world: &mut TPGWorld, cust_id: String, total_type: String, total: i64) {
     let db = world.db.as_ref().expect("No database connection");
-    let account = db
-        .fetch_user_account_for_customer_id(&cust_id)
-        .await
-        .expect("Failed to fetch account")
-        .expect("No account found");
-    trace!("User account: {account:?}");
-    let expected_total = match total_type.as_str() {
-        "total" => account.total_orders,
-        "current" => account.current_orders,
+    let balance = db.fetch_customer_order_balance(&cust_id).await.expect("Failed to fetch balance");
+    let actual = match total_type.as_str() {
+        "paid" => balance.total_paid,
+        "current" => balance.total_current,
+        "expired" => balance.total_expired,
+        "cancelled" => balance.total_cancelled,
         _ => panic!("Invalid total type: {total_type}"),
     };
-    assert_eq!(expected_total, MicroTari::from_tari(total));
+    assert_eq!(actual, MicroTari::from_tari(total));
 }
 
 #[then(expr = "order \"{word}\" is in state {word}")]
@@ -292,53 +280,29 @@ async fn check_order_state(world: &mut TPGWorld, order_id: String, state: String
     assert_eq!(order.status, status);
 }
 
-#[then(regex = r#"^Account (\d+) has a (current|pending) balance of (\d+) Tari$"#)]
-async fn check_account_balance(world: &mut TPGWorld, acc_id: i64, bal_type: String, balance: i64) {
+#[then(regex = r#"^address (\w+) has a current balance of (\d+) XTR"#)]
+async fn check_address_balance(world: &mut TPGWorld, address: String, expected_balance: i64) {
     let db = world.db.as_ref().expect("No database connection");
-    let account = db.fetch_user_account(acc_id).await.expect("Failed to fetch account").expect("No account found");
-    let expected_balance = MicroTari::from_tari(balance);
-    let actual_balance = match bal_type.as_str() {
-        "current" => account.current_balance,
-        "pending" => account.current_pending,
-        _ => panic!("Invalid balance type: {bal_type}"),
-    };
-    assert_eq!(actual_balance, expected_balance);
+    let address = address.parse().expect("Invalid address");
+    let balance = db.fetch_address_balance(&address).await.expect("Failed to fetch balance");
+    assert_eq!(balance.current_balance(), MicroTari::from_tari(expected_balance));
 }
 
-#[then(regex = r#"^(\w+) has a (current|pending) balance of (\d+) Tari$"#)]
-async fn check_balance(world: &mut TPGWorld, user: String, bal_type: String, balance: i64) {
+#[then(regex = r#"^account for customer (\w+) has a current balance of (-?\d+) XTR"#)]
+async fn check_balance(world: &mut TPGWorld, cust_id: String, expected_balance: i64) {
     let db = world.db.as_ref().expect("No database connection");
+    let balance = db.fetch_customer_balance(&cust_id).await.expect("Failed to fetch balance");
+    assert_eq!(balance.current_balance(), MicroTari::from_tari(expected_balance));
+}
+
+#[then(regex = r#"^User (\w+) has a pending balance of (-?\d+) XTR"#)]
+async fn check_pending_balance(world: &mut TPGWorld, user_name: String, expected_balance: i64) {
     let users = SeedUsers::new();
-    let user = users.user(&user);
-    let account = db
-        .fetch_user_account_for_address(&user.address)
-        .await
-        .expect("Failed to fetch account")
-        .expect("No account found");
-    let expected_balance = MicroTari::from_tari(balance);
-    let actual_balance = match bal_type.as_str() {
-        "current" => account.current_balance,
-        "pending" => account.current_pending,
-        _ => panic!("Invalid balance type: {bal_type}"),
-    };
-    assert_eq!(actual_balance, expected_balance);
-}
-
-#[then(regex = r#"^account for customer (\w+) has a (current|pending) balance of (-?\d+) Tari$"#)]
-async fn check_customer_balance(world: &mut TPGWorld, cust_id: String, bal_type: String, balance: i64) {
+    let address = users.user(user_name.as_str()).address.clone();
     let db = world.db.as_ref().expect("No database connection");
-    let account = db
-        .fetch_user_account_for_customer_id(&cust_id)
-        .await
-        .expect("Failed to fetch account")
-        .expect("No account found");
-    let expected_balance = MicroTari::from_tari(balance);
-    let actual_balance = match bal_type.as_str() {
-        "current" => account.current_balance,
-        "pending" => account.current_pending,
-        _ => panic!("Invalid balance type: {bal_type}"),
-    };
-    assert_eq!(actual_balance, expected_balance);
+    let payments = db.fetch_pending_payments_for_address(&address).await.expect("Failed to fetch payments");
+    let balance = payments.iter().map(|p| p.amount).sum::<MicroTari>();
+    assert_eq!(balance, MicroTari::from_tari(expected_balance));
 }
 
 #[then(expr = "the {word} trigger fires with")]
@@ -377,8 +341,8 @@ async fn instapay(world: &mut TPGWorld, amount: i64, sender: TariAddress, txid: 
     let amount = MicroTari::from_tari(amount);
     let db = world.db.as_ref().expect("No database connection");
     let payment = NewPayment::new(sender, amount, txid);
-    let (acc, payment) = db.process_new_payment_for_pubkey(payment).await.expect("Failed to process payment");
-    info!("Processed payment for account {acc}: {payment:?}");
+    let payment = db.process_new_payment(payment).await.expect("Failed to process payment");
+    info!("Processed payment: {payment:?}");
     confirm_payment(world, payment.txid).await;
 }
 

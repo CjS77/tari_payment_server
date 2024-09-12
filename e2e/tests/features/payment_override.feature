@@ -50,9 +50,9 @@ Feature: Admins can mark an order as Paid
     {"order_id": "1", "customer_id":"alice", "total_price": 100000000, "status": "Paid"}
     """
     Then order "1" is in state Paid
-    Then account for alice has total orders worth 165 XTR
-    Then account for alice has current orders worth 65 XTR
-    Then Alice has a current balance of 0 Tari
+    Then customer id alice has paid orders worth 100 XTR
+    Then customer id alice has current orders worth 65 XTR
+    Then account for customer alice has a current balance of 0 XTR
 
   Scenario: Marking an order Paid a second time has no effect
     When Admin authenticates with nonce = 1 and roles = "write"
@@ -78,6 +78,6 @@ Feature: Admins can mark an order as Paid
     {"error": "Cannot complete this request. The requested order change is forbidden."}
     """
     Then order "1" is in state Paid
-    Then account for alice has total orders worth 165 XTR
-    Then account for alice has current orders worth 65 XTR
-    Then Alice has a current balance of 0 Tari
+    Then customer id alice has paid orders worth 100 XTR
+    Then customer id alice has current orders worth 65 XTR
+    Then account for customer alice has a current balance of 0 XTR

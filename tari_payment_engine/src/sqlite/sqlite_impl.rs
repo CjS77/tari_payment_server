@@ -1,7 +1,7 @@
 //! `SqliteDatabase` is a concrete implementation of a Tari Payment engine backend.
 //!
 //! Unsurprisingly, it uses SQLite as the backend and implements all the traits defined in the [`traits`] module.
-use std::fmt::Debug;
+use std::{cmp::Reverse, fmt::Debug};
 
 use chrono::Duration;
 use log::*;
@@ -9,23 +9,29 @@ use sqlx::SqlitePool;
 use tari_common_types::tari_address::TariAddress;
 use tpg_common::MicroTari;
 
-use super::db::{auth, db_url, exchange_rates, new_pool, orders, transfers, user_accounts, wallet_auth};
+use super::db::{accounts, auth, db_url, exchange_rates, new_pool, orders, transfers, wallet_auth};
 use crate::{
     db_types::{
+        AddressBalance,
         CreditNote,
+        CustomerBalance,
+        CustomerOrderBalance,
+        CustomerOrders,
         NewOrder,
         NewPayment,
+        NewSettlementJournalEntry,
         Order,
         OrderId,
         OrderStatusType,
         Payment,
         Role,
+        SerializedTariAddress,
+        SettlementType,
         TransferStatus,
-        UserAccount,
     },
     order_objects::{ModifyOrderRequest, OrderChanged, OrderQueryFilter},
     tpe_api::{
-        account_objects::{FullAccount, Pagination},
+        account_objects::{AddressHistory, CustomerHistory, Pagination},
         exchange_objects::ExchangeRate,
     },
     traits::{
@@ -41,7 +47,6 @@ use crate::{
         OrderMovedResult,
         PaymentGatewayDatabase,
         PaymentGatewayError,
-        UpdateWalletInfo,
         WalletAuth,
         WalletAuthApiError,
         WalletInfo,
@@ -67,120 +72,90 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         self.url.as_str()
     }
 
-    async fn fetch_or_create_account_for_order(&self, order: &NewOrder) -> Result<i64, PaymentGatewayError> {
-        let mut conn = self.pool.acquire().await?;
-        let cust_id = Some(order.customer_id.clone());
-        let pubkey = order.address.as_ref().cloned();
-        let id = user_accounts::fetch_or_create_account(cust_id, pubkey, &mut conn).await?;
-        Ok(id)
-    }
-
-    async fn fetch_or_create_account_for_payment(&self, payment: &Payment) -> Result<i64, PaymentGatewayError> {
-        let mut conn = self.pool.acquire().await?;
-        let pubkey = Some(payment.sender.clone().to_address());
-        let customer_id = match payment.order_id.as_ref() {
-            Some(oid) => orders::fetch_order_by_order_id(oid, &mut conn).await?.map(|o| o.customer_id),
-            None => None,
-        };
-        let id = user_accounts::fetch_or_create_account(customer_id, pubkey, &mut conn).await?;
-        Ok(id)
-    }
-
-    async fn process_new_order_for_customer(&self, order: NewOrder) -> Result<i64, PaymentGatewayError> {
+    async fn claim_order(&self, order_id: &OrderId, address: &TariAddress) -> Result<Order, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
-        let price = order.total_price;
-        let id = orders::idempotent_insert(order.clone(), &mut tx).await?;
-        debug!("🗃️ Order #{} has been saved in the DB with id {id}", order.order_id);
-        let is_claimed = order.address.is_some();
-        let account_id =
-            user_accounts::fetch_or_create_account(Some(order.customer_id.clone()), order.address, &mut tx).await?;
-        if is_claimed {
-            orders::update_order_status(id, OrderStatusType::New, &mut tx).await?;
+        let order = orders::fetch_order_by_order_id(order_id, &mut tx)
+            .await?
+            .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
+        let addr58 = address.to_base58();
+        if order.status != OrderStatusType::Unclaimed {
+            warn!(
+                "🖇️️ Order {} is not 'Unclaimed' and {addr58} is trying to claim it. The current status is {}",
+                order.order_id, order.status
+            );
         }
-        user_accounts::incr_order_totals(account_id, price, price, &mut tx).await?;
+        let order = orders::update_order_status(order.id, OrderStatusType::New, &mut tx).await?;
+        accounts::link_address_to_customer(address, &order.customer_id, &mut tx).await?;
+        info!("🗃️ Address {addr58} has been linked with customer id {}", order.customer_id);
         tx.commit().await?;
-        Ok(account_id)
+        Ok(order)
+    }
+
+    async fn auto_claim_order(&self, order: &Order) -> Result<Option<(TariAddress, Order)>, PaymentGatewayError> {
+        if order.status != OrderStatusType::Unclaimed {
+            error!("🖇️️ Order {} is not 'Unclaimed' and cannot be auto-claimed", order.order_id);
+            return Err(PaymentGatewayError::OrderModificationForbidden);
+        }
+        let mut tx = self.pool.begin().await?;
+        let cust_id = &order.customer_id;
+        let address = accounts::balances_for_customer_id(cust_id, &mut tx).await?;
+        // The first address is the most recent one
+        let Some(address) = address.first().map(|a| a.address().clone()) else {
+            // We could omit the tx commit here, 'cos we're not making any changes
+            tx.commit().await?;
+            return Ok(None);
+        };
+        let order = orders::update_order_status(order.id, OrderStatusType::New, &mut tx).await?;
+        tx.commit().await?;
+        Ok(Some((address, order)))
+    }
+
+    async fn insert_order(&self, order: NewOrder) -> Result<(Order, bool), PaymentGatewayError> {
+        let mut conn = self.pool.acquire().await?;
+        let result = orders::idempotent_insert(order, &mut conn).await?;
+        Ok(result)
     }
 
     /// Takes a new payment, and in a single atomic transaction,
     /// * calls `save_payment` to store the payment in the database. If the payment already exists, nothing further is
     ///   done.
     /// * The payment is marked as `Unconfirmed`
-    /// * creates a new account for the address if one does not already exist
     /// * Adds the payment amount to the account's total received, and total pending
     ///
-    /// Returns the account id for the public key.
-    async fn process_new_payment_for_pubkey(&self, payment: NewPayment) -> Result<(i64, Payment), PaymentGatewayError> {
+    /// Returns the newly created Payment record.
+    async fn process_new_payment(&self, payment: NewPayment) -> Result<Payment, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
-        let payment = transfers::idempotent_insert(payment.clone(), &mut tx).await?;
+        let maybe_order_id = payment.order_id.clone();
         debug!("🗃️ Payment {} received from [{}]", payment.txid, payment.sender.as_address());
-        let customer_id = match &payment.order_id {
-            Some(order_id) => {
-                let existing_order = orders::fetch_order_by_order_id(order_id, &mut tx).await?;
-                existing_order.map(|o| o.customer_id)
-            },
-            None => None,
-        };
-        let sender = Some(payment.sender.as_address().clone());
-        let acc_id = match user_accounts::fetch_or_create_account(customer_id, sender, &mut tx).await {
-            Ok(id) => id,
-            Err(AccountApiError::AmbiguousAccounts(info)) => {
-                // There are multiple accounts for the same address-customer pair. So we need to disambiguate
-                info!(
-                    "🗃️ The payment from address {addr} specified an order to pay, but it is already associated with \
-                     customer {cust} on account {o_acc}.I'm going to create a new entry linking the address {addr} to \
-                     account {o_acc}",
-                    addr = info.address,
-                    cust = info.customer_id,
-                    o_acc = info.customer_account_id
-                );
-                user_accounts::link_accounts(info.customer_account_id, None, Some(info.address), &mut tx).await?
-            },
-            Err(e) => return Err(e.into()),
-        };
-        user_accounts::adjust_balances(acc_id, payment.amount, payment.amount, MicroTari::from(0), &mut tx).await?;
+        let payment = transfers::idempotent_insert(payment, &mut tx).await?;
+        // If the order id is already known, link the address and customer_id
+        if let Some(order_id) = maybe_order_id {
+            accounts::link_address_to_order(&order_id, payment.sender.as_address(), &mut tx).await?;
+            info!("🗃️ Address {} linked to order {order_id}", payment.sender.as_address());
+        }
         debug!("🗃️ Transfer {} processed. {} credited to pending account", payment.txid, payment.amount);
         tx.commit().await?;
-        Ok((acc_id, payment))
+        Ok(payment)
     }
 
-    async fn process_credit_note_for_customer(&self, note: CreditNote) -> Result<(i64, Payment), PaymentGatewayError> {
+    async fn fetch_pending_payments_for_address(
+        &self,
+        address: &TariAddress,
+    ) -> Result<Vec<Payment>, PaymentGatewayError> {
+        let mut conn = self.pool.acquire().await?;
+        let payments = transfers::pending_payments(address, &mut conn).await?;
+        Ok(payments)
+    }
+
+    async fn process_credit_note_for_customer(&self, note: CreditNote) -> Result<Payment, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
-        let payment = transfers::credit_note(note.clone(), &mut tx).await?;
+        let payment = transfers::credit_note(&note, &mut tx).await?;
         debug!("🗃️ Credit note for {} created with address {}", note.customer_id, payment.sender.as_address());
-        let CreditNote { amount, customer_id, .. } = note;
-        let sender = Some(payment.sender.as_address().clone());
-        let account_id = user_accounts::fetch_or_create_account(Some(customer_id), sender, &mut tx).await?;
-        trace!("🗃️ Credit note: account {account_id} has been retrieved/created");
-        let zero = MicroTari::from(0);
-        user_accounts::adjust_balances(account_id, amount, zero, amount, &mut tx).await?;
-        trace!("🗃️ Credit note: adjusting balances for account {account_id} by {amount}");
+        let address = payment.sender.as_address();
+        accounts::link_address_to_customer(address, &note.customer_id, &mut tx).await?;
+        debug!("🗃️ Dummy wallet {} linked to customer id {}", address.to_base58(), note.customer_id);
         tx.commit().await?;
-        Ok((account_id, payment))
-    }
-
-    async fn fetch_payable_orders(&self, account_id: i64) -> Result<Vec<Order>, PaymentGatewayError> {
-        let mut tx = self.pool.begin().await?;
-        let account = user_accounts::user_account_by_id(account_id, &mut tx)
-            .await?
-            .ok_or(PaymentGatewayError::AccountNotFound(account_id))?;
-        let query = OrderQueryFilter::default()
-            .with_account_id(account_id)
-            .with_status(OrderStatusType::Unclaimed)
-            .with_status(OrderStatusType::New);
-        let unpaid_orders = orders::search_orders(query, &mut tx).await?;
-        let balance = account.current_balance;
-        trace!("🗃️ Account #{account_id} has {} unpaid orders and a balance of {}.", unpaid_orders.len(), balance);
-        let (paid_orders, _new_balance) =
-            unpaid_orders.into_iter().fold((vec![], balance), |(mut orders, mut balance), order| {
-                if balance >= order.total_price {
-                    balance -= order.total_price;
-                    orders.push(order);
-                }
-                (orders, balance)
-            });
-        tx.commit().await?;
-        Ok(paid_orders)
+        Ok(payment)
     }
 
     async fn fetch_payable_orders_for_address(&self, address: &TariAddress) -> Result<Vec<Order>, PaymentGatewayError> {
@@ -189,123 +164,69 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         Ok(orders)
     }
 
-    async fn try_pay_orders(&self, account_id: i64, orders: &[Order]) -> Result<Vec<Order>, PaymentGatewayError> {
+    /// Tries to pay for a single order from any wallet associated with the order's customer Id.
+    ///
+    /// It's possible to pay for the order from multiple wallets, in which case the settlement type will be `Multiple`,
+    /// with the sum total of the payments being equal to the order's total price.
+    async fn try_pay_order(&self, order: &Order) -> Result<MultiAccountPayment, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
-        let account = user_accounts::user_account_by_id(account_id, &mut tx)
-            .await?
-            .ok_or(PaymentGatewayError::AccountNotFound(account_id))?;
-        let mut new_balance = account.current_balance;
-        let mut result = Vec::with_capacity(orders.len());
-        for order in orders {
-            if new_balance >= order.total_price {
-                new_balance -= order.total_price;
-                let updated_order = orders::update_order_status(order.id, OrderStatusType::Paid, &mut tx).await?;
-                trace!("🗃️ Order #{} of {} marked as paid", order.id, order.total_price);
-                result.push(updated_order);
+        let mut balances = accounts::balances_for_customer_id(&order.customer_id, &mut tx).await?;
+        let mut total_due = order.total_price;
+        let total_credit = balances.iter().map(|b| b.current_balance()).sum();
+        if balances.is_empty() || (total_due > total_credit) {
+            let err = PaymentGatewayError::AccountError(AccountApiError::InsufficientFunds);
+            return Err(err);
+        }
+        // Sort the balances in descending order of current balance
+        balances.sort_by_key(|b| Reverse(b.current_balance()));
+        // Preferably, use a `Single` journal entry type
+        let settlement_type =
+            if balances[0].current_balance() > total_due { SettlementType::Single } else { SettlementType::Multiple };
+        let mut result = MultiAccountPayment::new(SerializedTariAddress::from(balances[0].address()), vec![], vec![]);
+        let zero = MicroTari::from(0);
+        for account in balances {
+            let address = SerializedTariAddress::from(account.address());
+            let amount_paid = account.current_balance().min(total_due);
+            total_due -= amount_paid;
+            let settlement = NewSettlementJournalEntry {
+                order_id: order.order_id.clone(),
+                payment_address: address,
+                amount: amount_paid,
+                settlement_type,
+            };
+            let settlement = accounts::insert_settlement(settlement, &mut tx).await?;
+            result.settlements.push(settlement);
+            if total_due == zero {
+                break;
             }
         }
-        let total_paid = account.current_balance - new_balance;
-        if total_paid != MicroTari::from(0) {
-            user_accounts::update_user_balance(account_id, new_balance, &mut tx).await?;
-            trace!("Account {account_id} balance updated from {} to {new_balance}", account.current_balance);
-            user_accounts::incr_order_totals(account_id, MicroTari::from(0), -total_paid, &mut tx).await?;
-            trace!("🗃️ Adjusted account #{account_id} orders outstanding by {total_paid}.");
+        if total_due == zero {
+            let paid_order = orders::update_order_status(order.id, OrderStatusType::Paid, &mut tx).await?;
+            result.orders_paid.push(paid_order);
         }
         tx.commit().await?;
         Ok(result)
     }
 
+    /// Tries to fulfil the orders using the address as payment source.
+    ///
+    /// This method will not try and use other addresses that are also linked to the customer ids in the order list.
     async fn try_pay_orders_from_address(
         &self,
         address: &TariAddress,
         orders: &[&Order],
     ) -> Result<MultiAccountPayment, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
-        // Fetch accounts with oldest account LAST
-        let mut accounts = user_accounts::fetch_accounts_for_address(address, false, &mut tx).await?;
-        let mut total_credit = accounts.iter().map(|acc| acc.current_balance).sum::<MicroTari>();
-        trace!("🗃️ Address {address} has {} accounts with a total credit of {total_credit}", accounts.len());
-        let mut paid_orders = Vec::with_capacity(orders.len());
-        let mut used_accounts: Vec<(i64, MicroTari)> = Vec::with_capacity(accounts.len());
-        for &order in orders {
-            // We must be able to pay for the entire order, or no deal.
-            trace!("🗃️ Trying to pay order {}", order.id);
-            if order.total_price > total_credit {
-                break;
-            }
-            trace!("🗃️ Order {} can be paid", order.id);
-            let mut outstanding_amount = order.total_price;
-            // Pay for order using oldest accounts FIRST (they're at the end of the list)
-            while accounts[0].current_balance < outstanding_amount {
-                let Some(used_acc) = accounts.pop() else {
-                    error!(
-                        "🗃️ Not enough funds to partially pay for order {} from address {address}. This is a bug, \
-                         because I've just checked that there are enough funds to cover the payment. Aborting this \
-                         transaction, and fix this ASAP",
-                        order.id
-                    );
-                    return Err(PaymentGatewayError::DatabaseError("Internal bug. Check Logs".into()));
-                };
-                if used_acc.current_balance == MicroTari::from(0) {
-                    trace!("🗃️ Skipping account {} because it has a balance of 0", used_acc.id);
-                    continue;
-                }
-                trace!(
-                    "🗃️ Used the {} in account {} to help pay for order {}",
-                    used_acc.current_balance,
-                    used_acc.id,
-                    order.id
-                );
-                let used_amount = used_acc.current_balance.min(outstanding_amount);
-                total_credit -= used_amount;
-                outstanding_amount -= used_amount;
-                used_accounts.push((used_acc.id, used_amount));
-            }
-            // This top account now has enough balance to pay for the order
-            let Some(used_acc) = accounts.last_mut() else {
-                error!(
-                    "🗃️ Not enough funds to complete payment for order {} from address {address}. This is a bug, \
-                     because I've just checked that there are enough funds to cover the payment. Aborting this \
-                     transaction, and fix this ASAP",
-                    order.id
-                );
-                return Err(PaymentGatewayError::DatabaseError("Internal bug. Check Logs".into()));
-            };
-            trace!(
-                "🗃️ Using {} in account {} to pay remainder of order {}",
-                used_acc.current_balance,
-                used_acc.id,
-                order.id
-            );
-            total_credit -= outstanding_amount;
-            used_accounts.push((used_acc.id, outstanding_amount));
-            used_acc.current_balance -= outstanding_amount;
-            let updated_order = orders::update_order_status(order.id, OrderStatusType::Paid, &mut tx).await?;
-            debug!("🗃️ Order {} paid for during multi-account payment", order.id);
-            paid_orders.push(updated_order);
-        }
-        // Update user balances
-        trace!("🗃️ Updating balances for for used accounts: {used_accounts:?}");
-        for (acc_id, amount) in &used_accounts {
-            let zero = MicroTari::from(0);
-            user_accounts::adjust_balances(*acc_id, zero, zero, -(*amount), &mut tx).await?;
-        }
-        let result = MultiAccountPayment::new(address.clone().into(), paid_orders, &used_accounts);
+        let result = self.pay_orders_for_address_with_conn(address, orders, &mut tx).await?;
         tx.commit().await?;
         Ok(result)
     }
 
-    async fn update_payment_status(
-        &self,
-        txid: &str,
-        status: TransferStatus,
-    ) -> Result<(i64, Payment), PaymentGatewayError> {
-        let mut tx = self.pool.begin().await?;
-        let payment = transfers::fetch_payment(txid, &mut tx).await?;
-        if payment.is_none() {
+    async fn update_payment_status(&self, txid: &str, status: TransferStatus) -> Result<Payment, PaymentGatewayError> {
+        let mut conn = self.pool.acquire().await?;
+        let Some(payment) = transfers::fetch_payment(txid, &mut conn).await? else {
             return Err(PaymentGatewayError::PaymentStatusUpdateError(format!("Payment {txid} not found")));
-        }
-        let payment = payment.unwrap();
+        };
         let old_status = payment.status;
         trace!("🗃️ Updating payment: Payment {txid} is currently {old_status}");
         use TransferStatus::*;
@@ -322,27 +243,10 @@ impl PaymentGatewayDatabase for SqliteDatabase {
                 "Payment {txid} has status {status} instead of 'Received'"
             )));
         }
-        trace!("🗃️ Looking for account linked to payment {txid}");
-        let account = match user_accounts::user_account_for_tx(txid, &mut tx).await {
-            Ok(Some(acc)) => Ok(acc),
-            Ok(None) => Err(PaymentGatewayError::AccountNotLinkedWithTransaction(format!(
-                "No account is not linked to payment {txid}"
-            ))),
-            Err(e) => Err(e.into()),
-        }?;
-        let acc_id = account.id;
-        let unchanged = MicroTari::from(0);
-        let amount = payment.amount;
-        let payment = transfers::update_status(txid, status, &mut tx).await?;
 
-        match status {
-            Confirmed => user_accounts::adjust_balances(acc_id, unchanged, -amount, amount, &mut tx).await?,
-            Cancelled => user_accounts::adjust_balances(acc_id, -amount, -amount, unchanged, &mut tx).await?,
-            _ => unreachable!(),
-        };
-        debug!("🗃️ Payment [{txid}] is now {status}. Balances have been updated.");
-        tx.commit().await?;
-        Ok((acc_id, payment))
+        let payment = transfers::update_status(txid, status, &mut conn).await?;
+        debug!("🗃️ Payment [{txid}] is now {status}.");
+        Ok(payment)
     }
 
     async fn fetch_payment_by_tx_id(&self, tx_id: &str) -> Result<Payment, PaymentGatewayError> {
@@ -352,31 +256,33 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     }
 
     /// A manual order status transition from `New` to `Paid` status.
-    /// This method is called by the default implementation of [`modify_status_for_order`] when the new status is
-    /// `Paid`. When this happens, the following side effects occur:
-    /// * A credit note for the `total_price` is created,
+    /// A credit note for the `total_price` is created.
     async fn mark_new_order_as_paid(&self, order: Order, reason: &str) -> Result<Order, PaymentGatewayError> {
         if order.status != OrderStatusType::New {
             error!("🗃️ Order {} is not in 'New' status. Cannot call **new**_to_paid", order.id);
             return Err(PaymentGatewayError::OrderModificationForbidden);
         }
         let mut tx = self.pool.begin().await?;
-        let mut account = user_accounts::user_account_for_order(&order.order_id, &mut tx)
-            .await?
-            .ok_or_else(|| PaymentGatewayError::AccountShouldExistForOrder(order.order_id.clone()))?;
         let reason = format!("Admin credit overrode for order {}. Reason: {reason}", order.order_id);
         let note = CreditNote::new(order.customer_id.clone(), order.total_price).with_reason(reason);
-        let payment = transfers::credit_note(note, &mut tx).await?;
-        info!(
+        let payment = transfers::credit_note(&note, &mut tx).await?;
+        let address = payment.sender.to_address();
+        debug!(
             "🗃️ Credit note: Customer {} received note for {} with address {}",
             order.customer_id,
             order.total_price,
-            payment.sender.as_address()
+            address.to_base58(),
         );
-        // Update account ex-database. This is safe because the transaction will roll back if there's an error
-        account.current_balance = account.current_balance + order.total_price;
-        let updated_order = orders::try_pay_order(&account, &order, &mut tx).await?;
+        let mut result = self.pay_orders_for_address_with_conn(&address, &[&order], &mut tx).await?;
+        if result.orders_paid.is_empty() {
+            error!(
+                "🗃️ Order {} could not be paid for atfer issuing a credit note. This is most likely a bug",
+                order.id
+            );
+            return Err(PaymentGatewayError::OrderNotFound(order.order_id));
+        }
         tx.commit().await?;
+        let updated_order = result.orders_paid.remove(0);
         Ok(updated_order)
     }
 
@@ -421,7 +327,6 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     /// The effect is as if a new order comes in with the given details.
     ///
     /// * The order status is updated in the database.
-    /// * The [`process_order`] flow is triggered.
     async fn reset_order(&self, order_id: &OrderId) -> Result<OrderChanged, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
         let old_order = orders::fetch_order_by_order_id(order_id, &mut tx)
@@ -435,12 +340,6 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         let updated_order = orders::update_order(&old_order.order_id, update, &mut tx)
             .await?
             .ok_or_else(|| AccountApiError::OrderDoesNotExist(old_order.order_id.clone()))?;
-
-        let price = updated_order.total_price;
-        let account = user_accounts::user_account_for_customer_id(&updated_order.customer_id, &mut tx)
-            .await?
-            .ok_or_else(|| PaymentGatewayError::AccountShouldExistForOrder(updated_order.order_id.clone()))?;
-        user_accounts::incr_order_totals(account.id, price, price, &mut tx).await?;
         tx.commit().await?;
         let result = OrderChanged::new(old_order, updated_order);
         Ok(result)
@@ -448,13 +347,12 @@ impl PaymentGatewayDatabase for SqliteDatabase {
 
     /// Change the customer id for the given `order_id`. This function has several side effects:
     /// - The `customer_id` field of the order is updated in the database.
-    /// - The total orders for the old and new customer are updated.
     /// - If the new customer does not exist, a new one is created.
     /// - If the order status was `Expired`, or `Cancelled`, it is **not** automatically reset to `New`. The admin must
     ///   follow up with a "change status" call to reset the order.
     ///
     /// ## Returns:
-    /// - The old and new account ids; and the updated order, if it was paid for by the new account.
+    /// - The updated order, if it was paid for by the new account.
     ///
     /// ## Failure modes:
     /// - If the order does not exist, an error is returned.
@@ -464,7 +362,6 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         order_id: &OrderId,
         new_cid: &str,
     ) -> Result<OrderMovedResult, PaymentGatewayError> {
-        let update = ModifyOrderRequest::default().with_new_customer_id(new_cid);
         let mut tx = self.pool.begin().await?;
         let old_order = orders::fetch_order_by_order_id(order_id, &mut tx)
             .await?
@@ -473,22 +370,13 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         if matches!(old_order.status, OrderStatusType::Paid) {
             return Err(PaymentGatewayError::OrderModificationForbidden);
         }
-        let old_acc = user_accounts::user_account_for_order(order_id, &mut tx).await?;
-        if old_acc.is_none() {
-            warn!("Order {order_id} does not have an associated account. This should not happen.");
-            tx.rollback().await?;
-            return Err(PaymentGatewayError::AccountShouldExistForOrder(order_id.clone()));
-        }
-        let old_account = old_acc.unwrap();
-        let cust_id = Some(new_cid.into());
-        let new_account_id = user_accounts::fetch_or_create_account(cust_id, None, &mut tx).await?;
-
-        if old_account.id == new_account_id {
-            debug!("🗃️ Order {order_id} is being reassigned to the same account. No action taken.");
+        if new_cid == old_order.customer_id {
+            debug!("🗃️ Order {order_id} is being reassigned to the same customer. No action taken.");
             tx.rollback().await?;
             return Err(PaymentGatewayError::OrderModificationNoOp);
         }
-        let new_order = orders::update_order(order_id, update, &mut tx).await?.ok_or_else(|| {
+        let update = ModifyOrderRequest::default().with_new_customer_id(new_cid);
+        let mut new_order = orders::update_order(order_id, update, &mut tx).await?.ok_or_else(|| {
             error!(
                 "Order {order_id} does not exist, but we fetched it within this same transaction. This should not \
                  happen. There's a data race of sorts happening here and should be sorted out."
@@ -497,48 +385,29 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         })?;
         // Order is either expired, cancelled or new by now. If expired or cancelled, we don't need to make any
         // adjustments but new orders need to be accounted for.
-        if matches!(new_order.status, OrderStatusType::New) {
-            user_accounts::incr_order_totals(old_account.id, -new_order.total_price, -new_order.total_price, &mut tx)
-                .await?;
-            debug!(
-                "🗃️ We're transferring an active order {order_id} from Customer {new_cid}. Their order totals were \
-                 adjusted accordingly."
-            );
-        }
+        tx.commit().await?;
 
-        let mut filled_order = None;
+        let mut settlements = Vec::new();
         if let OrderStatusType::New = new_order.status {
-            let new_account = user_accounts::user_account_by_id(new_account_id, &mut tx).await?.ok_or_else(|| {
-                error!("Account {new_account_id} does not exist, but we just created it. This should not happen.");
-                PaymentGatewayError::AccountShouldExistForOrder(order_id.clone())
-            })?;
-            let _ =
-                user_accounts::incr_order_totals(new_account_id, new_order.total_price, new_order.total_price, &mut tx)
-                    .await?;
-            debug!(
-                "🗃️ We've transferred an active order, {order_id}, to Customer id {new_cid}. Their order total has \
-                 been adjusted accordingly"
-            );
-            filled_order = match orders::try_pay_order(&new_account, &new_order, &mut tx).await {
-                Ok(order) => {
-                    debug!("🗃️ Order {order_id} has been paid for by the new account {new_account_id}");
-                    Some(order)
+            match self.try_pay_order(&new_order).await {
+                Ok(res) => {
+                    let mut orders_paid;
+                    MultiAccountPayment { settlements, orders_paid, .. } = res;
+                    if !orders_paid.is_empty() {
+                        new_order = orders_paid.remove(0);
+                    }
                 },
-                Err(AccountApiError::InsufficientFunds) => {
+                Err(PaymentGatewayError::AccountError(AccountApiError::InsufficientFunds)) => {
                     debug!(
-                        "🗃️ There weren't enough funds to pay for order {order_id} from the new account \
-                         {new_account_id} immediately, so the order remains as current"
+                        "🗃️ There weren't enough funds to pay for order {order_id} from the new customer id {} \
+                         immediately",
+                        new_cid
                     );
-                    None
                 },
-                Err(e) => return Err(e.into()),
+                Err(e) => return Err(e),
             };
         }
-        tx.commit().await?;
-        let result = match filled_order {
-            Some(filled_order) => OrderMovedResult::new(old_account.id, new_account_id, old_order, filled_order, true),
-            None => OrderMovedResult::new(old_account.id, new_account_id, old_order, new_order, false),
-        };
+        let result = OrderMovedResult::new(old_order, new_order, settlements);
         Ok(result)
     }
 
@@ -598,50 +467,6 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         Ok(delta)
     }
 
-    async fn attach_order_to_address(
-        &self,
-        order_id: &OrderId,
-        address: &TariAddress,
-    ) -> Result<(UserAccount, Order), PaymentGatewayError> {
-        let mut tx = self.pool.begin().await?;
-        let order = orders::fetch_order_by_order_id(order_id, &mut tx)
-            .await?
-            .ok_or_else(|| AccountApiError::OrderDoesNotExist(order_id.clone()))?;
-        let order = if order.status == OrderStatusType::Unclaimed {
-            orders::update_order_status(order.id, OrderStatusType::New, &mut tx).await?
-        } else {
-            warn!(
-                "🖇️️ Order {} is not 'Unclaimed' and we're trying to reassign the associated address. The current \
-                 status is {}",
-                order.order_id, order.status
-            );
-            order
-        };
-        let customer_id = order.customer_id.clone();
-        let acc_id =
-            match user_accounts::fetch_or_create_account(Some(customer_id), Some(address.clone()), &mut tx).await {
-                Ok(id) => id,
-                Err(AccountApiError::AmbiguousAccounts(info)) => {
-                    info!(
-                        "🖇️️ The wallet address {address} is already associated with {acc_len} account(s), but the \
-                         order is associated with customer {cust} on account {o_acc}.I'm going ahead and linking \
-                         {address} to account {o_acc} anyway, since it was requested.",
-                        address = address,
-                        acc_len = info.address_account_ids.len(),
-                        cust = info.customer_id,
-                        o_acc = info.customer_account_id
-                    );
-                    user_accounts::link_accounts(info.customer_account_id, None, Some(address.clone()), &mut tx).await?
-                },
-                Err(e) => return Err(e.into()),
-            };
-        let account = user_accounts::user_account_by_id(acc_id, &mut tx)
-            .await?
-            .ok_or_else(|| PaymentGatewayError::AccountShouldExistForOrder(order_id.clone()))?;
-        tx.commit().await?;
-        Ok((account, order))
-    }
-
     async fn expire_old_orders(
         &self,
         unclaimed_limit: Duration,
@@ -661,45 +486,16 @@ impl PaymentGatewayDatabase for SqliteDatabase {
 }
 
 impl AccountManagement for SqliteDatabase {
-    async fn fetch_user_account(&self, account_id: i64) -> Result<Option<UserAccount>, AccountApiError> {
+    async fn fetch_orders_for_address(&self, address: &TariAddress) -> Result<Vec<Order>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
-        user_accounts::user_account_by_id(account_id, &mut conn).await
-    }
-
-    /// Fetches the user account for the given order id. A user account must have already been created for this account.
-    /// If no account is found, `None` will be returned.
-    async fn fetch_user_account_for_order(&self, order_id: &OrderId) -> Result<Option<UserAccount>, AccountApiError> {
-        let mut conn = self.pool.acquire().await?;
-        user_accounts::user_account_for_order(order_id, &mut conn).await
-    }
-
-    async fn fetch_user_account_for_customer_id(
-        &self,
-        customer_id: &str,
-    ) -> Result<Option<UserAccount>, AccountApiError> {
-        let mut conn = self.pool.acquire().await?;
-        user_accounts::user_account_for_customer_id(customer_id, &mut conn).await
-    }
-
-    async fn fetch_user_account_for_address(
-        &self,
-        address: &TariAddress,
-    ) -> Result<Option<UserAccount>, AccountApiError> {
-        let mut conn = self.pool.acquire().await?;
-        user_accounts::user_account_for_address(address, &mut conn).await
-    }
-
-    async fn fetch_orders_for_account(&self, account_id: i64) -> Result<Vec<Order>, AccountApiError> {
-        let mut conn = self.pool.acquire().await?;
-        let query = OrderQueryFilter::default().with_account_id(account_id);
-        let orders = orders::search_orders(query, &mut conn).await?;
+        let orders = accounts::orders_for_address(address, &mut conn).await?;
         Ok(orders)
     }
 
     async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
-        let oid = orders::fetch_order_by_order_id(order_id, &mut conn).await?;
-        Ok(oid)
+        let order = orders::fetch_order_by_order_id(order_id, &mut conn).await?;
+        Ok(order)
     }
 
     async fn fetch_payments_for_address(&self, address: &TariAddress) -> Result<Vec<Payment>, AccountApiError> {
@@ -708,53 +504,75 @@ impl AccountManagement for SqliteDatabase {
         Ok(payments)
     }
 
-    async fn history_for_address(&self, address: &TariAddress) -> Result<Option<FullAccount>, AccountApiError> {
+    async fn history_for_address(&self, address: &TariAddress) -> Result<AddressHistory, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
-        let id = match user_accounts::user_account_for_address(address, &mut conn).await? {
-            Some(acc) => acc.id,
-            None => return Ok(None),
-        };
-        user_accounts::history_for_id(id, &mut conn).await
+        let balance = accounts::fetch_address_balance(address, &mut conn).await?;
+        let payments = transfers::fetch_payments_for_address(address, &mut conn).await?;
+        let orders = accounts::orders_for_address(address, &mut conn).await?;
+        let settlements = accounts::settlements_for_address(address, &mut conn).await?;
+        let address = SerializedTariAddress::from(address.clone());
+        let history = AddressHistory::new(address, balance, orders, payments, settlements);
+        Ok(history)
     }
 
-    async fn history_for_id(&self, id: i64) -> Result<Option<FullAccount>, AccountApiError> {
+    async fn history_for_customer(&self, customer_id: &str) -> Result<CustomerHistory, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
-        user_accounts::history_for_id(id, &mut conn).await
+        let balances = accounts::balances_for_customer_id(customer_id, &mut conn).await?;
+        let balance = CustomerBalance::new(balances);
+        let order_balance = accounts::customer_order_balance(customer_id, &mut conn).await?;
+        let query = OrderQueryFilter::default().with_customer_id(customer_id.to_string());
+        let orders = orders::search_orders(query, &mut conn).await?;
+        let settlements = accounts::settlements_for_customer_id(customer_id, &mut conn).await?;
+        let history = CustomerHistory::builder(customer_id.to_string())
+            .balance(balance)
+            .order_balance(order_balance)
+            .orders(orders)
+            .settlements(settlements)
+            .build()?;
+        Ok(history)
     }
 
-    async fn search_orders(
-        &self,
-        mut query: OrderQueryFilter,
-        only_for: Option<TariAddress>,
-    ) -> Result<Vec<Order>, AccountApiError> {
+    async fn search_orders(&self, query: OrderQueryFilter) -> Result<Vec<Order>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
-        if let Some(address) = only_for {
-            let id = match user_accounts::user_account_for_address(&address, &mut conn).await? {
-                Some(acc) => acc.id,
-                None => return Ok(vec![]),
-            };
-            query = query.with_account_id(id);
-        }
         let orders = orders::search_orders(query, &mut conn).await?;
         Ok(orders)
     }
 
-    async fn creditors(&self) -> Result<Vec<UserAccount>, AccountApiError> {
+    async fn creditors(&self) -> Result<Vec<CustomerOrders>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
-        let accounts = user_accounts::creditors(&mut conn).await?;
+        let accounts = accounts::creditors(&mut conn).await?;
         Ok(accounts)
     }
 
     async fn fetch_customer_ids(&self, pagination: &Pagination) -> Result<Vec<String>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
-        let ids = user_accounts::customer_ids(pagination, &mut conn).await?;
+        let ids = accounts::customer_ids(pagination, &mut conn).await?;
         Ok(ids)
     }
 
     async fn fetch_addresses(&self, pagination: &Pagination) -> Result<Vec<TariAddress>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
-        let addresses = user_accounts::addresses(pagination, &mut conn).await?;
+        let addresses = accounts::addresses(pagination, &mut conn).await?;
         Ok(addresses)
+    }
+
+    async fn fetch_address_balance(&self, address: &TariAddress) -> Result<AddressBalance, AccountApiError> {
+        let mut conn = self.pool.acquire().await?;
+        let account = accounts::fetch_address_balance(address, &mut conn).await?;
+        Ok(account)
+    }
+
+    async fn fetch_customer_balance(&self, customer_id: &str) -> Result<CustomerBalance, AccountApiError> {
+        let mut conn = self.pool.acquire().await?;
+        let balances = accounts::balances_for_customer_id(customer_id, &mut conn).await?;
+        let balance = CustomerBalance::new(balances);
+        Ok(balance)
+    }
+
+    async fn fetch_customer_order_balance(&self, customer_id: &str) -> Result<CustomerOrderBalance, AccountApiError> {
+        let mut conn = self.pool.acquire().await?;
+        let balances = accounts::customer_order_balance(customer_id, &mut conn).await?;
+        Ok(balances)
     }
 }
 
@@ -834,10 +652,6 @@ impl WalletManagement for SqliteDatabase {
         wallet_auth::deregister_wallet(_wallet_address, &mut conn).await
     }
 
-    async fn update_wallet_info(&self, _wallet: UpdateWalletInfo) -> Result<(), WalletManagementError> {
-        todo!()
-    }
-
     async fn fetch_authorized_wallets(&self) -> Result<Vec<WalletInfo>, WalletManagementError> {
         let mut conn = self.pool.acquire().await?;
         wallet_auth::fetch_authorized_wallets(&mut conn).await
@@ -876,5 +690,41 @@ impl SqliteDatabase {
     /// Returns a reference to the database connection pool.
     pub fn pool(&self) -> &SqlitePool {
         &self.pool
+    }
+
+    async fn pay_orders_for_address_with_conn(
+        &self,
+        address: &TariAddress,
+        orders: &[&Order],
+        tx: &mut sqlx::SqliteConnection,
+    ) -> Result<MultiAccountPayment, PaymentGatewayError> {
+        let balance = accounts::fetch_address_balance(address, tx).await?;
+        let mut remaining_credit = balance.current_balance();
+        trace!("🗃️ Address balance of {} is {remaining_credit}", address.to_base58());
+        let mut paid_orders = Vec::with_capacity(orders.len());
+        let mut settlements = Vec::with_capacity(orders.len());
+        for &order in orders {
+            // We must be able to pay for the entire order, or no deal.
+            trace!("🗃️ Checking if there's enough credit ({remaining_credit}) to pay for order [{}]", order.order_id);
+            if order.total_price > remaining_credit {
+                break;
+            }
+            trace!("🗃️ Order [{}] can be paid", order.order_id);
+            remaining_credit -= order.total_price;
+            let settlement = NewSettlementJournalEntry {
+                order_id: order.order_id.clone(),
+                payment_address: SerializedTariAddress::from(address.clone()),
+                amount: order.total_price,
+                settlement_type: SettlementType::Single,
+            };
+            let settlement = accounts::insert_settlement(settlement, tx).await?;
+            trace!("🗃️ Settlement journal entry created for order [{}] (id: {})", order.order_id, order.id);
+            settlements.push(settlement);
+            let updated_order = orders::update_order_status(order.id, OrderStatusType::Paid, tx).await?;
+            debug!("🗃️ Order {} paid for during multi-account payment", order.id);
+            paid_orders.push(updated_order);
+        }
+        let result = MultiAccountPayment::new(address.clone().into(), paid_orders, settlements);
+        Ok(result)
     }
 }

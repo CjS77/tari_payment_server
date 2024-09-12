@@ -4,18 +4,7 @@ use thiserror::Error;
 use tpg_common::MicroTari;
 
 use crate::{
-    db_types::{
-        CreditNote,
-        NewOrder,
-        NewPayment,
-        Order,
-        OrderId,
-        OrderStatusType,
-        Payment,
-        SerializedTariAddress,
-        TransferStatus,
-        UserAccount,
-    },
+    db_types::{CreditNote, NewOrder, NewPayment, Order, OrderId, OrderStatusType, Payment, TransferStatus},
     order_objects::OrderChanged,
     traits::{
         data_objects::{ExpiryResult, MultiAccountPayment, OrderMovedResult},
@@ -36,66 +25,60 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// The URL of the database
     fn url(&self) -> &str;
 
-    /// Fetches the user account for the given order.
+    /// Claim the order, identified by `order_id` for the given wallet `address`.
     ///
-    /// If the account does not exist, one is created and the given customer id and/or public key is linked to the
-    /// account.
-    async fn fetch_or_create_account_for_order(&self, order: &NewOrder) -> Result<i64, PaymentGatewayError>;
+    /// The order must currently be `Unclaimed`.
+    ///
+    /// The customer id in the order will be associated with the address as part of the claim.
+    /// Returns the updated order record.
+    async fn claim_order(&self, order_id: &OrderId, address: &TariAddress) -> Result<Order, PaymentGatewayError>;
 
-    /// Fetches the user account for the given payment.
+    /// Attempt to automatically claim the order, by looking for any addresses that are already associated
+    /// with the customer id in the order. If there are multiple addresses, the most recent one is used.
     ///
-    /// If the account does not exist, one is created and the given public key and (if present) customer id is linked to
-    /// the account.
-    async fn fetch_or_create_account_for_payment(&self, payment: &Payment) -> Result<i64, PaymentGatewayError>;
+    /// The order status must be `Unclaimed`, and will be set to `New` if the claim is successful.
+    async fn auto_claim_order(&self, order: &Order) -> Result<Option<(TariAddress, Order)>, PaymentGatewayError>;
 
-    /// Takes a new order, and in a single atomic transaction,
-    /// * Stores the order in the database. If the order already exists, nothing further is done.
-    /// * Creates a new account for the customer if one does not already exist
-    /// * Updates the total orders value for the account
-    ///
-    /// Returns the account id for the customer.
-    async fn process_new_order_for_customer(&self, order: NewOrder) -> Result<i64, PaymentGatewayError>;
+    /// Takes a new order, and in a single atomic transaction, stores the order in the database.
+    /// This call is idempotent
+    /// Returns true if the order was inserted, or false if it already existed.
+    async fn insert_order(&self, order: NewOrder) -> Result<(Order, bool), PaymentGatewayError>;
 
     /// Takes a new payment, and in a single atomic transaction,
     /// * calls `save_payment` to store the payment in the database. If the payment already exists, nothing further is
     ///   done.
     /// * The payment is marked as `Unconfirmed`
-    /// * creates a new account for the public key if one does not already exist
     ///
-    /// Returns the account id for the public key.
-    async fn process_new_payment_for_pubkey(&self, payment: NewPayment) -> Result<(i64, Payment), PaymentGatewayError>;
+    /// Returns the newly created Payment record.
+    async fn process_new_payment(&self, payment: NewPayment) -> Result<Payment, PaymentGatewayError>;
+
+    /// Fetches all pending payments for the given address.
+    async fn fetch_pending_payments_for_address(
+        &self,
+        address: &TariAddress,
+    ) -> Result<Vec<Payment>, PaymentGatewayError>;
 
     /// Creates a new credit note for a customer id
     /// * Stores the payment in the database. If the payment already exists, nothing further is   done.
     /// * The payment is marked as `Confirmed`
     /// * The payment type is set to `Manual`
-    /// * creates a new account for the customer id if one does not already exist
     ///
-    /// Returns the account id for the customer id.
-    async fn process_credit_note_for_customer(&self, note: CreditNote) -> Result<(i64, Payment), PaymentGatewayError>;
-
-    /// Checks whether any orders associated with the given account id can be fulfilled.
-    /// If no orders can be fulfilled, an empty vector is returned.
-    async fn fetch_payable_orders(&self, account_id: i64) -> Result<Vec<Order>, PaymentGatewayError>;
+    /// A random wallet address is generated for the credit note, and the payment is linked to the customer id.
+    ///
+    /// Returns the payment record for the credit note.
+    async fn process_credit_note_for_customer(&self, note: CreditNote) -> Result<Payment, PaymentGatewayError>;
 
     /// Checks whether any orders associated with the given address can be fulfilled.
     async fn fetch_payable_orders_for_address(&self, address: &TariAddress) -> Result<Vec<Order>, PaymentGatewayError>;
 
-    /// Tries to fulfil the list of orders given from the given account.
-    ///
-    /// Any order that has enough credit in the account
-    /// * Will be marked as Paid
-    /// * Returned in the result vector.
-    async fn try_pay_orders(&self, account_id: i64, orders: &[Order]) -> Result<Vec<Order>, PaymentGatewayError>;
+    /// Tries to pay for an order using any addresses associated with the customer id attached to this order.
+    /// If you've claimed an order, or otherwise know which address you want to pay from, use
+    /// [`try_pay_orders_from_address`] instead.
+    async fn try_pay_order(&self, order: &Order) -> Result<MultiAccountPayment, PaymentGatewayError>;
 
-    /// Tries to fulfil the orders using _any_ accounts that are linked to the given wallet address.
+    /// Tries to fulfil the orders using the address as payment source.
     ///
-    /// Credit may be split across accounts. For example, if two accounts, A1 and A2, are linked to the address, and
-    /// A1 has 10 XTR and A2 has 5 XTR, then an order for 13 Tari will be split between the two accounts will use
-    /// all 10 XTR from A1 and 3 XTR from A2.
-    ///
-    /// The orders will take priority in the order they are given. If the first order cannot be fulfilled, the second
-    /// order will be attempted, and so on.
+    /// This method will not try and use other addresses that are also linked to the customer ids in the order list.
     async fn try_pay_orders_from_address(
         &self,
         address: &TariAddress,
@@ -109,11 +92,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// If the status is unchanged, then nothing is changed, and `None` is returned.
     ///
     /// If the status is changed, the account id corresponding to the transaction is returned.
-    async fn update_payment_status(
-        &self,
-        tx_id: &str,
-        status: TransferStatus,
-    ) -> Result<(i64, Payment), PaymentGatewayError>;
+    async fn update_payment_status(&self, tx_id: &str, status: TransferStatus) -> Result<Payment, PaymentGatewayError>;
 
     /// Fetches the payment for the given transaction id.
     async fn fetch_payment_by_tx_id(&self, tx_id: &str) -> Result<Payment, PaymentGatewayError>;
@@ -182,8 +161,6 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
 
     /// Changes the memo field for an order.
     ///
-    /// This function has the following side effects.
-    ///
     /// Changing the memo does not trigger any other flows, does not affect
     /// the order status, and does not affect order fulfillment.
     ///
@@ -221,14 +198,6 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
         Err(PaymentGatewayError::UnsupportedAction("Multiple currencies".to_string()))
     }
 
-    /// Attaches an order to an address. This is used to link an order to a wallet address for payment.
-    /// The user account associated with the address, as well as the modified Order object are returned.
-    async fn attach_order_to_address(
-        &self,
-        order_id: &OrderId,
-        address: &TariAddress,
-    ) -> Result<(UserAccount, Order), PaymentGatewayError>;
-
     /// Marks unapid and unclaimed orders as expired.
     ///
     /// Any orders that have not been _updated_ (based on the `updated_at` field) for longer than the given duration
@@ -254,11 +223,11 @@ pub enum PaymentGatewayError {
     #[error("We have an internal database engine (configuration/uptime etc.) : {0}")]
     DatabaseError(String),
     #[error("Cannot insert order, since it already exists with id {0}")]
-    OrderAlreadyExists(i64),
+    OrderAlreadyExists(OrderId),
     #[error("Cannot insert payment, since it already exists with txid {0}")]
     PaymentAlreadyExists(String),
     #[error("{0}")]
-    UserAccountError(#[from] AccountApiError),
+    AccountError(#[from] AccountApiError),
     #[error("The requested account id {0} does not exist")]
     AccountNotFound(i64),
     #[error("The requested account does not exist (even though it should): {0}")]

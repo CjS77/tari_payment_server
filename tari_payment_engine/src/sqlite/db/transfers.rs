@@ -37,12 +37,12 @@ pub async fn idempotent_insert(
 /// a dummy address is created that is unique to the customer id and easily identifiable as a dummy address.
 ///
 /// If the credit note is successfully issued, the address of the dummy address is returned.
-pub async fn credit_note(note: CreditNote, conn: &mut SqliteConnection) -> Result<Payment, PaymentGatewayError> {
+pub async fn credit_note(note: &CreditNote, conn: &mut SqliteConnection) -> Result<Payment, PaymentGatewayError> {
     let timestamp = Utc::now().timestamp();
     let txid = format!("credit_note_{}:{}:{timestamp}", note.customer_id, note.amount);
     let address = create_dummy_address_for_cust_id(&note.customer_id);
     let base58_addr = address.to_base58();
-    let memo = format!("Credit note: {}", note.reason.unwrap_or("No reason given".into()));
+    let memo = format!("Credit note: {}", note.reason.as_deref().unwrap_or("No reason given"));
     let payment = sqlx::query_as(
         r#"
             INSERT INTO payments (txid, sender, amount, memo, payment_type, status)
@@ -88,5 +88,19 @@ pub async fn fetch_payments_for_address(
 ) -> Result<Vec<Payment>, sqlx::Error> {
     let payments =
         sqlx::query_as(r#"SELECT * FROM payments WHERE sender = ?"#).bind(address.to_base58()).fetch_all(conn).await?;
+    Ok(payments)
+}
+
+pub async fn pending_payments(address: &TariAddress, conn: &mut SqliteConnection) -> Result<Vec<Payment>, sqlx::Error> {
+    let address = address.to_base58();
+    let payments = sqlx::query_as(
+        r#"SELECT * FROM payments
+    WHERE status = 'Received'
+    AND sender = $1
+    ORDER BY created_at"#,
+    )
+    .bind(address)
+    .fetch_all(conn)
+    .await?;
     Ok(payments)
 }

@@ -16,10 +16,13 @@ use tari_jwt::{
     Ristretto256SigningKey,
 };
 use tari_payment_engine::{
-    db_types::{CreditNote, LoginToken, Order, OrderId, Role, SerializedTariAddress, UserAccount},
+    db_types::{AddressBalance, CreditNote, LoginToken, Order, OrderId, Role, SerializedTariAddress},
     helpers::MemoSignature,
     order_objects::{ClaimedOrder, OrderChanged, OrderResult},
-    tpe_api::{account_objects::FullAccount, payment_objects::PaymentsResult},
+    tpe_api::{
+        account_objects::{AddressHistory, CustomerHistory},
+        payment_objects::PaymentsResult,
+    },
     traits::{NewWalletInfo, OrderMovedResult, WalletInfo},
 };
 use tari_payment_server::data_objects::{
@@ -130,7 +133,7 @@ impl PaymentServerClient {
         Ok(())
     }
 
-    pub async fn my_account(&self) -> Result<UserAccount> {
+    pub async fn my_account(&self) -> Result<AddressBalance> {
         let url = self.url("/api/account")?;
         let res = self.client.get(url).header("tpg_access_token", self.access_token.clone()).send().await?;
         match res.status() {
@@ -210,16 +213,16 @@ impl PaymentServerClient {
     /// respectively, since these methods only provide data directly linked to the anchor address, whereas `my_history`
     /// does a reverse link search to find _all_ addresses attached to the account before querying for orders and
     /// payments.
-    pub async fn my_history(&self) -> Result<FullAccount> {
+    pub async fn my_history(&self) -> Result<AddressHistory> {
         self.auth_get_request("/api/history").await
     }
 
-    pub async fn history_for_address(&self, address: &TariAddress) -> Result<FullAccount> {
+    pub async fn history_for_address(&self, address: &TariAddress) -> Result<AddressHistory> {
         self.auth_get_request(&format!("/api/history/address/{}", address.to_base58())).await
     }
 
-    pub async fn history_for_id(&self, account_id: i64) -> Result<FullAccount> {
-        self.auth_get_request(&format!("/api/history/id/{account_id}")).await
+    pub async fn history_for_id(&self, cust_id: &str) -> Result<CustomerHistory> {
+        self.auth_get_request(&format!("/api/history/customer/{cust_id}")).await
     }
 
     async fn auth_get_request<T: DeserializeOwned>(&self, path: &str) -> Result<T> {

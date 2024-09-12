@@ -2,9 +2,9 @@ use tari_common_types::tari_address::TariAddress;
 use thiserror::Error;
 
 use crate::{
-    db_types::{Order, OrderId, Payment, UserAccount},
+    db_types::{AddressBalance, CustomerBalance, CustomerOrderBalance, CustomerOrders, Order, OrderId, Payment},
     order_objects::OrderQueryFilter,
-    tpe_api::account_objects::{FullAccount, Pagination},
+    tpe_api::account_objects::{AddressHistory, CustomerHistory, Pagination},
 };
 
 #[derive(Debug, Clone, Error)]
@@ -15,10 +15,14 @@ pub enum AccountApiError {
     QueryError(String),
     #[error("The requested order does not exist: {0}")]
     OrderDoesNotExist(OrderId),
+    #[error("The requested address does not exist in the database: {0}")]
+    AddressDoesNotExists(TariAddress),
     #[error("Insufficient funds to complete the transaction")]
     InsufficientFunds,
     #[error("Cannot uniquely determine the account for the address-customer pair")]
     AmbiguousAccounts(AmbiguousAccountInfo),
+    #[error("Internal error: {0}")]
+    InternalError(String),
 }
 
 impl AccountApiError {
@@ -63,43 +67,42 @@ impl From<sqlx::Error> for AccountApiError {
 /// merchant accounts and orders. `AccountManagement` provides methods for querying information about these accounts.
 #[allow(async_fn_in_trait)]
 pub trait AccountManagement {
-    /// Fetches the user account associated with the given account id. If no account exists, `None` is returned.
-    async fn fetch_user_account(&self, account_id: i64) -> Result<Option<UserAccount>, AccountApiError>;
-
-    /// Fetches the user account for the given order id. A user account must have already been created for this account.
-    /// If no account is found, `None` will be returned.
-    async fn fetch_user_account_for_order(&self, order_id: &OrderId) -> Result<Option<UserAccount>, AccountApiError>;
-
-    async fn fetch_user_account_for_customer_id(
-        &self,
-        customer_id: &str,
-    ) -> Result<Option<UserAccount>, AccountApiError>;
-    async fn fetch_user_account_for_address(
-        &self,
-        address: &TariAddress,
-    ) -> Result<Option<UserAccount>, AccountApiError>;
-
-    async fn fetch_orders_for_account(&self, account_id: i64) -> Result<Vec<Order>, AccountApiError>;
+    async fn fetch_orders_for_address(&self, acaddress: &TariAddress) -> Result<Vec<Order>, AccountApiError>;
 
     async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, AccountApiError>;
 
     async fn fetch_payments_for_address(&self, address: &TariAddress) -> Result<Vec<Payment>, AccountApiError>;
 
     /// Returns the consolidated account history for the given address, if it exists.
-    async fn history_for_address(&self, address: &TariAddress) -> Result<Option<FullAccount>, AccountApiError>;
+    async fn history_for_address(&self, address: &TariAddress) -> Result<AddressHistory, AccountApiError>;
 
-    /// Returns the consolidated account history for the given account id, if it exists.
-    async fn history_for_id(&self, account_id: i64) -> Result<Option<FullAccount>, AccountApiError>;
+    /// Returns the consolidated account history for the given customer id, if it exists.
+    async fn history_for_customer(&self, customer_id: &str) -> Result<CustomerHistory, AccountApiError>;
 
-    async fn search_orders(
-        &self,
-        query: OrderQueryFilter,
-        only_for: Option<TariAddress>,
-    ) -> Result<Vec<Order>, AccountApiError>;
+    async fn search_orders(&self, query: OrderQueryFilter) -> Result<Vec<Order>, AccountApiError>;
 
-    async fn creditors(&self) -> Result<Vec<UserAccount>, AccountApiError>;
+    async fn creditors(&self) -> Result<Vec<CustomerOrders>, AccountApiError>;
 
     async fn fetch_customer_ids(&self, pagination: &Pagination) -> Result<Vec<String>, AccountApiError>;
 
     async fn fetch_addresses(&self, pagination: &Pagination) -> Result<Vec<TariAddress>, AccountApiError>;
+
+    /// Fetches the balance for the given address
+    ///
+    /// This includes all payments received, both pending and confirmed tallied against all orders paid for by the
+    /// address.
+    async fn fetch_address_balance(&self, address: &TariAddress) -> Result<AddressBalance, AccountApiError>;
+
+    /// Fetches the balance for the given customer
+    ///
+    /// This method fetches all balances for all wallets associated with the customer id.
+    ///
+    /// It's possible that a wallet is associated with multiple customer ids, in which case the balances will be
+    /// double counted, so don't rely on the result of this method for broad accounting/auditing purposes.
+    async fn fetch_customer_balance(&self, customer_id: &str) -> Result<CustomerBalance, AccountApiError>;
+
+    /// Fetches the state of orders made with respect to this customer id.
+    ///
+    /// This includes the total paid prders, current orders, and expired and cancelled orders.
+    async fn fetch_customer_order_balance(&self, customer_id: &str) -> Result<CustomerOrderBalance, AccountApiError>;
 }

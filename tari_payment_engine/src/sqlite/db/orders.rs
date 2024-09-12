@@ -1,21 +1,28 @@
 use chrono::Duration;
 use log::{debug, trace};
-use sqlx::{sqlite::SqliteRow, FromRow, QueryBuilder, Row, SqliteConnection};
+use sqlx::{sqlite::SqliteRow, FromRow, QueryBuilder, SqliteConnection};
 use tari_common_types::tari_address::TariAddress;
-use tpg_common::MicroTari;
 
 use crate::{
-    db_types::{NewOrder, Order, OrderId, OrderStatusType, UserAccount},
+    db_types::{NewOrder, Order, OrderId, OrderStatusType},
     order_objects::{ModifyOrderRequest, OrderQueryFilter},
-    sqlite::db::user_accounts,
-    traits::{AccountApiError, PaymentGatewayError},
+    traits::PaymentGatewayError,
 };
 
-pub async fn idempotent_insert(order: NewOrder, conn: &mut SqliteConnection) -> Result<i64, PaymentGatewayError> {
-    match order_exists(&order.order_id, conn).await? {
-        Some(id) => Err(PaymentGatewayError::OrderAlreadyExists(id)),
-        None => insert_order(order, conn).await,
-    }
+/// Inserts the order into the database, returning `false` in the second parameter if the order already exists.
+pub async fn idempotent_insert(
+    order: NewOrder,
+    conn: &mut SqliteConnection,
+) -> Result<(Order, bool), PaymentGatewayError> {
+    let inserted = match fetch_order_by_order_id(&order.order_id, conn).await? {
+        Some(order) => (order, false),
+        None => {
+            let order = insert_order(order, conn).await?;
+            debug!("📝️ Order [{}] inserted with id {}", order.order_id, order.id);
+            (order, true)
+        },
+    };
+    Ok(inserted)
 }
 
 /// Inserts a new order into the database using the given connection. This is not atomic. You can embed this call
@@ -23,8 +30,8 @@ pub async fn idempotent_insert(order: NewOrder, conn: &mut SqliteConnection) -> 
 ///
 /// If a Tari Address is provided, and it already exists in the database, the order status is set to 'New'.
 /// If the address is not found in the database, or if it is not provided, the order status is set to 'Unclaimed'.
-async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<i64, PaymentGatewayError> {
-    let id = sqlx::query(
+async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<Order, PaymentGatewayError> {
+    let order = sqlx::query_as(
         r#"
             INSERT INTO orders (
                 order_id,
@@ -35,7 +42,7 @@ async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<i6
                 currency,
                 created_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING id;
+            RETURNING *;
         "#,
     )
     .bind(order.order_id)
@@ -46,10 +53,9 @@ async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<i6
     .bind(order.currency)
     .bind(order.created_at)
     .fetch_one(conn)
-    .await?
-    .get(0);
+    .await?;
     // The DB should trigger an automatic status entry for the order
-    Ok(id)
+    Ok(order)
 }
 
 /// Returns the last entry in the orders table for the corresponding `order_id`
@@ -57,34 +63,9 @@ pub async fn fetch_order_by_order_id(
     order_id: &OrderId,
     conn: &mut SqliteConnection,
 ) -> Result<Option<Order>, sqlx::Error> {
-    let order = sqlx::query_as!(
-        Order,
-        r#"
-            SELECT
-                id,
-                order_id,
-                customer_id,
-                memo,
-                total_price,
-                original_price,
-                currency,
-                created_at as "created_at: chrono::DateTime<chrono::Utc>",
-                updated_at as "updated_at: chrono::DateTime<chrono::Utc>",
-                status
-            FROM orders
-            WHERE order_id = $1
-            ORDER BY id DESC
-            LIMIT 1;
-        "#,
-        order_id
-    )
-    .fetch_one(conn)
-    .await;
-    match order {
-        Err(sqlx::Error::RowNotFound) => Ok(None),
-        Err(e) => Err(e),
-        Ok(o) => Ok(Some(o)),
-    }
+    let order =
+        sqlx::query_as("SELECT * FROM orders WHERE order_id = $1").bind(order_id.as_str()).fetch_optional(conn).await?;
+    Ok(order)
 }
 
 /// Checks whether the order with the given `OrderId` already exists in the database. If it does exist, the `id` of the
@@ -115,11 +96,6 @@ pub async fn search_orders(query: OrderQueryFilter, conn: &mut SqliteConnection)
     if let Some(order_id) = query.order_id {
         where_clause.push("order_id = ");
         where_clause.push_bind_unseparated(order_id.to_string());
-    }
-    if let Some(id) = query.account_id {
-        where_clause.push("customer_id in (SELECT customer_id FROM user_account_customer_ids WHERE user_account_id = ");
-        where_clause.push_bind_unseparated(id);
-        where_clause.push_unseparated(")");
     }
     if let Some(cid) = query.customer_id {
         where_clause.push("customer_id=");
@@ -155,7 +131,7 @@ pub async fn search_orders(query: OrderQueryFilter, conn: &mut SqliteConnection)
 }
 
 pub(crate) async fn update_order_status(
-    order_id: i64,
+    id: i64,
     status: OrderStatusType,
     conn: &mut SqliteConnection,
 ) -> Result<Order, PaymentGatewayError> {
@@ -163,10 +139,10 @@ pub(crate) async fn update_order_status(
     let result: Option<Order> =
         sqlx::query_as("UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *")
             .bind(status)
-            .bind(order_id)
+            .bind(id)
             .fetch_optional(conn)
             .await?;
-    result.ok_or(PaymentGatewayError::OrderIdNotFound(order_id))
+    result.ok_or(PaymentGatewayError::OrderIdNotFound(id))
 }
 
 pub(crate) async fn update_order(
@@ -213,29 +189,6 @@ pub(crate) async fn update_order(
     Ok(res)
 }
 
-pub(crate) async fn try_pay_order(
-    account: &UserAccount,
-    order: &Order,
-    conn: &mut SqliteConnection,
-) -> Result<Order, AccountApiError> {
-    let mut current_balance = account.current_balance;
-    if current_balance < order.total_price {
-        return Err(AccountApiError::InsufficientFunds);
-    }
-    let acc_id = account.id;
-    current_balance -= order.total_price;
-    let order = update_order_status(order.id, OrderStatusType::Paid, conn).await.map_err(|e| match e {
-        PaymentGatewayError::DatabaseError(s) => AccountApiError::DatabaseError(s),
-        _ => unreachable!("Unexpected error type: {e}"),
-    })?;
-    trace!("📝️ Order #{} of {} marked as paid", order.id, order.total_price);
-    user_accounts::update_user_balance(account.id, current_balance, conn).await?;
-    trace!("Account {acc_id} balance updated from {} to {current_balance}", account.current_balance);
-    user_accounts::incr_order_totals(account.id, MicroTari::from(0), -order.total_price, conn).await?;
-    trace!("📝️ Adjusted account #{acc_id} orders outstanding by {}.", order.total_price);
-    Ok(order)
-}
-
 pub(crate) async fn expire_orders(
     status: OrderStatusType,
     limit: Duration,
@@ -262,12 +215,21 @@ pub(crate) async fn fetch_payable_orders_for_address(
 ) -> Result<Vec<Order>, PaymentGatewayError> {
     let result: Vec<Order> = sqlx::query_as(
         r#"
-    WITH customer_ids AS (
-      SELECT customer_id FROM user_account_customer_ids
-      WHERE id in (SELECT id FROM user_account_address WHERE address = $1)
-    )
-    SELECT * FROM orders where status = 'New' and customer_id in (select customer_id from customer_ids);
-    "#,
+        SELECT
+            orders.id as id,
+            order_id,
+            orders.customer_id as customer_id,
+            memo,
+            total_price,
+            original_price,
+            currency,
+            orders.created_at as created_at,
+            orders.updated_at as updated_at,
+            status
+        FROM orders JOIN address_customer_id_link ON orders.customer_id = address_customer_id_link.customer_id
+        WHERE
+         status = 'New' AND
+         address = $1"#,
     )
     .bind(address.to_base58())
     .fetch_all(conn)

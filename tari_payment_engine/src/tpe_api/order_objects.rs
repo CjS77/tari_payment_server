@@ -43,11 +43,11 @@ where D: serde::Deserializer<'de> {
 pub struct OrderQueryFilter {
     pub memo: Option<String>,
     pub order_id: Option<OrderId>,
-    pub account_id: Option<i64>,
     pub customer_id: Option<String>,
     pub currency: Option<String>,
     pub since: Option<DateTime<Utc>>,
     pub until: Option<DateTime<Utc>>,
+    #[serde(default, deserialize_with = "string_to_statuses")]
     pub status: Option<Vec<OrderStatusType>>,
 }
 
@@ -75,11 +75,6 @@ impl OrderQueryFilter {
         let dt = until.try_into().map_err(|e| AccountApiError::QueryError(e.to_string()))?;
         self.until = Some(dt);
         Ok(self)
-    }
-
-    pub fn with_account_id(mut self, account_id: i64) -> Self {
-        self.account_id = Some(account_id);
-        self
     }
 
     pub fn with_order_id(mut self, order_id: OrderId) -> Self {
@@ -110,7 +105,6 @@ impl OrderQueryFilter {
     pub fn is_empty(&self) -> bool {
         self.memo.is_none() &&
             self.order_id.is_none() &&
-            self.account_id.is_none() &&
             self.customer_id.is_none() &&
             self.currency.is_none() &&
             self.status.is_none() &&
@@ -131,9 +125,6 @@ impl Display for OrderQueryFilter {
         if let Some(order_id) = &self.order_id {
             write!(f, "order_id: {order_id}. ")?;
         }
-        if let Some(account_id) = &self.account_id {
-            write!(f, "account_id: {account_id}. ")?;
-        }
         if let Some(customer_id) = &self.customer_id {
             write!(f, "customer_id: {customer_id}. ")?;
         }
@@ -152,6 +143,18 @@ impl Display for OrderQueryFilter {
         }
         Ok(())
     }
+}
+
+fn string_to_statuses<'de, D>(deserializer: D) -> Result<Option<Vec<OrderStatusType>>, D::Error>
+where D: serde::Deserializer<'de> {
+    let param = Option::<String>::deserialize(deserializer)?;
+    let statuses = param.map(|s| {
+        s.split(',')
+            .map(|s| s.trim())
+            .filter_map(|s| OrderStatusType::from_str(s).ok())
+            .collect::<Vec<OrderStatusType>>()
+    });
+    Ok(statuses)
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -241,7 +244,12 @@ impl ClaimedOrder {
 
 impl From<Order> for ClaimedOrder {
     fn from(o: Order) -> Self {
-        let expires_at = o.expires_at().unwrap_or(o.updated_at);
+        // TODO - use the config values here
+        let expires_at = match o.status {
+            OrderStatusType::New => o.updated_at + chrono::Duration::hours(6),
+            OrderStatusType::Unclaimed => o.updated_at + chrono::Duration::hours(2),
+            _ => o.updated_at,
+        };
         let mut result = ClaimedOrder::new(o.order_id, o.total_price);
         result.expires_at = expires_at;
         result.status = o.status;

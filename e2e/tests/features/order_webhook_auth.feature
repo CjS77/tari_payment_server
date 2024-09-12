@@ -12,9 +12,9 @@ Feature: Order flow
       "signature":"601d2f88738b9aacdf75b62de9db23bb8d1aeb9fef8c7d127a05e9648729e64143adcee0a3d50665eb9c7817a0035ad9ac6248a8547bd6d5a4796b917bd57d09"
     }
     """
-    Then Customer #1 has current orders worth 2500 XTR
-    And Alice has a current balance of 0 Tari
     Then order "alice001" is in state New
+    And customer id 1 has current orders worth 2500 XTR
+    And account for customer alice has a current balance of 0 XTR
 
   Scenario: Replaying signature for different order fails
     When Customer #1 ["alice"] places order "alice002" for 2500 XTR, with memo
@@ -27,7 +27,7 @@ Feature: Order flow
     """
     # Webhook endpoints always return 200. Check the body for success status.
     Then I receive a 200 Ok response with the message '"success":true'
-    # TODO show that order is unclaimed
+    And order "alice002" is in state Unclaimed
 
   Scenario: Replaying signature with different address fails
     When Customer #1 ["alice"] places order "alice001" for 2500 XTR, with memo
@@ -40,7 +40,7 @@ Feature: Order flow
     """
     # Webhook endpoints always return 200. Check the body for success status.
     Then I receive a 200 Ok response with the message '"success":true'
-    # TODO show that order is unclaimed
+    And order "alice001" is in state Unclaimed
 
 
 

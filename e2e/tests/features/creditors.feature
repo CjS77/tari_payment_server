@@ -1,3 +1,4 @@
+@creditors
 Feature: Creditors
   Background:
     Given a database with some accounts
@@ -11,9 +12,9 @@ Feature: Creditors
       Then I receive a partial JSON response:
       """
       [
-        {"id":1,"total_received":115000000,"current_pending":115000000,"current_balance":0,"total_orders":165000000,"current_orders":165000000},
-        {"id":2,"total_received":550000000,"current_pending":550000000,"current_balance":0,"total_orders":550000000,"current_orders":550000000},
-        {"id":4,"total_received":700000000,"current_pending":700000000,"current_balance":0,"total_orders":0,"current_orders":0}
+        {"customer_id":"admin","status":"New","total_orders":25000000},
+        {"customer_id":"alice","status":"New","total_orders":165000000},
+        {"customer_id":"bob","status":"New","total_orders":550000000}
       ]
       """
       When payment alicepayment001 is confirmed
@@ -23,9 +24,9 @@ Feature: Creditors
       Then I receive a partial JSON response:
       """
       [
-        {"id":1,"total_received":115000000,"current_pending":100000000,"current_balance":15000000,"total_orders":165000000,"current_orders":165000000},
-        {"id":2,"total_received":550000000,"current_pending":500000000,"current_balance":50000000,"total_orders":550000000,"current_orders":550000000},
-        {"id":4,"total_received":700000000,"current_pending":700000000,"current_balance":0,"total_orders":0,"current_orders":0}
+        {"customer_id":"admin","status":"New","total_orders":25000000},
+        {"customer_id":"alice","status":"New","total_orders":165000000},
+        {"customer_id":"bob","status":"New","total_orders":550000000}
       ]
       """
 
@@ -40,8 +41,8 @@ Feature: Creditors
       Then I receive a partial JSON response:
       """
       [
-        {"id":1,"total_received":115000000,"current_pending":0,"current_balance":15000000,"total_orders":165000000,"current_orders":65000000},
-        {"id":4,"total_received":700000000,"current_pending":0,"current_balance":700000000,"total_orders":0,"current_orders":0}
+        {"customer_id":"admin","status":"New","total_orders":25000000},
+        {"customer_id":"alice","status":"New","total_orders":65000000}
       ]
       """
 

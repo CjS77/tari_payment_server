@@ -136,19 +136,6 @@ impl Hash for SerializedTariAddress {
     }
 }
 
-//--------------------------------------     UserAccount       ---------------------------------------------------------
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow, Default)]
-pub struct UserAccount {
-    pub id: i64,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub total_received: MicroTari,
-    pub current_pending: MicroTari,
-    pub current_balance: MicroTari,
-    pub total_orders: MicroTari,
-    pub current_orders: MicroTari,
-}
-
 //--------------------------------------   OrderStatusType     ---------------------------------------------------------
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Type, Serialize, Deserialize)]
 pub enum OrderStatusType {
@@ -275,16 +262,6 @@ impl PartialEq for Order {
 
 impl Eq for Order {}
 
-impl Order {
-    pub fn expires_at(&self) -> Option<DateTime<Utc>> {
-        match self.status {
-            OrderStatusType::New => Some(self.updated_at + chrono::Duration::hours(6)),
-            // todo! add claimed status to extend expiry time
-            _ => None,
-        }
-    }
-}
-
 //--------------------------------------        NewOrder       ---------------------------------------------------------
 #[derive(Debug, Clone)]
 pub struct NewOrder {
@@ -365,8 +342,6 @@ pub struct Payment {
     pub amount: MicroTari,
     /// The memo attached to the transfer
     pub memo: Option<String>,
-    /// The customer id associated with this order. Generally, this is extracted from the memo.
-    pub order_id: Option<OrderId>,
     pub payment_type: PaymentType,
     pub status: TransferStatus,
 }
@@ -474,6 +449,119 @@ impl CreditNote {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct AddressBalance {
+    address: SerializedTariAddress,
+    /// the sum of all Tari wallet transfers that have been confirmed
+    total_confirmed: MicroTari,
+    /// the total value of all orders that have been fulfilled
+    total_paid: MicroTari,
+    /// the current balance of the address (total_confirmed - total_paid)
+    current_balance: MicroTari,
+    last_update: DateTime<Utc>,
+}
+
+impl AddressBalance {
+    pub fn new(address: TariAddress) -> Self {
+        Self {
+            address: SerializedTariAddress::from(address),
+            total_confirmed: MicroTari::from_tari(0),
+            total_paid: MicroTari::from_tari(0),
+            current_balance: MicroTari::from_tari(0),
+            last_update: Utc::now(),
+        }
+    }
+
+    pub fn address(&self) -> &TariAddress {
+        self.address.as_address()
+    }
+
+    pub fn total_confirmed(&self) -> MicroTari {
+        self.total_confirmed
+    }
+
+    pub fn total_paid(&self) -> MicroTari {
+        self.total_paid
+    }
+
+    pub fn current_balance(&self) -> MicroTari {
+        self.current_balance
+    }
+
+    pub fn last_update(&self) -> DateTime<Utc> {
+        self.last_update
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomerBalance {
+    total_confirmed: MicroTari,
+    total_paid: MicroTari,
+    current_balance: MicroTari,
+    addresses: Vec<AddressBalance>,
+}
+
+impl CustomerBalance {
+    pub fn new(balances: Vec<AddressBalance>) -> Self {
+        let total_confirmed = balances.iter().map(|b| b.total_confirmed).sum();
+        let total_paid = balances.iter().map(|b| b.total_paid).sum();
+        let current_balance = balances.iter().map(|b| b.current_balance).sum();
+        Self { total_confirmed, total_paid, current_balance, addresses: balances }
+    }
+
+    pub fn total_confirmed(&self) -> MicroTari {
+        self.total_confirmed
+    }
+
+    pub fn total_paid(&self) -> MicroTari {
+        self.total_paid
+    }
+
+    pub fn current_balance(&self) -> MicroTari {
+        self.current_balance
+    }
+
+    pub fn addresses(&self) -> &[AddressBalance] {
+        &self.addresses
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewSettlementJournalEntry {
+    pub order_id: OrderId,
+    pub payment_address: SerializedTariAddress,
+    pub settlement_type: SettlementType,
+    pub amount: MicroTari,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct SettlementJournalEntry {
+    pub id: i64,
+    pub created_at: DateTime<Utc>,
+    pub order_id: OrderId,
+    pub payment_address: SerializedTariAddress,
+    pub settlement_type: SettlementType,
+    pub amount: MicroTari,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum SettlementType {
+    // Indicates that the order was paid from multiple addresses
+    Multiple,
+    // Indicates that the order was paid from a single address
+    Single,
+}
+
+impl Display for SettlementType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SettlementType::Multiple => write!(f, "Multiple"),
+            SettlementType::Single => write!(f, "Single"),
+        }
+    }
+}
+
 //-----------------------------------------   PaymentStatus   ---------------------------------------------------------
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
@@ -571,6 +659,38 @@ pub struct LoginToken {
     pub address: TariAddress,
     pub nonce: u64,
     pub desired_roles: Roles,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct CustomerOrders {
+    pub customer_id: String,
+    pub status: OrderStatusType,
+    pub total_orders: MicroTari,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CustomerOrderBalance {
+    pub customer_id: String,
+    pub total_current: MicroTari,
+    pub total_paid: MicroTari,
+    pub total_expired: MicroTari,
+    pub total_cancelled: MicroTari,
+}
+
+impl CustomerOrderBalance {
+    pub fn new(balances: &[CustomerOrders]) -> Self {
+        if balances.is_empty() {
+            return Self::default();
+        }
+        let customer_id = balances[0].customer_id.clone();
+        use OrderStatusType::*;
+        let total_current =
+            balances.iter().filter(|b| [New, Unclaimed].contains(&b.status)).map(|b| b.total_orders).sum();
+        let total_paid = balances.iter().filter(|b| b.status == Paid).map(|b| b.total_orders).sum();
+        let total_expired = balances.iter().filter(|b| b.status == Expired).map(|b| b.total_orders).sum();
+        let total_cancelled = balances.iter().filter(|b| b.status == Cancelled).map(|b| b.total_orders).sum();
+        Self { customer_id, total_current, total_paid, total_expired, total_cancelled }
+    }
 }
 
 #[cfg(test)]

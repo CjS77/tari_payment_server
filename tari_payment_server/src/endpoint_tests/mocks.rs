@@ -1,28 +1,27 @@
 use mockall::mock;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
-    db_types::{Order, OrderId, Payment, Role, UserAccount},
+    db_types::{AddressBalance, CustomerBalance, CustomerOrderBalance, CustomerOrders, Order, OrderId, Payment, Role},
     order_objects::OrderQueryFilter,
-    tpe_api::account_objects::{FullAccount, Pagination},
+    tpe_api::account_objects::{AddressHistory, CustomerHistory, Pagination},
     traits::{AccountApiError, AccountManagement, AuthApiError, AuthManagement},
 };
 
 mock! {
     pub AccountManager {}
     impl AccountManagement for AccountManager {
-        async fn fetch_user_account(&self, account_id: i64) -> Result<Option<UserAccount>, AccountApiError>;
-        async fn fetch_user_account_for_order(&self, order_id: &OrderId) -> Result<Option<UserAccount>, AccountApiError>;
-        async fn fetch_user_account_for_customer_id(&self, customer_id: &str) -> Result<Option<UserAccount>, AccountApiError>;
-        async fn fetch_user_account_for_address(&self, address: &TariAddress) -> Result<Option<UserAccount>, AccountApiError>;
-        async fn fetch_orders_for_account(&self, account_id: i64) -> Result<Vec<Order>, AccountApiError>;
         async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, AccountApiError>;
         async fn fetch_payments_for_address(&self, address: &TariAddress) -> Result<Vec<Payment>, AccountApiError>;
-        async fn history_for_address(&self, address: &TariAddress) -> Result<Option<FullAccount>, AccountApiError>;
-        async fn history_for_id(&self, account_id: i64) -> Result<Option<FullAccount>, AccountApiError>;
-        async fn search_orders(&self, query: OrderQueryFilter, only_address: Option<TariAddress>) -> Result<Vec<Order>, AccountApiError>;
-        async fn creditors(&self) -> Result<Vec<UserAccount>, AccountApiError>;
+        async fn history_for_address(&self, address: &TariAddress) -> Result<AddressHistory, AccountApiError>;
+        async fn search_orders(&self, query: OrderQueryFilter) -> Result<Vec<Order>, AccountApiError>;
+        async fn creditors(&self) -> Result<Vec<CustomerOrders>, AccountApiError>;
         async fn fetch_customer_ids(&self, pagination: &Pagination) -> Result<Vec<String>, AccountApiError>;
         async fn fetch_addresses(&self, pagination: &Pagination) -> Result<Vec<TariAddress>, AccountApiError>;
+        async fn fetch_orders_for_address(&self, address: &TariAddress) -> Result<Vec<Order>, AccountApiError>;
+        async fn fetch_address_balance(&self, address: &TariAddress) -> Result<AddressBalance, AccountApiError>;
+        async fn fetch_customer_balance(&self, customer_id: &str) -> Result<CustomerBalance, AccountApiError>;
+        async fn history_for_customer(&self, customer_id: &str) -> Result<CustomerHistory, AccountApiError>;
+        async fn fetch_customer_order_balance(&self, customer_id: &str) -> Result<CustomerOrderBalance, AccountApiError>;
     }
 }
 
