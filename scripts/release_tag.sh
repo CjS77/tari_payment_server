@@ -36,6 +36,6 @@ git commit -am "Updated version to $REL_VER"
 echo "Tagging new release: $REL_VER"
 git tag ${REL_VER}
 git push origin "release-${REL_VER}"
-pit push origin ${REL_VER}
+git push origin ${REL_VER}
 echo "Release tag updated"
 
