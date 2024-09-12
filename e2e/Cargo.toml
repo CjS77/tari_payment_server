@@ -1,15 +1,15 @@
 [package]
 name = "e2e"
-version = "1.0.0-beta"
+version = "1.1.0-beta"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-shopify_tools = { version = "1.0.0-beta", path = "../shopify_tools" }
-tari_payment_engine = { version = "1.0.0-beta", path = "../tari_payment_engine", features = ["test_utils"] }
-tari_payment_server = { version = "1.0.0-beta", path = "../tari_payment_server" }
-tpg_common = { version = "1.0.0-beta", path = "../tpg_common" }
+shopify_tools = { version = "1.1.0-beta", path = "../shopify_tools" }
+tari_payment_engine = { version = "1.1.0-beta", path = "../tari_payment_engine", features = ["test_utils"] }
+tari_payment_server = { version = "1.1.0-beta", path = "../tari_payment_server" }
+tpg_common = { version = "1.1.0-beta", path = "../tpg_common" }
 
 log = "0.4.21"
 tari_common_types = {version = "1.3.1-pre.1", git = "https://github.com/tari-project/tari.git", package = "tari_common_types", tag = "v1.3.1-pre.1" }

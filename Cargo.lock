@@ -1434,7 +1434,7 @@ dependencies = [
 
 [[package]]
 name = "e2e"
-version = "1.0.0-beta"
+version = "1.1.0-beta"
 dependencies = [
  "actix-web",
  "chrono",
@@ -3676,7 +3676,7 @@ checksum = "24188a676b6ae68c3b2cb3a01be17fbf7240ce009799bb56d5b1409051e78fde"
 
 [[package]]
 name = "shopify_tools"
-version = "1.0.0-beta"
+version = "1.1.0-beta"
 dependencies = [
  "chrono",
  "graphql-parser",
@@ -4349,7 +4349,7 @@ dependencies = [
 
 [[package]]
 name = "tari_payment_engine"
-version = "1.0.0-beta"
+version = "1.1.0-beta"
 dependencies = [
  "blake2",
  "chrono",
@@ -4374,7 +4374,7 @@ dependencies = [
 
 [[package]]
 name = "tari_payment_server"
-version = "1.0.0-beta"
+version = "1.1.0-beta"
 dependencies = [
  "actix-http",
  "actix-jwt-auth-middleware",
@@ -4448,7 +4448,7 @@ dependencies = [
 
 [[package]]
 name = "taritools"
-version = "1.0.0-beta"
+version = "1.1.0-beta"
 dependencies = [
  "anyhow",
  "blake2",
@@ -4798,7 +4798,7 @@ checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
 
 [[package]]
 name = "tpg_common"
-version = "1.0.0-beta"
+version = "1.1.0-beta"
 dependencies = [
  "serde",
  "sqlx",
