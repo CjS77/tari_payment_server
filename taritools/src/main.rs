@@ -30,7 +30,7 @@ use crate::{
 
 pub const APP_NAME: &str = env!("CARGO_PKG_NAME");
 #[derive(Parser, Debug)]
-#[command(version = "1.0.0", author = "CjS77")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 pub struct Arguments {
     /// The network to use (nextnet, stagenet, mainnet). Default is mainnet.
     #[arg(short, long, default_value = "mainnet")]
