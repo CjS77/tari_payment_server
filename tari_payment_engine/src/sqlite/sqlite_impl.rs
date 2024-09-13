@@ -312,8 +312,6 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         let order = orders::update_order(&order.order_id, update, &mut tx)
             .await?
             .ok_or_else(|| AccountApiError::OrderDoesNotExist(order.order_id.clone()))?;
-        // Don't update totals, since there's a TRIGGER that effectively does this for us:
-        // user_accounts::incr_order_totals(account.id, -order.total_price, -order.total_price, &mut tx).await?;
         tx.commit().await?;
         Ok(order)
     }

@@ -168,7 +168,8 @@ pub(crate) async fn customer_ids(
     pagination: &Pagination,
     conn: &mut SqliteConnection,
 ) -> Result<Vec<String>, AccountApiError> {
-    let rows = with_pagination("SELECT customer_id FROM user_account_customer_ids", pagination, conn).await?;
+    let rows =
+        with_pagination("SELECT DISTINCT customer_id FROM orders ORDER BY customer_id", pagination, conn).await?;
     let customer_ids = rows.into_iter().map(|r| r.get("customer_id")).collect::<Vec<String>>();
     Ok(customer_ids)
 }
@@ -177,8 +178,8 @@ pub(crate) async fn addresses(
     pagination: &Pagination,
     conn: &mut SqliteConnection,
 ) -> Result<Vec<TariAddress>, AccountApiError> {
-    let rows = with_pagination("SELECT address FROM user_account_address", pagination, conn).await?;
-    let addresses = rows.into_iter().filter_map(|r| TariAddress::from_base58(r.get("address")).ok()).collect();
+    let rows = with_pagination("SELECT DISTINCT sender FROM payments ORDER BY sender ASC", pagination, conn).await?;
+    let addresses = rows.into_iter().filter_map(|r| TariAddress::from_base58(r.get("sender")).ok()).collect();
     Ok(addresses)
 }
 
