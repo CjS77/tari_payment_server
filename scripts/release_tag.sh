@@ -17,16 +17,19 @@ for f in ${CARGO_FILES[@]}; do
         if [ "$f" == "$f2" ]; then
             continue
         fi
+        echo "Updating dependencies in $f2"
         # Extract the package name from the file path
         PACKAGE=$(basename "$(dirname "$f2")")
         # if package is the current directory (.), skip
         if [ "$PACKAGE" == "." ]; then
             continue
         fi
+        echo "    Updating ${PACKAGE} to $NEW_VER"
+
 
         #echo "Setting ${PACKAGE} in $f to $NEW_VER.."
         # Use sed to update the version number for the specific package
-        sed -i "s/${PACKAGE}\s*=\s*{\s*version\s*=\s*\"[0-9\.]*\"/${PACKAGE} = { version = \"$NEW_VER\"/" "$f"
+        sed -i "s/${PACKAGE}\s*=\s*{\s*version\s*=\s*\"[^\"]*\"/${PACKAGE} = { version = \"$NEW_VER\"/" "$f"
     done
     echo "Updated $f"
 done
