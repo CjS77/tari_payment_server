@@ -13,7 +13,7 @@ pub mod commands {
     pub const EDIT_MEMO: &str = "Edit memo";
     pub const EXIT: &str = "Exit";
     pub const FETCH_PRICE: &str = "Fetch Tari price";
-    pub const HISTORY_FOR_ACCOUNT_ID: &str = "History for Account Id";
+    pub const HISTORY_FOR_ACCOUNT_ID: &str = "History for Customer Id";
     pub const HISTORY_FOR_ADDRESS: &str = "History for Address";
     pub const ISSUE_CREDIT: &str = "Issue Credit";
     pub const LIST_AUTH_WALLETS: &str = "List authorized wallets";
