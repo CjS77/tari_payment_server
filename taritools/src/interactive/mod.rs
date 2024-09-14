@@ -301,8 +301,10 @@ impl InteractiveApp {
 
     async fn history_for_customer(&mut self) -> Result<String> {
         let _unused = self.login().await;
-        let client = self.client().expect("User is logged in. Client should not be None");
-        let cust_id = dialoguer::Input::<String>::new().with_prompt("Enter customer id").interact()?;
+        let client = &self.user.as_ref().expect("User is logged in. Client should not be None").client;
+        self.customer_ids.update(client).await?;
+        let idx = FuzzySelect::new().with_prompt("Select customer ID").items(self.customer_ids.items()).interact()?;
+        let cust_id = &self.customer_ids.items()[idx];
         let history = client.history_for_id(&cust_id).await?;
         format_customer_history(&history)
     }

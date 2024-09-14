@@ -273,7 +273,7 @@ pub fn format_customer_history(history: &CustomerHistory) -> Result<String> {
     let orders = format_orders(&history.orders);
     writeln!(f, "### Orders\n\n{orders}\n")?;
     let settlements = format_settlements(&history.settlements)?;
-    writeln!(f, "### Transactions: {settlements}")?;
+    writeln!(f, "### Transactions:\n\n{settlements}\n")?;
     Ok(f)
 }
 
