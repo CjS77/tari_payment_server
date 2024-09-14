@@ -54,33 +54,49 @@ impl OrderMovedResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MultiAccountPayment {
-    pub address: SerializedTariAddress,
     pub orders_paid: Vec<Order>,
     /// An array of account ids used to pay for the orders, as well as the amount paid from each account
     pub settlements: Vec<SettlementJournalEntry>,
 }
 
 impl MultiAccountPayment {
-    pub fn new(
-        address: SerializedTariAddress,
-        orders_paid: Vec<Order>,
-        settlements: Vec<SettlementJournalEntry>,
-    ) -> Self {
-        Self { address, orders_paid, settlements }
+    pub fn new(orders_paid: Vec<Order>, settlements: Vec<SettlementJournalEntry>) -> Self {
+        Self { orders_paid, settlements }
     }
 
     pub fn order_count(&self) -> usize {
         self.orders_paid.len()
     }
 
+    /// Converts this payment into the first order.
+    ///
+    /// Only call this if you know that this payment only contains exactly one order.
+    ///
+    /// Panics if there are no orders in this payment.
+    pub fn to_order(mut self) -> Order {
+        self.orders_paid.remove(0)
+    }
+
     pub fn total_paid(&self) -> MicroTari {
         self.settlements.iter().map(|s| s.amount).sum()
+    }
+
+    /// Merge the payments into a single payment, using the first payment's address as the representative address.
+    /// You can retrieve the other addresses from the `settlements` field.
+    pub fn merge<I: IntoIterator<Item = MultiAccountPayment>>(payments: I) -> Option<Self> {
+        let mut iter = payments.into_iter();
+        let mut merged = iter.next()?;
+        for next in iter {
+            merged.orders_paid.extend(next.orders_paid);
+            merged.settlements.extend(next.settlements);
+        }
+        Some(merged)
     }
 }
 
 impl Display for MultiAccountPayment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "MultiAccountPayment from primary address {}:", self.address.as_address())?;
+        write!(f, "Multi-account payment. ")?;
         let n = self.settlements.len();
         writeln!(
             f,

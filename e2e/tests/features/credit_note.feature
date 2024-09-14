@@ -72,7 +72,14 @@ Feature: Admins can issue credit notes
     Then I receive a 200 OK response
     Then I receive a partial JSON response:
     """
-    [{"order_id": "2", "customer_id":"bob", "memo": "Manually inserted by Charlie", "total_price": 200000000}]
+    {
+      "orders_paid":[
+        {"order_id":"2","customer_id":"bob","memo":"Manually inserted by Charlie","total_price":200000000,"status":"Paid"}
+      ],
+      "settlements":[
+        {"order_id":"2","payment_address":"13111eLuVvxBvAAf3tKJFWKNhJrv5e1dV4on8e3AW1Qq4e","settlement_type":"single","amount":200000000}
+      ]
+    }
     """
     Then account for customer bob has a current balance of 0 XTR
 
@@ -90,7 +97,10 @@ Feature: Admins can issue credit notes
     Then I receive a 200 OK response
     Then I receive a partial JSON response:
     """
-    [{"order_id": "2", "customer_id":"bob", "memo": "Manually inserted by Charlie", "total_price": 200000000}]
+    {
+      "orders_paid":[{"order_id":"2","customer_id":"bob","memo":"Manually inserted by Charlie","total_price":200000000,"status":"Paid"}],
+      "settlements":[{"order_id":"2","payment_address":"13111eLuVvxBvAAf3tKJFWKNhJrv5e1dV4on8e3AW1Qq4e","settlement_type":"single","amount":200000000}]
+    }
     """
     Then account for customer bob has a current balance of 50 XTR
 

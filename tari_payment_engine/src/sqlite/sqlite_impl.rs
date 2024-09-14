@@ -168,7 +168,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     ///
     /// It's possible to pay for the order from multiple wallets, in which case the settlement type will be `Multiple`,
     /// with the sum total of the payments being equal to the order's total price.
-    async fn try_pay_order(&self, order: &Order) -> Result<MultiAccountPayment, PaymentGatewayError> {
+    async fn try_pay_order(&self, order: &Order) -> Result<Option<MultiAccountPayment>, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
         let mut balances = accounts::balances_for_customer_id(&order.customer_id, &mut tx).await?;
         let mut total_due = order.total_price;
@@ -181,8 +181,8 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         balances.sort_by_key(|b| Reverse(b.current_balance()));
         // Preferably, use a `Single` journal entry type
         let settlement_type =
-            if balances[0].current_balance() > total_due { SettlementType::Single } else { SettlementType::Multiple };
-        let mut result = MultiAccountPayment::new(SerializedTariAddress::from(balances[0].address()), vec![], vec![]);
+            if balances[0].current_balance() >= total_due { SettlementType::Single } else { SettlementType::Multiple };
+        let mut result = MultiAccountPayment::new(vec![], vec![]);
         let zero = MicroTari::from(0);
         for account in balances {
             let address = SerializedTariAddress::from(account.address());
@@ -205,7 +205,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             result.orders_paid.push(paid_order);
         }
         tx.commit().await?;
-        Ok(result)
+        Ok(if result.orders_paid.is_empty() { None } else { Some(result) })
     }
 
     /// Tries to fulfil the orders using the address as payment source.
@@ -215,7 +215,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         &self,
         address: &TariAddress,
         orders: &[&Order],
-    ) -> Result<MultiAccountPayment, PaymentGatewayError> {
+    ) -> Result<Option<MultiAccountPayment>, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
         let result = self.pay_orders_for_address_with_conn(address, orders, &mut tx).await?;
         tx.commit().await?;
@@ -273,16 +273,17 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             order.total_price,
             address.to_base58(),
         );
-        let mut result = self.pay_orders_for_address_with_conn(&address, &[&order], &mut tx).await?;
-        if result.orders_paid.is_empty() {
+        let result = self.pay_orders_for_address_with_conn(&address, &[&order], &mut tx).await?;
+        if result.is_none() {
             error!(
-                "🗃️ Order {} could not be paid for atfer issuing a credit note. This is most likely a bug",
+                "🗃️ Order {} could not be paid for atfer issuing a credit note for the full amount. This is most \
+                 likely a bug",
                 order.id
             );
             return Err(PaymentGatewayError::OrderNotFound(order.order_id));
         }
         tx.commit().await?;
-        let updated_order = result.orders_paid.remove(0);
+        let updated_order = result.unwrap().orders_paid.remove(0);
         Ok(updated_order)
     }
 
@@ -388,13 +389,12 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         let mut settlements = Vec::new();
         if let OrderStatusType::New = new_order.status {
             match self.try_pay_order(&new_order).await {
-                Ok(res) => {
+                Ok(Some(payment)) => {
                     let mut orders_paid;
-                    MultiAccountPayment { settlements, orders_paid, .. } = res;
-                    if !orders_paid.is_empty() {
-                        new_order = orders_paid.remove(0);
-                    }
+                    MultiAccountPayment { settlements, orders_paid, .. } = payment;
+                    orders_paid.drain(..1).for_each(|o| new_order = o);
                 },
+                Ok(None) => { /* noop */ },
                 Err(PaymentGatewayError::AccountError(AccountApiError::InsufficientFunds)) => {
                     debug!(
                         "🗃️ There weren't enough funds to pay for order {order_id} from the new customer id {} \
@@ -695,7 +695,7 @@ impl SqliteDatabase {
         address: &TariAddress,
         orders: &[&Order],
         tx: &mut sqlx::SqliteConnection,
-    ) -> Result<MultiAccountPayment, PaymentGatewayError> {
+    ) -> Result<Option<MultiAccountPayment>, PaymentGatewayError> {
         let balance = accounts::fetch_address_balance(address, tx).await?;
         let mut remaining_credit = balance.current_balance();
         trace!("🗃️ Address balance of {} is {remaining_credit}", address.to_base58());
@@ -722,7 +722,8 @@ impl SqliteDatabase {
             debug!("🗃️ Order {} paid for during multi-account payment", order.id);
             paid_orders.push(updated_order);
         }
-        let result = MultiAccountPayment::new(address.clone().into(), paid_orders, settlements);
+
+        let result = (!paid_orders.is_empty()).then(|| MultiAccountPayment::new(paid_orders, settlements));
         Ok(result)
     }
 }
