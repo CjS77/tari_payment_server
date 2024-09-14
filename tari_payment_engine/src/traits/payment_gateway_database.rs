@@ -74,7 +74,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// Tries to pay for an order using any addresses associated with the customer id attached to this order.
     /// If you've claimed an order, or otherwise know which address you want to pay from, use
     /// [`try_pay_orders_from_address`] instead.
-    async fn try_pay_order(&self, order: &Order) -> Result<MultiAccountPayment, PaymentGatewayError>;
+    async fn try_pay_order(&self, order: &Order) -> Result<Option<MultiAccountPayment>, PaymentGatewayError>;
 
     /// Tries to fulfil the orders using the address as payment source.
     ///
@@ -83,7 +83,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
         &self,
         address: &TariAddress,
         orders: &[&Order],
-    ) -> Result<MultiAccountPayment, PaymentGatewayError>;
+    ) -> Result<Option<MultiAccountPayment>, PaymentGatewayError>;
 
     /// Updates the payment status for the given transaction id. This is typically called to transition a payment from
     /// `Unconfirmed` to `Confirmed` or `Cancelled`.

@@ -25,6 +25,7 @@ use std::{ops::Deref, str::FromStr};
 
 use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
 use log::*;
+use serde_json::json;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
     db_types::{CreditNote, Order, OrderId, OrderStatusType, Role, SerializedTariAddress},
@@ -582,11 +583,17 @@ pub async fn issue_credit<B: PaymentGatewayDatabase>(
 ) -> Result<HttpResponse, ServerError> {
     let note = body.into_inner();
     debug!("💻️ Credit note request for {note:?}");
-    let orders = api.issue_credit_note(note).await.map_err(|e| {
+    let result = api.issue_credit_note(note).await.map_err(|e| {
         debug!("💻️ Could not issue credit. {e}");
         ServerError::BackendError(e.to_string())
     })?;
-    Ok(HttpResponse::Ok().json(orders.orders_paid))
+    match result {
+        Some(orders) => Ok(HttpResponse::Ok().json(orders)),
+        None => Ok(HttpResponse::Ok().json(json!({
+            "orders_paid": [],
+            "settlements": []
+        }))),
+    }
 }
 
 route!(fulfil_order => Post "/fulfill" impl PaymentGatewayDatabase where requires [Role::Write]);
