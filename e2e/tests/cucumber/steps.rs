@@ -13,7 +13,7 @@ use tari_jwt::{
     Ristretto256SigningKey,
 };
 use tari_payment_engine::{
-    db_types::{NewPayment, OrderId, Role},
+    db_types::{NewPayment, OrderId, Role, TransferStatus},
     events::{EventProducers, EventType},
     traits::{AccountManagement, AuthManagement, PaymentGatewayDatabase},
     OrderFlowApi,
@@ -353,6 +353,20 @@ async fn expire_old_orders(world: &mut TPGWorld) {
     let unpaid_limit = Duration::seconds(4);
     let orders = db.expire_old_orders(unclaimed_limit, unpaid_limit).await.expect("Failed to expire orders");
     info!("Expired orders: {}", serde_json::to_string(&orders).expect("Failed to serialize orders"));
+}
+
+// Used to test edge cases. This is a payment that does not trigger order matching or fire events.
+#[when(expr = "a direct payment of {int} XTR is placed in {word}'s account")]
+async fn direct_payment(world: &mut TPGWorld, amount: i64, user: String) {
+    let users = SeedUsers::new();
+    let user = users.user(&user);
+    let address = user.address.clone();
+    let db = world.db.as_ref().expect("No database connection");
+    let txid = format!("direct-{}-{}", user.username, chrono::Utc::now().timestamp_micros());
+    let payment = NewPayment::new(address, MicroTari::from_tari(amount), txid.clone());
+    let payment = db.process_new_payment(payment).await.expect("Failed to process payment");
+    info!("Processed payment: {payment:?}");
+    db.update_payment_status(&txid, TransferStatus::Confirmed).await.expect("Failed to confirm payment");
 }
 
 fn modify_signature(token: String, value: &str) -> String {

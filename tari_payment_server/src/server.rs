@@ -61,6 +61,9 @@ use crate::{
         ReassignOrderRoute,
         RemoveAuthorizedWalletRoute,
         ResetOrderRoute,
+        SettleAddressRoute,
+        SettleCustomerRoute,
+        SettleMyAccountRoute,
         TxConfirmationNotificationRoute,
         UnfulfilledOrdersRoute,
         UpdateOrderMemoRoute,
@@ -173,6 +176,9 @@ pub fn create_server_instance(
             .service(GetAuthorizedWalletsRoute::<SqliteDatabase>::new())
             .service(RemoveAuthorizedWalletRoute::<SqliteDatabase>::new())
             .service(AddAuthorizedWalletRoute::<SqliteDatabase>::new())
+            .service(SettleAddressRoute::<SqliteDatabase>::new())
+            .service(SettleCustomerRoute::<SqliteDatabase>::new())
+            .service(SettleMyAccountRoute::<SqliteDatabase>::new())
             .service(CheckTokenRoute::new());
         let use_x_forwarded_for = config.use_x_forwarded_for;
         let use_forwarded = config.use_forwarded;
