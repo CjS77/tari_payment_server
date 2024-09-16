@@ -305,7 +305,7 @@ impl InteractiveApp {
         self.customer_ids.update(client).await?;
         let idx = FuzzySelect::new().with_prompt("Select customer ID").items(self.customer_ids.items()).interact()?;
         let cust_id = &self.customer_ids.items()[idx];
-        let history = client.history_for_id(&cust_id).await?;
+        let history = client.history_for_id(cust_id).await?;
         format_customer_history(&history)
     }
 

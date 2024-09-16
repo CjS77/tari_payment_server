@@ -572,6 +572,12 @@ impl AccountManagement for SqliteDatabase {
         let balances = accounts::customer_order_balance(customer_id, &mut conn).await?;
         Ok(balances)
     }
+
+    async fn fetch_customer_ids_for_address(&self, address: &TariAddress) -> Result<Vec<String>, AccountApiError> {
+        let mut conn = self.pool.acquire().await?;
+        let ids = accounts::customer_ids_for_address(address, &mut conn).await?;
+        Ok(ids)
+    }
 }
 
 impl AuthManagement for SqliteDatabase {

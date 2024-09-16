@@ -9,7 +9,7 @@ use crate::{
     db_types::{CreditNote, NewOrder, NewPayment, Order, OrderId, OrderStatusType, Payment, TransferStatus},
     events::{EventProducers, OrderAnnulledEvent, OrderClaimedEvent, OrderEvent, OrderModifiedEvent, PaymentEvent},
     helpers::MemoSignature,
-    order_objects::{ClaimedOrder, OrderChanged},
+    order_objects::{ClaimedOrder, OrderChanged, OrderQueryFilter},
     traits::{
         AccountApiError,
         ExpiryResult,
@@ -530,6 +530,43 @@ where B: PaymentGatewayDatabase
         for order in &result.unpaid {
             self.call_order_annulled_hook(order).await;
         }
+        Ok(result)
+    }
+
+    pub async fn settle_orders_for_address(
+        &self,
+        address: &TariAddress,
+    ) -> Result<Option<MultiAccountPayment>, PaymentGatewayError> {
+        let customer_ids = self.db.fetch_customer_ids_for_address(address).await?;
+        let addr = address.to_base58();
+        debug!("🔄️⚖️ {} customer ids found for address {addr}. Starting order settlement...", customer_ids.len());
+        let mut maybe_paid_orders = vec![None];
+        for cust_id in customer_ids {
+            let orders_paid = self.settle_orders_for_customer_id(&cust_id).await?;
+            if let Some(o) = &orders_paid {
+                debug!("🔄️⚖️ {} orders settled for customer id {} for {addr}", o.order_count(), cust_id);
+            } else {
+                debug!("🔄️⚖️ No orders settled for customer id {} for {addr}", cust_id);
+            }
+            maybe_paid_orders.push(orders_paid);
+        }
+        let result = maybe_paid_orders.into_iter().flatten().collect::<Vec<MultiAccountPayment>>();
+        let result = MultiAccountPayment::merge(result);
+        debug!("🔄️⚖️ {addr} settlement complete. Merging results and returning to caller");
+        Ok(result)
+    }
+
+    pub async fn settle_orders_for_customer_id(
+        &self,
+        customer_id: &str,
+    ) -> Result<Option<MultiAccountPayment>, PaymentGatewayError> {
+        let query = OrderQueryFilter::default()
+            .with_customer_id(customer_id.to_string())
+            .with_status(OrderStatusType::New)
+            .with_status(OrderStatusType::Unclaimed);
+        let orders = self.db.search_orders(query).await?;
+        let orders_ref = orders.iter().collect::<Vec<&Order>>();
+        let result = self.try_pay_orders(&orders_ref).await?;
         Ok(result)
     }
 

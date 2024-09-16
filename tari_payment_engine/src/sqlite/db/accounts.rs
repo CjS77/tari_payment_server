@@ -183,6 +183,18 @@ pub(crate) async fn addresses(
     Ok(addresses)
 }
 
+pub(crate) async fn customer_ids_for_address(
+    address: &TariAddress,
+    conn: &mut SqliteConnection,
+) -> Result<Vec<String>, AccountApiError> {
+    let rows = sqlx::query("SELECT customer_id FROM address_customer_id_link WHERE address = $1")
+        .bind(address.to_base58())
+        .fetch_all(conn)
+        .await?;
+    let customer_ids = rows.into_iter().map(|r| r.get("customer_id")).collect::<Vec<String>>();
+    Ok(customer_ids)
+}
+
 async fn with_pagination(
     q: &str,
     pagination: &Pagination,

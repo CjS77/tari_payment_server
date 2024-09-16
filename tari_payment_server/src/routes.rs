@@ -526,6 +526,48 @@ pub async fn addresses<B: AccountManagement>(
     Ok(HttpResponse::Ok().json(addresses))
 }
 
+route!(settle_address => Post "/settle/address/{address}" impl PaymentGatewayDatabase where requires [Role::Write]);
+pub async fn settle_address<B: PaymentGatewayDatabase>(
+    path: web::Path<SerializedTariAddress>,
+    api: web::Data<OrderFlowApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let address = path.into_inner().to_address();
+    debug!("💻️ GET settle_address for {address}");
+    let result = api.settle_orders_for_address(&address).await.map_err(|e| {
+        debug!("💻️ Could not settle address. {e}");
+        e
+    })?;
+    Ok(HttpResponse::Ok().json(result))
+}
+
+route!(settle_customer => Post "/settle/customer/{customer_id}" impl PaymentGatewayDatabase where requires [Role::Write]);
+pub async fn settle_customer<B: PaymentGatewayDatabase>(
+    path: web::Path<String>,
+    api: web::Data<OrderFlowApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let customer_id = path.into_inner();
+    debug!("💻️ GET settle_customer for {customer_id}");
+    let result = api.settle_orders_for_customer_id(&customer_id).await.map_err(|e| {
+        debug!("💻️ Could not settle customer. {e}");
+        e
+    })?;
+    Ok(HttpResponse::Ok().json(result))
+}
+
+route!(settle_my_account => Post "/settle" impl PaymentGatewayDatabase);
+pub async fn settle_my_account<B: PaymentGatewayDatabase>(
+    claims: JwtClaims,
+    api: web::Data<OrderFlowApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let address = claims.address;
+    debug!("💻️ GET settle_address for {address}");
+    let result = api.settle_orders_for_address(&address).await.map_err(|e| {
+        debug!("💻️ Could not settle address. {e}");
+        e
+    })?;
+    Ok(HttpResponse::Ok().json(result))
+}
+
 //----------------------------------------------   Payments  ----------------------------------------------------
 
 route!(my_payments => Get "/payments" impl AccountManagement);

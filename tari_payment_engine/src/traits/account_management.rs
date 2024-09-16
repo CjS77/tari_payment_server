@@ -105,4 +105,7 @@ pub trait AccountManagement {
     ///
     /// This includes the total paid prders, current orders, and expired and cancelled orders.
     async fn fetch_customer_order_balance(&self, customer_id: &str) -> Result<CustomerOrderBalance, AccountApiError>;
+
+    /// Fetches all customer ids associated with the given address
+    async fn fetch_customer_ids_for_address(&self, address: &TariAddress) -> Result<Vec<String>, AccountApiError>;
 }

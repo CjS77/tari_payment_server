@@ -22,6 +22,7 @@ mock! {
         async fn fetch_customer_balance(&self, customer_id: &str) -> Result<CustomerBalance, AccountApiError>;
         async fn history_for_customer(&self, customer_id: &str) -> Result<CustomerHistory, AccountApiError>;
         async fn fetch_customer_order_balance(&self, customer_id: &str) -> Result<CustomerOrderBalance, AccountApiError>;
+        async fn fetch_customer_ids_for_address(&self, address: &TariAddress) -> Result<Vec<String>, AccountApiError>;
     }
 }
 

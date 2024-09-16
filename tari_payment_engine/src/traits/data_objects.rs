@@ -81,7 +81,7 @@ impl MultiAccountPayment {
         self.settlements.iter().map(|s| s.amount).sum()
     }
 
-    /// Merge the payments into a single payment, using the first payment's address as the representative address.
+    /// Merge the payments into a single payment.
     /// You can retrieve the other addresses from the `settlements` field.
     pub fn merge<I: IntoIterator<Item = MultiAccountPayment>>(payments: I) -> Option<Self> {
         let mut iter = payments.into_iter();
