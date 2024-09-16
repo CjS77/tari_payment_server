@@ -16,7 +16,17 @@ use tari_jwt::{
     Ristretto256SigningKey,
 };
 use tari_payment_engine::{
-    db_types::{AddressBalance, CreditNote, LoginToken, Order, OrderId, Role, SerializedTariAddress},
+    db_types::{
+        AddressBalance,
+        CreditNote,
+        CustomerBalance,
+        CustomerOrders,
+        LoginToken,
+        Order,
+        OrderId,
+        Role,
+        SerializedTariAddress,
+    },
     helpers::MemoSignature,
     order_objects::{ClaimedOrder, OrderChanged, OrderResult},
     tpe_api::{
@@ -108,10 +118,6 @@ impl PaymentServerClient {
         Ok(addresses)
     }
 
-    pub async fn authorized_wallets(&self) -> Result<Vec<WalletInfo>> {
-        self.auth_get_request("/api/wallets").await
-    }
-
     pub async fn add_authorized_wallet(&self, wallet: &NewWalletInfo) -> Result<()> {
         let url = self.url("/api/wallets")?;
         let res =
@@ -133,7 +139,20 @@ impl PaymentServerClient {
         Ok(())
     }
 
-    pub async fn my_account(&self) -> Result<AddressBalance> {
+    pub async fn my_balance(&self) -> Result<AddressBalance> {
+        let url = self.url("/api/balance")?;
+        let res = self.client.get(url).header("tpg_access_token", self.access_token.clone()).send().await?;
+        match res.status() {
+            StatusCode::OK => Ok(res.json().await?),
+            StatusCode::NOT_FOUND => Err(anyhow!("No account exists for you yet")),
+            _ => {
+                let msg = res.text().await?;
+                Err(anyhow!("Error fetching account: {msg}"))
+            },
+        }
+    }
+
+    pub async fn my_account(&self) -> Result<()> {
         let url = self.url("/api/account")?;
         let res = self.client.get(url).header("tpg_access_token", self.access_token.clone()).send().await?;
         match res.status() {
@@ -148,6 +167,10 @@ impl PaymentServerClient {
 
     pub async fn fetch_exchange_rates(&self, currency: &str) -> Result<ExchangeRateResult> {
         self.auth_get_request(&format!("/api/exchange_rate/{currency}")).await
+    }
+
+    pub async fn authorized_wallets(&self) -> Result<Vec<WalletInfo>> {
+        self.auth_get_request("/api/wallets").await
     }
 
     pub async fn claim_order(&self, signature: &MemoSignature) -> Result<ClaimedOrder> {
@@ -219,6 +242,10 @@ impl PaymentServerClient {
 
     pub async fn history_for_address(&self, address: &TariAddress) -> Result<AddressHistory> {
         self.auth_get_request(&format!("/api/history/address/{}", address.to_base58())).await
+    }
+
+    pub async fn balance_for_address(&self, address: &TariAddress) -> Result<AddressBalance> {
+        self.auth_get_request(&format!("/api/balance/{}", address.to_base58())).await
     }
 
     pub async fn history_for_id(&self, cust_id: &str) -> Result<CustomerHistory> {
@@ -336,6 +363,10 @@ impl PaymentServerClient {
         }
         let result: OrderMovedResult = res.json().await?;
         Ok(result)
+    }
+
+    pub async fn creditors(&self) -> Result<Vec<CustomerOrders>> {
+        self.auth_get_request("/api/creditors").await
     }
 }
 

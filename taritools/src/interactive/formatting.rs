@@ -11,7 +11,15 @@ use prettytable::{
 use qrcode::{render::unicode, QrCode};
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
-    db_types::{AddressBalance, CustomerBalance, CustomerOrderBalance, Order, Payment, SettlementJournalEntry},
+    db_types::{
+        AddressBalance,
+        CustomerBalance,
+        CustomerOrderBalance,
+        CustomerOrders,
+        Order,
+        Payment,
+        SettlementJournalEntry,
+    },
     order_objects::{ClaimedOrder, OrderResult},
     tpe_api::{
         account_objects::{AddressHistory, CustomerHistory},
@@ -274,6 +282,18 @@ pub fn format_customer_history(history: &CustomerHistory) -> Result<String> {
     writeln!(f, "### Orders\n\n{orders}\n")?;
     let settlements = format_settlements(&history.settlements)?;
     writeln!(f, "### Transactions:\n\n{settlements}\n")?;
+    Ok(f)
+}
+
+pub fn format_customer_orders(orders: &[CustomerOrders]) -> Result<String> {
+    let mut f = String::new();
+    let mut table = Table::new();
+    table.set_titles(row!["Customer ID", "Order status", "Total value"]);
+    orders.iter().for_each(|customer| {
+        table.add_row(row![customer.customer_id, customer.status, customer.total_orders.to_string(),]);
+    });
+    markdown_style(&mut table);
+    writeln!(f, "{table}")?;
     Ok(f)
 }
 

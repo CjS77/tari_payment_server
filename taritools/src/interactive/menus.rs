@@ -8,8 +8,10 @@ pub type Menu = (&'static str, &'static [&'static str]);
 pub mod commands {
     pub const ADD_AUTH_WALLET: &str = "Add authorized wallet";
     pub const ADD_PROFILE: &str = "Add profile";
+    pub const BALANCE_FOR_ADDRESS: &str = "Balance for Address";
     pub const CANCEL: &str = "Cancel Order";
     pub const CLAIM_ORDER: &str = "Claim Order";
+    pub const CREDITORS: &str = "Get all unpaid orders";
     pub const EDIT_MEMO: &str = "Edit memo";
     pub const EXIT: &str = "Exit";
     pub const FETCH_PRICE: &str = "Fetch Tari price";
@@ -20,8 +22,8 @@ pub mod commands {
     pub const LIST_PAYMENT_ADDRESSES: &str = "List payment addresses";
     pub const LOGOUT: &str = "Logout";
     pub const MARK_ORDER_PAID: &str = "Mark order as Paid";
-    pub const MY_ACCOUNT: &str = "My Account";
     pub const MY_ACCOUNT_HISTORY: &str = "Account History";
+    pub const MY_BALANCE: &str = "My Balance";
     pub const MY_OPEN_ORDERS: &str = "My Open Orders";
     pub const MY_ORDERS: &str = "My Orders";
     pub const MY_PAYMENTS: &str = "My Payments";
@@ -42,7 +44,7 @@ pub use commands::*;
 
 pub const TOP_MENU: [&str; 4] = [NAV_TO_ADMIN_MENU, NAV_TO_USER_MENU, LOGOUT, EXIT];
 
-pub const ADMIN_MENU: [&str; 20] = [
+pub const ADMIN_MENU: [&str; 22] = [
     CANCEL,
     MARK_ORDER_PAID,
     RESET_ORDER,
@@ -51,7 +53,9 @@ pub const ADMIN_MENU: [&str; 20] = [
     LOGOUT,
     NAV_BACK,
     ISSUE_CREDIT,
+    CREDITORS,
     ORDER_BY_ID,
+    BALANCE_FOR_ADDRESS,
     ORDERS_FOR_ADDRESS,
     PAYMENTS_FOR_ADDRESS,
     HISTORY_FOR_ADDRESS,
@@ -68,10 +72,10 @@ pub const ADMIN_MENU: [&str; 20] = [
 pub const USER_MENU: [&str; 11] = [
     ADD_PROFILE,
     CLAIM_ORDER,
-    MY_ACCOUNT,
     LOGOUT,
     NAV_BACK,
     EXIT,
+    MY_BALANCE,
     MY_ORDERS,
     MY_OPEN_ORDERS,
     MY_PAYMENTS,

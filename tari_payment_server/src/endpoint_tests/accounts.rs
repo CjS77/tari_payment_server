@@ -8,7 +8,7 @@ use super::helpers::{get_request, issue_token};
 use crate::{
     auth::JwtClaims,
     endpoint_tests::mocks::MockAccountManager,
-    routes::{AccountRoute, MyAccountRoute},
+    routes::{BalanceRoute, MyBalanceRoute},
 };
 
 #[actix_web::test]
@@ -38,7 +38,7 @@ async fn fetch_my_account_expired_token() {
 fn configure(cfg: &mut ServiceConfig) {
     let account_manager = MockAccountManager::new();
     let accounts_api = AccountApi::new(account_manager);
-    cfg.service(MyAccountRoute::<MockAccountManager>::new())
-        .service(AccountRoute::<MockAccountManager>::new())
+    cfg.service(MyBalanceRoute::<MockAccountManager>::new())
+        .service(BalanceRoute::<MockAccountManager>::new())
         .app_data(web::Data::new(accounts_api));
 }

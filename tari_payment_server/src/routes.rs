@@ -248,40 +248,45 @@ pub async fn get_history_for_customer<B: AccountManagement>(
     Ok(history)
 }
 
-//----------------------------------------------   Account  ----------------------------------------------------
+//----------------------------------------------   Balance  ----------------------------------------------------
 
-route!(my_account => Get "/account" impl AccountManagement);
-/// Route handler for the account endpoint
+route!(my_balance => Get "/balance" impl AccountManagement);
+/// Route handler for the balance endpoint
 ///
-/// This route is used to fetch account information for a given address. The address that is queried is the one that
+/// This route is used to fetch the balance for a given address. The address that is queried is the one that
 /// is associated with the JWT token that is supplied in the `tpg_access_token` header.
 ///
-/// To access other accounts, the user must have the `ReadAll` role and can use the `/account/{address}` endpoint.
-//#[get("/account/")]
-pub async fn my_account<B: AccountManagement>(
+/// To access other balances, the user must have the `ReadAll` role and can use the `/balance/{address}` endpoint.
+pub async fn my_balance<B: AccountManagement>(
     claims: JwtClaims,
     api: web::Data<AccountApi<B>>,
 ) -> Result<HttpResponse, ServerError> {
-    debug!("💻️ GET my_account for {}", claims.address);
-    get_account(&claims.address, api.as_ref()).await
+    debug!("💻️ GET my_balance for {}", claims.address);
+    get_balance(&claims.address, api.as_ref()).await
 }
 
-route!(account => Get "/account/{address}" impl AccountManagement where requires [Role::ReadAll]);
-/// Route handler for the account/{address} endpoint
+route!(balance => Get "/balance/{address}" impl AccountManagement where requires [Role::ReadAll]);
+/// Route handler for the balance/{address} endpoint
 ///
-/// This route is used to fetch account information for the address supplied in the query path
-///
-/// To access other accounts, the user must have the `ReadAll` role and can use the `/account/{address}` endpoint.
-/// Otherwise, the user can only access their own account. It is usually more convenient to use the `/account` endpoint
-/// for this purpose.
-//#[get("/account/{address}")]
-pub async fn account<B: AccountManagement>(
+/// This route is used to fetch the balance for the address supplied in the query path
+pub async fn balance<B: AccountManagement>(
     path: web::Path<SerializedTariAddress>,
     api: web::Data<AccountApi<B>>,
 ) -> Result<HttpResponse, ServerError> {
     let address = path.into_inner().to_address();
-    debug!("💻️ GET account for {address}");
-    get_account(&address, api.as_ref()).await
+    debug!("💻️ GET balance for {address}");
+    get_balance(&address, api.as_ref()).await
+}
+
+pub async fn get_balance<B: AccountManagement>(
+    address: &TariAddress,
+    api: &AccountApi<B>,
+) -> Result<HttpResponse, ServerError> {
+    let balance = api.fetch_address_balance(address).await.map_err(|e| {
+        debug!("💻️ Could not fetch balance. {e}");
+        ServerError::BackendError(e.to_string())
+    })?;
+    Ok(HttpResponse::Ok().json(balance))
 }
 
 route!(creditors => Get "/creditors" impl AccountManagement where requires [Role::ReadAll]);
@@ -308,17 +313,6 @@ pub async fn creditors<B: AccountManagement>(api: web::Data<AccountApi<B>>) -> R
         ServerError::BackendError(e.to_string())
     })?;
     Ok(HttpResponse::Ok().json(accounts))
-}
-
-pub async fn get_account<B: AccountManagement>(
-    address: &TariAddress,
-    api: &AccountApi<B>,
-) -> Result<HttpResponse, ServerError> {
-    let account = api.fetch_address_balance(address).await.map_err(|e| {
-        debug!("💻️ Could not fetch account. {e}");
-        ServerError::BackendError(e.to_string())
-    })?;
-    Ok(HttpResponse::Ok().json(account))
 }
 
 //----------------------------------------------   Orders  ----------------------------------------------------

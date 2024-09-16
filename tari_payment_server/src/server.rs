@@ -32,10 +32,10 @@ use crate::{
     middleware::HmacMiddlewareFactory,
     routes::{
         health,
-        AccountRoute,
         AddAuthorizedWalletRoute,
         AddressesRoute,
         AuthRoute,
+        BalanceRoute,
         CancelOrderRoute,
         CheckTokenRoute,
         ClaimOrderRoute,
@@ -49,7 +49,7 @@ use crate::{
         HistoryForCustomerRoute,
         IncomingPaymentNotificationRoute,
         IssueCreditRoute,
-        MyAccountRoute,
+        MyBalanceRoute,
         MyHistoryRoute,
         MyOrdersRoute,
         MyPaymentsRoute,
@@ -148,8 +148,8 @@ pub fn create_server_instance(
         // Routes that require authentication
         let auth_scope = web::scope("/api")
             .service(UpdateRolesRoute::<SqliteDatabase>::new())
-            .service(MyAccountRoute::<SqliteDatabase>::new())
-            .service(AccountRoute::<SqliteDatabase>::new())
+            .service(BalanceRoute::<SqliteDatabase>::new())
+            .service(MyBalanceRoute::<SqliteDatabase>::new())
             .service(MyHistoryRoute::<SqliteDatabase>::new())
             .service(HistoryForAddressRoute::<SqliteDatabase>::new())
             .service(HistoryForCustomerRoute::<SqliteDatabase>::new())

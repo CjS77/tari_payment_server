@@ -33,6 +33,7 @@ use crate::{
             format_addresses_with_qr_code,
             format_claimed_order,
             format_customer_history,
+            format_customer_orders,
             format_exchange_rate,
             format_order,
             format_order_result,
@@ -128,7 +129,8 @@ impl InteractiveApp {
                 .interact()?;
             match self.current_menu.1[i] {
                 SERVER_HEALTH => self.server_health().await,
-                MY_ACCOUNT => self.my_account().await,
+                BALANCE_FOR_ADDRESS => handle_response(self.balance_for_address().await),
+                MY_BALANCE => self.my_balance().await,
                 MY_ORDERS => self.my_orders().await,
                 CLAIM_ORDER => handle_response(self.claim_order().await),
                 MY_OPEN_ORDERS => self.my_unfulfilled_orders().await,
@@ -137,6 +139,7 @@ impl InteractiveApp {
                 NAV_TO_ADMIN_MENU => self.select_menu(menus::admin_menu()),
                 NAV_TO_USER_MENU => self.select_menu(menus::user_menu()),
                 CANCEL => handle_response(self.cancel_order().await),
+                CREDITORS => handle_response(self.creditors().await),
                 RESET_ORDER => handle_response(self.reset_order().await),
                 MARK_ORDER_PAID => handle_response(self.fulfil_order().await),
                 FETCH_PRICE => self.fetch_tari_price().await,
@@ -220,13 +223,13 @@ impl InteractiveApp {
         Ok(format!("Wallet {address} has been removed successfully"))
     }
 
-    async fn my_account(&mut self) {
+    async fn my_balance(&mut self) {
         let mut res = self.login().await;
         if res.is_ok() {
             res = self
                 .client()
                 .expect("User is logged in. Client should not be None")
-                .my_account()
+                .my_balance()
                 .await
                 .and_then(|a| format_address_balance(&a))
         }
@@ -271,6 +274,15 @@ impl InteractiveApp {
         handle_response(res)
     }
 
+    async fn creditors(&mut self) -> Result<String> {
+        let _unused = self.login().await?;
+        self.client()
+            .expect("User is logged in. Client should not be None")
+            .creditors()
+            .await
+            .and_then(|o| format_customer_orders(&o))
+    }
+
     async fn my_payments(&mut self) {
         let mut res = self.login().await;
         if res.is_ok() {
@@ -297,6 +309,14 @@ impl InteractiveApp {
         let client = self.client().expect("User is logged in. Client should not be None");
         let history = client.history_for_address(&address).await?;
         format_address_history(&history)
+    }
+
+    async fn balance_for_address(&mut self) -> Result<String> {
+        let _unused = self.login().await;
+        let address = self.select_address().await?;
+        let client = self.client().expect("User is logged in. Client should not be None");
+        let balance = client.balance_for_address(&address).await?;
+        format_address_balance(&balance)
     }
 
     async fn history_for_customer(&mut self) -> Result<String> {
