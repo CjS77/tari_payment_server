@@ -67,7 +67,7 @@ impl From<sqlx::Error> for AccountApiError {
 /// merchant accounts and orders. `AccountManagement` provides methods for querying information about these accounts.
 #[allow(async_fn_in_trait)]
 pub trait AccountManagement {
-    async fn fetch_orders_for_address(&self, acaddress: &TariAddress) -> Result<Vec<Order>, AccountApiError>;
+    async fn fetch_orders_for_address(&self, address: &TariAddress) -> Result<Vec<Order>, AccountApiError>;
 
     async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, AccountApiError>;
 

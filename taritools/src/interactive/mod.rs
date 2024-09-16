@@ -266,7 +266,7 @@ impl InteractiveApp {
                 .expect("User is logged in. Client should not be None")
                 .my_unfulfilled_orders()
                 .await
-                .map(|o| format_orders(&o));
+                .and_then(format_order_result);
         }
         handle_response(res)
     }

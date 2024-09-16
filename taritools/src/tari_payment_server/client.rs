@@ -199,7 +199,7 @@ impl PaymentServerClient {
         self.auth_get_request("/api/orders").await
     }
 
-    pub async fn my_unfulfilled_orders(&self) -> Result<Vec<Order>> {
+    pub async fn my_unfulfilled_orders(&self) -> Result<OrderResult> {
         self.auth_get_request("/api/unfulfilled_orders").await
     }
 
