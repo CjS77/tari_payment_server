@@ -81,6 +81,10 @@ pub trait AccountManagement {
 
     async fn search_orders(&self, query: OrderQueryFilter) -> Result<Vec<Order>, AccountApiError>;
 
+    /// Creditors are the list of users that have unpaid orders.
+    /// Unapid orders are defined as "New" orders only.
+    /// Unclaimed orders are not considered unpaid (though this definition is somewhat arbitrary and could change in
+    /// future).
     async fn creditors(&self) -> Result<Vec<CustomerOrders>, AccountApiError>;
 
     async fn fetch_customer_ids(&self, pagination: &Pagination) -> Result<Vec<String>, AccountApiError>;
