@@ -29,6 +29,7 @@ pub(crate) async fn link_address_to_order(
     link_address_to_customer(address, &order.customer_id, conn).await
 }
 
+/// Links an address to a customer id. This function is idempotent due to a uniqueness constraint on the DB table.
 pub(crate) async fn link_address_to_customer(
     address: &TariAddress,
     customer_id: &str,

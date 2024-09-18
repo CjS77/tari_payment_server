@@ -104,7 +104,11 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// * A credit note for the `total_price` is created,
     /// * The `process_new_payment` flow is triggered, which will cause the order to be fulfilled and the status updated
     ///   to `Paid`.
-    async fn mark_new_order_as_paid(&self, order: Order, reason: &str) -> Result<Order, PaymentGatewayError>;
+    async fn mark_new_or_unclaimed_order_as_paid(
+        &self,
+        order: Order,
+        reason: &str,
+    ) -> Result<Order, PaymentGatewayError>;
 
     /// A manual order status transition from `New` to `Expired` or `Cancelled` status.
     ///
