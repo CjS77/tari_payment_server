@@ -74,19 +74,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
 
     async fn claim_order(&self, order_id: &OrderId, address: &TariAddress) -> Result<Order, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
-        let order = orders::fetch_order_by_order_id(order_id, &mut tx)
-            .await?
-            .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
-        let addr58 = address.to_base58();
-        if order.status != OrderStatusType::Unclaimed {
-            warn!(
-                "🖇️️ Order {} is not 'Unclaimed' and {addr58} is trying to claim it. The current status is {}",
-                order.order_id, order.status
-            );
-        }
-        let order = orders::update_order_status(order.id, OrderStatusType::New, &mut tx).await?;
-        accounts::link_address_to_customer(address, &order.customer_id, &mut tx).await?;
-        info!("🗃️ Address {addr58} has been linked with customer id {}", order.customer_id);
+        let order = self.claim_order_with_conn(order_id, address, &mut tx).await?;
         tx.commit().await?;
         Ok(order)
     }
@@ -257,9 +245,16 @@ impl PaymentGatewayDatabase for SqliteDatabase {
 
     /// A manual order status transition from `New` to `Paid` status.
     /// A credit note for the `total_price` is created.
-    async fn mark_new_order_as_paid(&self, order: Order, reason: &str) -> Result<Order, PaymentGatewayError> {
-        if order.status != OrderStatusType::New {
-            error!("🗃️ Order {} is not in 'New' status. Cannot call **new**_to_paid", order.id);
+    async fn mark_new_or_unclaimed_order_as_paid(
+        &self,
+        order: Order,
+        reason: &str,
+    ) -> Result<Order, PaymentGatewayError> {
+        if ![OrderStatusType::New, OrderStatusType::Unclaimed].contains(&order.status) {
+            error!(
+                "🗃️ Order {} is not in 'New' or 'Unclaimed' status. Cannot override this and mark it as paid",
+                order.id
+            );
             return Err(PaymentGatewayError::OrderModificationForbidden);
         }
         let mut tx = self.pool.begin().await?;
@@ -273,6 +268,10 @@ impl PaymentGatewayDatabase for SqliteDatabase {
             order.total_price,
             address.to_base58(),
         );
+        // Claim the order for the credit note address
+        if order.status == OrderStatusType::Unclaimed {
+            self.claim_order_with_conn(&order.order_id, &address, &mut tx).await?;
+        }
         let result = self.pay_orders_for_address_with_conn(&address, &[&order], &mut tx).await?;
         if result.is_none() {
             error!(
@@ -731,5 +730,27 @@ impl SqliteDatabase {
 
         let result = (!paid_orders.is_empty()).then(|| MultiAccountPayment::new(paid_orders, settlements));
         Ok(result)
+    }
+
+    async fn claim_order_with_conn(
+        &self,
+        order_id: &OrderId,
+        address: &TariAddress,
+        tx: &mut sqlx::SqliteConnection,
+    ) -> Result<Order, PaymentGatewayError> {
+        let order = orders::fetch_order_by_order_id(order_id, tx)
+            .await?
+            .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
+        let addr58 = address.to_base58();
+        if order.status != OrderStatusType::Unclaimed {
+            warn!(
+                "🖇️️ Order {} is not 'Unclaimed' and {addr58} is trying to claim it. The current status is {}",
+                order.order_id, order.status
+            );
+        }
+        let order = orders::update_order_status(order.id, OrderStatusType::New, tx).await?;
+        accounts::link_address_to_customer(address, &order.customer_id, tx).await?;
+        info!("🗃️ Address {addr58} has been linked with customer id {}", order.customer_id);
+        Ok(order)
     }
 }

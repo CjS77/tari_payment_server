@@ -279,7 +279,7 @@ where B: PaymentGatewayDatabase
         Ok(())
     }
 
-    /// A manual order status transition from `New` to `Paid` status.
+    /// A manual order status transition from `New`, or `Unclaimed` to `Paid` status.
     /// This method is called by the default implementation of [`modify_status_for_order`] when the new status is
     /// `Paid`. When this happens, the following side effects occur:
     ///
@@ -294,7 +294,7 @@ where B: PaymentGatewayDatabase
             .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
         // We don't call self.issue_credit_note() here because we want to force this specific order to get paid
         // The former lets any valid order be paid once the credit is issued.
-        let updated_order = self.db.mark_new_order_as_paid(order, reason).await?;
+        let updated_order = self.db.mark_new_or_unclaimed_order_as_paid(order, reason).await?;
         if updated_order.status == OrderStatusType::Paid {
             self.call_order_paid_hook(&[updated_order.clone()]).await;
             info!(
