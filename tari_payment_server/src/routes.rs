@@ -775,6 +775,7 @@ route!(reset_order => Patch "/reset_order/{order_id}" impl PaymentGatewayDatabas
 ///
 /// ## Returns
 /// The endpoint returns the order states before and after the reset.
+#[cfg(not(feature = "shopify"))]
 pub async fn reset_order<B: PaymentGatewayDatabase>(
     path: web::Path<OrderId>,
     api: web::Data<OrderFlowApi<B>>,
@@ -786,6 +787,11 @@ pub async fn reset_order<B: PaymentGatewayDatabase>(
         e
     })?;
     Ok(HttpResponse::Ok().json(updated_order))
+}
+
+#[cfg(feature = "shopify")]
+pub async fn reset_order<B: PaymentGatewayDatabase>() -> Result<HttpResponse, ServerError> {
+    Err(ServerError::UnsupportedAction("Resetting orders is not supported in Shopify".to_string()))
 }
 
 //------------------------------------------   Incoming payments  ---------------------------------------------

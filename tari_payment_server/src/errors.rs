@@ -43,6 +43,8 @@ pub enum ServerError {
     UnauthorizedWalletRequest,
     #[error("Cannot complete this request. {0}")]
     CannotCompleteRequest(String),
+    #[error("This endpoint is not supported on this configuration. {0}")]
+    UnsupportedAction(String),
 }
 
 impl ResponseError for ServerError {
@@ -71,6 +73,7 @@ impl ResponseError for ServerError {
             Self::NoRecordFound(_) => StatusCode::NOT_FOUND,
             Self::InsufficientPermissions(_) => StatusCode::FORBIDDEN,
             Self::UnauthorizedWalletRequest => StatusCode::UNAUTHORIZED,
+            Self::UnsupportedAction(_) => StatusCode::NOT_IMPLEMENTED,
         }
     }
 
