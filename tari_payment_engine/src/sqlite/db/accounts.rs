@@ -11,23 +11,9 @@ use crate::{
         OrderId,
         SettlementJournalEntry,
     },
-    sqlite::db::orders,
     tpe_api::account_objects::Pagination,
     traits::AccountApiError,
 };
-
-/// you don't _really_ link orders and addresses, you link wallet addresses to customers. This is a convenience
-/// function to do that.
-pub(crate) async fn link_address_to_order(
-    order_id: &OrderId,
-    address: &TariAddress,
-    conn: &mut SqliteConnection,
-) -> Result<(), AccountApiError> {
-    let Some(order) = orders::fetch_order_by_order_id(order_id, conn).await? else {
-        return Err(AccountApiError::dne(order_id.clone()));
-    };
-    link_address_to_customer(address, &order.customer_id, conn).await
-}
 
 /// Links an address to a customer id. This function is idempotent due to a uniqueness constraint on the DB table.
 pub(crate) async fn link_address_to_customer(
@@ -54,6 +40,23 @@ pub(crate) async fn balances_for_customer_id(
     "#,
     )
     .bind(customer_id)
+    .fetch_all(conn)
+    .await?;
+    Ok(addresses)
+}
+
+pub(crate) async fn balances_for_order_id(
+    order_id: &OrderId,
+    conn: &mut SqliteConnection,
+) -> Result<Vec<AddressBalance>, AccountApiError> {
+    let addresses: Vec<AddressBalance> = sqlx::query_as(
+        r#"
+    SELECT * FROM address_balance
+    WHERE address in (SELECT sender from payments WHERE order_id = $1)
+    ORDER BY last_update DESC
+    "#,
+    )
+    .bind(order_id.as_str())
     .fetch_all(conn)
     .await?;
     Ok(addresses)

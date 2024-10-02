@@ -57,6 +57,7 @@ use crate::{
         OrderByIdRoute,
         OrdersRoute,
         OrdersSearchRoute,
+        PaymentForOrderRoute,
         PaymentsRoute,
         ReassignOrderRoute,
         RemoveAuthorizedWalletRoute,
@@ -160,6 +161,7 @@ pub fn create_server_instance(
             .service(OrderByIdRoute::<SqliteDatabase>::new())
             .service(MyPaymentsRoute::<SqliteDatabase>::new())
             .service(PaymentsRoute::<SqliteDatabase>::new())
+            .service(PaymentForOrderRoute::<SqliteDatabase>::new())
             .service(OrdersSearchRoute::<SqliteDatabase>::new())
             .service(CreditorsRoute::<SqliteDatabase>::new())
             .service(IssueCreditRoute::<SqliteDatabase>::new())

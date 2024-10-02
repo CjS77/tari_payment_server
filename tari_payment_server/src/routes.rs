@@ -605,6 +605,21 @@ where B: AccountManagement {
     }
 }
 
+route!(payment_for_order => Get "/payments-for-order/{order_id}" impl AccountManagement where requires [Role::ReadAll]);
+/// Route handler for the payments-for-order/{order_id} endpoint
+pub async fn payment_for_order<B: AccountManagement>(
+    path: web::Path<OrderId>,
+    api: web::Data<AccountApi<B>>,
+) -> Result<HttpResponse, ServerError> {
+    let order_id = path.into_inner();
+    debug!("💻️ GET payment_for_order({order_id})");
+    let payments = api.fetch_payments_for_order(&order_id).await.map_err(|e| {
+        debug!("💻️ Could not fetch payments. {e}");
+        ServerError::BackendError(e.to_string())
+    })?;
+    Ok(HttpResponse::Ok().json(payments))
+}
+
 //----------------------------------------------   Modify ----------------------------------------------------
 
 route!(issue_credit => Post "/credit" impl PaymentGatewayDatabase where requires [Role::Write]);
@@ -900,6 +915,10 @@ where
     // -- from here on, we trust that the notification is legitimate.
     let tx_id = confirmation.txid.clone();
     let result = match order_api.confirm_payment(confirmation.txid).await {
+        Err(PaymentGatewayError::PaymentModificationNoOp) => {
+            info!("💻️ Payment {} already confirmed.", tx_id);
+            JsonResponse::success("Payment already confirmed.")
+        },
         Err(e) => {
             error!("💻️ Could not confirm payment. {e}");
             JsonResponse::failure(String::from("Could not confirm payment."))

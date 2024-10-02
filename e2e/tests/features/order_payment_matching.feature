@@ -370,3 +370,62 @@ Feature: Order Fulfillment
     And account for customer 1 has a current balance of 400 XTR
     And account for customer 2 has a current balance of 0 XTR
 
+  Scenario: Alice: Order -> Pay with payment_id -> Confirm. The order is fulfilled.
+    When Customer #1 ["alice"] places order "alice001" for 2100 XTR, with memo
+    When a payment arrives from x-forwarded-for 192.168.1.100
+    """
+    {"payment": {
+      "sender":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
+      "amount":2500000000,
+      "txid":"payment001",
+      "order_id": "alice001"
+    },
+    "auth": {
+      "address":"14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG",
+      "nonce":1,
+      "signature":"1c95cc4ac7101701a76f117c1a1422ce5df171541ee8f2d85d2ce51c72c87952f1a5b1257e0dff920096fff3811e442d6551bca2665d8ef9c7361688388ce10a"}
+    }
+    """
+    Then order "alice001" is in state New
+    When a confirmation arrives from x-forwarded-for 192.168.1.100
+    """
+    { "confirmation": {"txid": "payment001"},
+      "auth": {
+        "address":"14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG",
+        "nonce":2,
+        "signature":"16729e3c9b08022a16edfa0bf2e1cfc1d8dadd5e6387b4fd76005ac8a20c0f53087434524748981e9c61f9b7ce122fdf1a45299b132cd4495b19b7d1208cea01"
+      }
+    }
+    """
+    Then order "alice001" is in state Paid
+    And account for customer 1 has a current balance of 400 XTR
+
+  Scenario: Alice: Pay with payment_id -> Confirm -> Order. The order is fulfilled.
+    When a payment arrives from x-forwarded-for 192.168.1.100
+    """
+    {"payment": {
+      "sender":"14wqR3rjyVbjgXDyLVaL97p3CksHc84cz9hLLMMTMYDjtBt",
+      "amount":2500000000,
+      "txid":"payment001",
+      "order_id": "alice001"
+    },
+    "auth": {
+      "address":"14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG",
+      "nonce":1,
+      "signature":"1c95cc4ac7101701a76f117c1a1422ce5df171541ee8f2d85d2ce51c72c87952f1a5b1257e0dff920096fff3811e442d6551bca2665d8ef9c7361688388ce10a"}
+    }
+    """
+    Then I receive a 200 Ok response with the message '"success":true'
+    When a confirmation arrives from x-forwarded-for 192.168.1.100
+    """
+    { "confirmation": {"txid": "payment001"},
+      "auth": {
+        "address":"14z3iHvgokZcXmokAYQKveeJ4rMqSGtPahrC2CPvx63UQmG",
+        "nonce":2,
+        "signature":"16729e3c9b08022a16edfa0bf2e1cfc1d8dadd5e6387b4fd76005ac8a20c0f53087434524748981e9c61f9b7ce122fdf1a45299b132cd4495b19b7d1208cea01"
+      }
+    }
+    """
+    When Customer #1 ["alice"] places order "alice001" for 2100 XTR, with memo
+    Then order "alice001" is in state Paid
+    And account for customer 1 has a current balance of 400 XTR

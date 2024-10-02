@@ -19,11 +19,11 @@ use tari_payment_engine::{
     db_types::{
         AddressBalance,
         CreditNote,
-        CustomerBalance,
         CustomerOrders,
         LoginToken,
         Order,
         OrderId,
+        Payment,
         Role,
         SerializedTariAddress,
     },
@@ -324,6 +324,10 @@ impl PaymentServerClient {
 
     pub async fn payments_for_address(&self, address: TariAddress) -> Result<PaymentsResult> {
         self.auth_get_request(&format!("/api/payments/{}", address.to_base58())).await
+    }
+
+    pub async fn payments_for_order(&self, order_id: &OrderId) -> Result<Vec<Payment>> {
+        self.auth_get_request(&format!("/api/payments-for-order/{order_id}")).await
     }
 
     pub async fn issue_credit(&self, customer_id: &str, amount: MicroTari, reason: String) -> Result<Vec<Order>> {

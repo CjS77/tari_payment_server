@@ -10,13 +10,13 @@ PROFILE="TPS Hot Wallet"
 LOGFILE=$HOME/.taritools/tps_notify.log
 
 register_received_payment() {
-  ${BIN} wallet received --profile "$PROFILE" --amount "$2" --txid $3 --memo "$4" --sender $5 &>>$LOGFILE
+  ${BIN} wallet received --profile "$PROFILE" --amount "$2" --txid $3 --memo "$4" --sender $6 --payment_id "$5" &>>$LOGFILE
   echo "Registering payment received is complete" >> $LOGFILE
 }
 
 register_confirmation() {
   echo "Signalling payment (possibly again)"
-  ${BIN} wallet received --profile "$PROFILE" --amount "$2" --txid $3 --memo "$4" --sender $5 &>>$LOGFILE
+  ${BIN} wallet received --profile "$PROFILE" --amount "$2" --txid $3 --memo "$4" --sender $6 --payment_id "$5" &>>$LOGFILE
   sleep 2
   ${BIN} wallet confirmed --profile "$PROFILE" --txid $3 &>>$LOGFILE
   echo "Registering confirmation received is complete" >> $LOGFILE
@@ -34,7 +34,7 @@ done
 escaped_args=$(echo "$escaped_args" | sed 's/ *$//')
 echo $escaped_args >> $LOGFILE
 
-if [ -n "${12}" ]; then
+if [ -n "${13}" ]; then
   if [ "$1" == "received" ]; then
     echo "Registering payment received" >> $LOGFILE
     register_received_payment "$@"
@@ -55,14 +55,15 @@ fi
 #  $2 = amount,
 #  $3 = tx_id
 #  $4 = message
-#  $5 = source address public key
-#  $6 = destination address public key
-#  $7 = status
-#  $8 = excess,
-#  $9 = public_nonce,
-# $10 = signature,
-# $11 = number of confirmations (if applicable, otherwise empty string)
-# $12 = direction
+#  $5 = payment_id
+#  $6 = source address public key
+#  $7 = destination address public key
+#  $8 = status
+#  $9 = excess,
+#  $10 = public_nonce,
+# $11 = signature,
+# $12 = number of confirmations (if applicable, otherwise empty string)
+# $13 = direction
 
 # 2.
 # For transaction "sent" event, we only have the pending outbound transaction:
