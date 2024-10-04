@@ -6,7 +6,7 @@ use log::*;
 use tari_common_types::tari_address::TariAddress;
 
 use crate::{
-    db_types::{AddressBalance, CustomerBalance, CustomerOrders, Order, OrderId},
+    db_types::{AddressBalance, CustomerBalance, CustomerOrders, Order, OrderId, Payment},
     order_objects::{OrderQueryFilter, OrderResult},
     tpe_api::{
         account_objects::{AddressHistory, CustomerHistory, Pagination},
@@ -94,5 +94,9 @@ where B: AccountManagement
 
     pub async fn fetch_customer_balance(&self, customer_id: &str) -> Result<CustomerBalance, AccountApiError> {
         self.db.fetch_customer_balance(customer_id).await
+    }
+
+    pub async fn fetch_payments_for_order(&self, order_id: &OrderId) -> Result<Vec<Payment>, AccountApiError> {
+        self.db.fetch_payments_for_order(order_id).await
     }
 }

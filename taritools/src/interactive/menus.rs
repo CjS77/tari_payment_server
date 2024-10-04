@@ -14,6 +14,7 @@ pub mod commands {
     pub const CREDITORS: &str = "Get all unpaid orders";
     pub const EDIT_MEMO: &str = "Edit memo";
     pub const EXIT: &str = "Exit";
+    pub const FETCH_PAYMENTS_FOR_ORDER: &str = "Fetch Payments for Order";
     pub const FETCH_PRICE: &str = "Fetch Tari price";
     pub const HISTORY_FOR_ACCOUNT_ID: &str = "History for Customer Id";
     pub const HISTORY_FOR_ADDRESS: &str = "History for Address";
@@ -44,7 +45,7 @@ pub use commands::*;
 
 pub const TOP_MENU: [&str; 4] = [NAV_TO_ADMIN_MENU, NAV_TO_USER_MENU, LOGOUT, EXIT];
 
-pub const ADMIN_MENU: [&str; 22] = [
+pub const ADMIN_MENU: [&str; 23] = [
     CANCEL,
     MARK_ORDER_PAID,
     RESET_ORDER,
@@ -57,6 +58,7 @@ pub const ADMIN_MENU: [&str; 22] = [
     ORDER_BY_ID,
     BALANCE_FOR_ADDRESS,
     ORDERS_FOR_ADDRESS,
+    FETCH_PAYMENTS_FOR_ORDER,
     PAYMENTS_FOR_ADDRESS,
     HISTORY_FOR_ADDRESS,
     HISTORY_FOR_ACCOUNT_ID,

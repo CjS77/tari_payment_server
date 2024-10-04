@@ -3,7 +3,7 @@ use sqlx::SqliteConnection;
 use tari_common_types::tari_address::TariAddress;
 
 use crate::{
-    db_types::{CreditNote, NewPayment, Payment, TransferStatus},
+    db_types::{CreditNote, NewPayment, OrderId, Payment, TransferStatus},
     helpers::create_dummy_address_for_cust_id,
     traits::PaymentGatewayError,
 };
@@ -16,7 +16,7 @@ pub async fn idempotent_insert(
     let address = transfer.sender.as_address().to_base58();
     let payment = sqlx::query_as(
         r#"
-            INSERT INTO payments (txid, sender, amount, memo) VALUES ($1, $2, $3, $4)
+            INSERT INTO payments (txid, sender, amount, memo, order_id) VALUES ($1, $2, $3, $4, $5)
             RETURNING *;
         "#,
     )
@@ -24,6 +24,7 @@ pub async fn idempotent_insert(
     .bind(address)
     .bind(transfer.amount)
     .bind(transfer.memo)
+    .bind(transfer.order_id)
     .fetch_one(conn)
     .await
     .map_err(|e| match e {
@@ -102,5 +103,14 @@ pub async fn pending_payments(address: &TariAddress, conn: &mut SqliteConnection
     .bind(address)
     .fetch_all(conn)
     .await?;
+    Ok(payments)
+}
+
+pub async fn fetch_payments_for_order(
+    order_id: &OrderId,
+    conn: &mut SqliteConnection,
+) -> Result<Vec<Payment>, sqlx::Error> {
+    let payments =
+        sqlx::query_as(r#"SELECT * FROM payments WHERE order_id = ?"#).bind(order_id.as_str()).fetch_all(conn).await?;
     Ok(payments)
 }

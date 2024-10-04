@@ -86,14 +86,18 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         }
         let mut tx = self.pool.begin().await?;
         let cust_id = &order.customer_id;
-        let address = accounts::balances_for_customer_id(cust_id, &mut tx).await?;
-        // The first address is the most recent one
+        let mut address = accounts::balances_for_order_id(&order.order_id, &mut tx).await?;
+        if address.is_empty() {
+            address = accounts::balances_for_customer_id(cust_id, &mut tx).await?;
+        }
+        // The first address is either explicitly lined to the order, or the most recent one
         let Some(address) = address.first().map(|a| a.address().clone()) else {
             // We could omit the tx commit here, 'cos we're not making any changes
             tx.commit().await?;
             return Ok(None);
         };
         let order = orders::update_order_status(order.id, OrderStatusType::New, &mut tx).await?;
+        accounts::link_address_to_customer(&address, &order.customer_id, &mut tx).await?;
         tx.commit().await?;
         Ok(Some((address, order)))
     }
@@ -118,8 +122,20 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         let payment = transfers::idempotent_insert(payment, &mut tx).await?;
         // If the order id is already known, link the address and customer_id
         if let Some(order_id) = maybe_order_id {
-            accounts::link_address_to_order(&order_id, payment.sender.as_address(), &mut tx).await?;
-            info!("🗃️ Address {} linked to order {order_id}", payment.sender.as_address());
+            info!(
+                "🗃️ The payment {} contains an order id ({order_id}), so I'm going to try and claim an existing order",
+                payment.txid
+            );
+            match self.claim_order_with_conn(&order_id, payment.sender.as_address(), &mut tx).await {
+                Ok(_) => info!("🗃️ Address {} linked to order {order_id}", payment.sender.as_address()),
+                Err(PaymentGatewayError::OrderNotFound(id)) => {
+                    info!(
+                        "🗃️ Order {id} is not in the database, and so it can't be matched. Either the order has not \
+                         come through from the storefront yet, or it has been mistyped."
+                    );
+                },
+                Err(e) => return Err(e),
+            };
         }
         debug!("🗃️ Transfer {} processed. {} credited to pending account", payment.txid, payment.amount);
         tx.commit().await?;
@@ -158,9 +174,19 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     /// with the sum total of the payments being equal to the order's total price.
     async fn try_pay_order(&self, order: &Order) -> Result<Option<MultiAccountPayment>, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
+        // First check for any payments that contain the order id
+        let order_balances = accounts::balances_for_order_id(&order.order_id, &mut tx).await?;
+        debug!("🗃️ Found {} payments explicitly lined to order {}", order_balances.len(), order.order_id);
         let mut balances = accounts::balances_for_customer_id(&order.customer_id, &mut tx).await?;
+        balances.extend(order_balances);
         let mut total_due = order.total_price;
         let total_credit = balances.iter().map(|b| b.current_balance()).sum();
+        debug!(
+            "🗃️ Found {} payments in total for customer {} with total current balance of {}",
+            balances.len(),
+            order.customer_id,
+            total_credit
+        );
         if balances.is_empty() || (total_due > total_credit) {
             let err = PaymentGatewayError::AccountError(AccountApiError::InsufficientFunds);
             return Err(err);
@@ -575,6 +601,12 @@ impl AccountManagement for SqliteDatabase {
     async fn fetch_customer_ids_for_address(&self, address: &TariAddress) -> Result<Vec<String>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
         let ids = accounts::customer_ids_for_address(address, &mut conn).await?;
+        Ok(ids)
+    }
+
+    async fn fetch_payments_for_order(&self, order_id: &OrderId) -> Result<Vec<Payment>, AccountApiError> {
+        let mut conn = self.pool.acquire().await?;
+        let ids = transfers::fetch_payments_for_order(order_id, &mut conn).await?;
         Ok(ids)
     }
 }

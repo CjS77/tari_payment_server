@@ -112,4 +112,7 @@ pub trait AccountManagement {
 
     /// Fetches all customer ids associated with the given address
     async fn fetch_customer_ids_for_address(&self, address: &TariAddress) -> Result<Vec<String>, AccountApiError>;
+
+    /// Fetches payments that are explicitly linked to an order id
+    async fn fetch_payments_for_order(&self, order_id: &OrderId) -> Result<Vec<Payment>, AccountApiError>;
 }

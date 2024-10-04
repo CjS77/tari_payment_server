@@ -371,7 +371,9 @@ where B: PaymentGatewayDatabase
     }
 
     /// Tries to pay for the given set of orders using _any_ funds associated with the customer id attached to the
-    /// order. If you want to pay for orders using a specific address, use [`try_pay_orders_from_address`] instead.
+    /// order.
+    ///
+    /// If you want to pay for orders using a specific address, use [`try_pay_orders_from_address`] instead.
     /// This function will try to pay for each order in the list, and return a single payment object that contains all
     /// the orders that were paid for.
     ///

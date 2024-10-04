@@ -38,6 +38,7 @@ use crate::{
             format_order,
             format_order_result,
             format_orders,
+            format_payments,
             format_payments_result,
             format_wallet_list,
             print_order,
@@ -143,6 +144,7 @@ impl InteractiveApp {
                 RESET_ORDER => handle_response(self.reset_order().await),
                 MARK_ORDER_PAID => handle_response(self.fulfil_order().await),
                 FETCH_PRICE => self.fetch_tari_price().await,
+                FETCH_PAYMENTS_FOR_ORDER => handle_response(self.payments_for_order().await),
                 SET_PRICE => self.set_tari_price().await,
                 ISSUE_CREDIT => handle_response(self.issue_credit().await),
                 ORDER_BY_ID => handle_response(self.order_by_id().await),
@@ -404,6 +406,15 @@ impl InteractiveApp {
         let address = self.select_address().await?;
         let client = self.client().expect("User is logged in. Client should not be None");
         client.orders_for_address(address).await.and_then(format_order_result)
+    }
+
+    async fn payments_for_order(&mut self) -> Result<String> {
+        let _unused = self.login().await;
+        let order_id = dialoguer::Input::<String>::new().with_prompt("Enter order ID").interact()?;
+        let order_id = OrderId::new(order_id);
+        let client = self.client().expect("User is logged in. Client should not be None");
+        let payments = client.payments_for_order(&order_id).await?;
+        Ok(format_payments(&payments))
     }
 
     async fn payments_for_address(&mut self) -> Result<String> {
