@@ -12,10 +12,10 @@ use tari_payment_engine::{
     db_types::{NewPayment, OrderId, SerializedTariAddress},
     helpers::WalletSignature,
 };
-use tari_payment_server::data_objects::TransactionConfirmation;
+use tari_payment_server::{config::OrderIdField, data_objects::TransactionConfirmation};
 use tpg_common::MicroTari;
 
-use crate::{keys::KeyInfo, PaymentAuthParams, TxConfirmParams};
+use crate::{keys::KeyInfo, shopify, PaymentAuthParams, TxConfirmParams};
 
 #[derive(Debug, Subcommand)]
 pub enum WalletCommand {
@@ -104,18 +104,52 @@ fn extract_order_id_from_payment_id(payment_id: &str) -> Option<OrderId> {
             return None;
         },
     };
-    order_id_from_payment_id_str(&order_id)
+    let format = shopify::order_id_field_from_env();
+    order_id_from_payment_id_str(&order_id, format)
 }
 
-fn order_id_from_payment_id_str(payment_id_str: &str) -> Option<OrderId> {
-    let order_id_regex = Regex::new(r#"^(order[\s_]?id[:=]\s*)?"?([^".]*)"?"#).expect("Invalid hardcoded regex");
-    let s = order_id_regex.captures(payment_id_str).and_then(|c| c.get(2)).map(|s| s.as_str().trim())?;
-    if s.is_empty() {
-        warn!("Payment id was decoded correctly, but orderId was empty");
+fn order_id_from_payment_id_str(payment_id_str: &str, format: OrderIdField) -> Option<OrderId> {
+    if is_forbidden_pattern(payment_id_str) {
         return None;
     }
-    info!("Payment id was decoded correctly, orderId: {s}");
-    Some(OrderId::new(s))
+    match format {
+        OrderIdField::Id => {
+            debug!("We're configured to use the order id as the payment id");
+            let order_id_regex =
+                Regex::new(r#"^(order[\s_]?id[:=]\s*)?"?([^".]*)"?"#).expect("Invalid hardcoded regex");
+            let s = order_id_regex.captures(payment_id_str).and_then(|c| c.get(2)).map(|s| s.as_str().trim())?;
+
+            if s.is_empty() {
+                warn!("Payment id was decoded correctly, but orderId was empty");
+                None
+            } else {
+                info!("Payment id was decoded correctly, orderId: {s}");
+                Some(OrderId::new(s))
+            }
+        },
+        OrderIdField::Name => {
+            debug!("We're configured to use the order name as the payment id");
+            let order_id_regex = Regex::new(r#"#?(\d+)"#).expect("Invalid hardcoded regex");
+            let s =
+                order_id_regex.captures(payment_id_str).and_then(|c| c.get(1)).map(|s| format!("#{}", s.as_str()))?;
+            Some(OrderId::new(s))
+        },
+    }
+}
+
+fn is_forbidden_pattern(payment_id_str: &str) -> bool {
+    // Empty strings are not allowed
+    if payment_id_str.is_empty() {
+        warn!("Payment id was empty");
+        return true;
+    }
+    // Check for phone numbers
+    let regex = Regex::new(r#"^[^\d]*\d{3}-\d{3}-\d{4}$"#).expect("Invalid hardcoded regex");
+    if regex.is_match(payment_id_str) {
+        warn!("Payment id looked like a phone number: {payment_id_str}");
+        return true;
+    }
+    false
 }
 
 #[derive(Debug, Args)]
@@ -238,22 +272,48 @@ mod test {
     pub fn order_id_regex() {
         env_logger::try_init().ok();
         let matches = |actual: Option<OrderId>, expected: &str| actual.unwrap().as_str() == expected;
-        assert!(matches(order_id_from_payment_id_str("order_id: 12345"), "12345"));
-        assert!(matches(order_id_from_payment_id_str("order_id=\"12345\""), "12345"));
-        assert!(matches(order_id_from_payment_id_str("order_id: \"12345\"\n"), "12345"));
-        assert!(matches(order_id_from_payment_id_str("order_id=\"12345"), "12345"));
-        assert!(matches(order_id_from_payment_id_str("order_id= \" 12345\"\n"), "12345"));
-        assert!(matches(order_id_from_payment_id_str("order_id=126dbsa"), "126dbsa"));
-        assert!(matches(order_id_from_payment_id_str("order12345"), "order12345"));
-        assert!(matches(order_id_from_payment_id_str("order#12345"), "order#12345"));
+        assert!(matches(order_id_from_payment_id_str("order_id: 12345", OrderIdField::Id), "12345"));
+        assert!(matches(order_id_from_payment_id_str("order_id=\"12345\"", OrderIdField::Id), "12345"));
+        assert!(matches(order_id_from_payment_id_str("order_id: \"12345\"\n", OrderIdField::Id), "12345"));
+        assert!(matches(order_id_from_payment_id_str("order_id=\"12345", OrderIdField::Id), "12345"));
+        assert!(matches(order_id_from_payment_id_str("order_id= \" 12345\"\n", OrderIdField::Id), "12345"));
+        assert!(matches(order_id_from_payment_id_str("order_id=126dbsa", OrderIdField::Id), "126dbsa"));
+        assert!(matches(order_id_from_payment_id_str("order12345", OrderIdField::Id), "order12345"));
+        assert!(matches(order_id_from_payment_id_str("order#12345", OrderIdField::Id), "order#12345"));
         // if order_id is actually part of the order id, the format must be like one of these:
-        assert!(matches(order_id_from_payment_id_str("order_id:\"order_id#12345\""), "order_id#12345"));
-        assert!(matches(order_id_from_payment_id_str("order_id=order_id#12345"), "order_id#12345"));
-        assert!(matches(order_id_from_payment_id_str("123456"), "123456"));
-        assert!(matches(order_id_from_payment_id_str("\"123456\""), "123456"));
-        assert!(matches(order_id_from_payment_id_str("\" ab123456cd \""), "ab123456cd"));
-        assert!(order_id_from_payment_id_str("order_id=").is_none());
-        assert!(order_id_from_payment_id_str("order_id=\"\"").is_none());
-        assert!(order_id_from_payment_id_str("order_id=\"\"").is_none());
+        assert!(matches(
+            order_id_from_payment_id_str("order_id:\"order_id#12345\"", OrderIdField::Id),
+            "order_id#12345"
+        ));
+        assert!(matches(order_id_from_payment_id_str("order_id=order_id#12345", OrderIdField::Id), "order_id#12345"));
+        assert!(matches(order_id_from_payment_id_str("123456", OrderIdField::Id), "123456"));
+        assert!(matches(order_id_from_payment_id_str("\"123456\"", OrderIdField::Id), "123456"));
+        assert!(matches(order_id_from_payment_id_str("\" ab123456cd \"", OrderIdField::Id), "ab123456cd"));
+        assert!(order_id_from_payment_id_str("order_id=", OrderIdField::Id).is_none());
+        assert!(order_id_from_payment_id_str("order_id=\"\"", OrderIdField::Id).is_none());
+        assert!(order_id_from_payment_id_str("order_id=\"\"", OrderIdField::Id).is_none());
+    }
+
+    #[test]
+    pub fn shopify_order_name() {
+        env_logger::try_init().ok();
+        let matches = |actual: Option<OrderId>, expected: &str| actual.unwrap().as_str() == expected;
+        assert!(matches(order_id_from_payment_id_str("12345", OrderIdField::Name), "#12345"));
+        assert!(matches(order_id_from_payment_id_str("#12345", OrderIdField::Name), "#12345"));
+        assert!(matches(order_id_from_payment_id_str("#00001", OrderIdField::Name), "#00001"));
+        assert!(matches(order_id_from_payment_id_str("Order#12345", OrderIdField::Name), "#12345"));
+        assert!(matches(order_id_from_payment_id_str("Order# 12345", OrderIdField::Name), "#12345"));
+        assert!(matches(order_id_from_payment_id_str("order#12345", OrderIdField::Name), "#12345"));
+        assert!(matches(order_id_from_payment_id_str("order 12345", OrderIdField::Name), "#12345"));
+        assert!(matches(order_id_from_payment_id_str("Order ID is 1234", OrderIdField::Name), "#1234"));
+        assert!(matches(order_id_from_payment_id_str("Track Order 9876. This is 500", OrderIdField::Name), "#9876"));
+        assert!(matches(order_id_from_payment_id_str("order 123 456", OrderIdField::Name), "#123"));
+        assert!(matches(order_id_from_payment_id_str("123 45 67", OrderIdField::Name), "#123"));
+        assert!(matches(order_id_from_payment_id_str("#5674 Main st", OrderIdField::Name), "#5674"));
+        assert!(matches(order_id_from_payment_id_str("5674 Main st", OrderIdField::Name), "#5674"));
+        assert!(matches(order_id_from_payment_id_str("#5674. Phone 555-666-1111", OrderIdField::Name), "#5674"));
+        assert!(order_id_from_payment_id_str("555-888-9995", OrderIdField::Name).is_none());
+        assert!(order_id_from_payment_id_str("phone: 555-888-9995", OrderIdField::Name).is_none());
+        assert!(order_id_from_payment_id_str("Order#", OrderIdField::Name).is_none());
     }
 }
