@@ -226,6 +226,29 @@ async fn place_short_order(world: &mut TPGWorld, user: i64, email: String, order
     place_order(world, user, email, order_id, amount, now.to_rfc3339(), step).await;
 }
 
+#[when(expr = "Customer #{int} [{string}] places order with name \"{word}\" for {int} XTR")]
+async fn place_order_with_name(world: &mut TPGWorld, user: i64, email: String, order_name: String, amount: i64) {
+    world.response = None;
+    let res = world
+        .request(Method::POST, "/shopify/webhook/checkout_create", |req| {
+            let mut order = ShopifyOrder::default();
+            order.created_at = chrono::Utc::now().to_rfc3339();
+            order.id = format!("id-{order_name}");
+            order.name = order_name;
+            order.note = None;
+            order.currency = "XTR".to_string();
+            order.total_price = format!("{amount}.00");
+            order.user_id = Some(user);
+            order.email = Some(email);
+            order.customer.id = user;
+            let order = serde_json::to_string(&order).expect("Failed to serialize order");
+            req.body(order).header("Content-Type", "application/json")
+        })
+        .await;
+    trace!("Got Response: {} {}", res.0, res.1);
+    world.response = Some(res);
+}
+
 #[when(expr = "Customer #{int} [{string}] places order \"{word}\" for {int} XTR at {string}, with memo")]
 async fn place_order(
     world: &mut TPGWorld,
