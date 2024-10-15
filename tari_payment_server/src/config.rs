@@ -59,6 +59,7 @@ pub struct ShopifyConfig {
     pub whitelist: Option<Vec<IpAddr>>,
     pub admin_access_token: Secret<String>,
     pub storefront_access_token: Secret<String>,
+    pub order_id_field: OrderIdField,
 }
 
 impl Default for ServerConfig {
@@ -74,6 +75,18 @@ impl Default for ServerConfig {
             unpaid_order_timeout: DEFAULT_UNPAID_ORDER_TIMEOUT,
             shopify_config: ShopifyConfig::default(),
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum OrderIdField {
+    Name,
+    Id,
+}
+
+impl Default for OrderIdField {
+    fn default() -> Self {
+        Self::Id
     }
 }
 
@@ -175,6 +188,14 @@ impl ShopifyConfig {
                 info!("🪛️ Shopify IP whitelist: {addrs}");
             },
         }
+        let order_id_field = match env::var("TPG_SHOPIFY_ORDER_ID_FIELD").map(|s| s.to_lowercase()) {
+            Ok(s) if s == "name" => OrderIdField::Name,
+            Ok(s) if s == "id" => OrderIdField::Id,
+            _ => {
+                warn!("TPG_SHOPIFY_ORDER_ID_FIELD not set, using 'id' as default");
+                OrderIdField::Id
+            },
+        };
         Self {
             shop: api_config.shop,
             api_version: api_config.api_version,
@@ -185,6 +206,7 @@ impl ShopifyConfig {
             whitelist,
             admin_access_token: api_config.admin_access_token,
             storefront_access_token: api_config.storefront_access_token,
+            order_id_field,
         }
     }
 
