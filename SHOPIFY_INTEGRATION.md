@@ -136,6 +136,8 @@ TPS assumes that the following environment variables are set when making use of 
 - `TPG_SHOPIFY_API_KEY`: This variable is used to set the API key for your Shopify app. If not set, an error message will be logged, and the value will be set to an empty string.
 - `TPG_SHOPIFY_HMAC_CHECKS`. A flag to indicate whether to check the HMAC signature of incoming requests from Shopify.
   Set to `1` to enable HMAC checks, and `0` to disable them. You **almost certainly want to enable this in production.**
+- `TPG_SHOPIFY_ORDER_ID_FIELD`. Specify which field should be used as the order id. Must be one of `name` or `id`. 
+   Default is `id`.
   
 ## Configure webhooks to interact with your server.
 
