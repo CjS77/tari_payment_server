@@ -115,6 +115,7 @@ pub fn create_server_instance(
 ) -> Result<Server, ServerError> {
     let proxy_config = ProxyConfig::from_config(&config);
     let shopify_config = config.shopify_config.shopify_api_config();
+    let order_id_field = config.shopify_config.order_id_field;
     let shopify_api = ShopifyApi::new(shopify_config).map_err(|e| {
         let msg = format!("Failed to create Shopify API: {e}");
         error!("{msg}");
@@ -145,7 +146,8 @@ pub fn create_server_instance(
             .app_data(web::Data::new(wallet_auth))
             .app_data(web::Data::new(wallet_manager))
             .app_data(web::Data::new(exchange_rates))
-            .app_data(web::Data::new(proxy_config));
+            .app_data(web::Data::new(proxy_config))
+            .app_data(web::Data::new(order_id_field));
         // Routes that require authentication
         let auth_scope = web::scope("/api")
             .service(UpdateRolesRoute::<SqliteDatabase>::new())
