@@ -85,6 +85,3 @@ Feature: Wallet Authorization
     }}
     """
     Then I receive a 401 Ok response with the message ''
-
-
-

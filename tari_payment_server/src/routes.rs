@@ -826,23 +826,36 @@ where
     let PaymentNotification { mut payment, auth } = body.into_inner();
     let use_x_forwarded_for = config.use_x_forwarded_for;
     let use_forwarded = config.use_forwarded;
+    let disable_whitelist = config.disable_wallet_whitelist;
     // Log the payment
-    let Some(peer_addr) = get_remote_ip(&req, use_x_forwarded_for, use_forwarded) else {
-        warn!("💻️ Could not determine remote IP address for a wallet payment notification. The request is rejected");
-        return HttpResponse::Unauthorized().finish();
+    trace!("💻️ Extracting remote IP address. {req:?}. {:?}", req.connection_info());
+    let peer_addr = match (get_remote_ip(&req, use_x_forwarded_for, use_forwarded), disable_whitelist) {
+        (Some(ip), _) => Some(ip),
+        (None, true) => {
+            info!(
+                "💻️ Could not determine remote IP address for a wallet payment notification. The whitelist is \
+                 disabled, so the request is allowed, but it could not be logged."
+            );
+            None
+        },
+        (None, false) => {
+            warn!(
+                "💻️ Could not determine remote IP address for a wallet payment notification. The request is rejected"
+            );
+            return HttpResponse::Unauthorized().finish();
+        },
     };
-    info!("💻️ New payment notification received from IP {peer_addr}.");
+    info!("💻️ New payment notification received from IP {peer_addr:?}.");
     info!("💻️ Payment: {}", serde_json::to_string(&payment).unwrap_or_else(|e| format!("{e}")));
     info!("💻️ Auth: {}", serde_json::to_string(&auth).unwrap_or_else(|e| format!("{e}")));
     trace!("💻️ Verifying wallet signature");
     if !auth.is_valid(&payment) {
-        warn!("💻️ Invalid wallet signature received from {peer_addr}. The request is rejected.");
+        warn!("💻️ Invalid wallet signature received from {peer_addr:?}. The request is rejected.");
         return HttpResponse::Unauthorized().finish();
     }
-    trace!("💻️ Extracting remote IP address. {req:?}. {:?}", req.connection_info());
     let auth_api = auth_api.as_ref();
-    if let Err(e) = auth_api.authenticate_wallet(auth, &peer_addr, &payment).await {
-        warn!("💻️ Unauthorized wallet signature received from {peer_addr}. Reason: {e}. The request is rejected.");
+    if let Err(e) = auth_api.authenticate_wallet(auth, peer_addr.as_ref(), &payment, disable_whitelist).await {
+        warn!("💻️ Unauthorized wallet signature received from {peer_addr:?}. Reason: {e}. The request is rejected.");
         return HttpResponse::Unauthorized().finish();
     }
     // -- from here on, we trust that the notification is legitimate.
@@ -893,23 +906,36 @@ where
     let TransactionConfirmationNotification { confirmation, auth } = body.into_inner();
     let use_x_forwarded_for = config.use_x_forwarded_for;
     let use_forwarded = config.use_forwarded;
+    let disable_whitelist = config.disable_wallet_whitelist;
     trace!("💻️ Extracting remote IP address. {req:?}. {:?}", req.connection_info());
-    let Some(peer_addr) = get_remote_ip(&req, use_x_forwarded_for, use_forwarded) else {
-        warn!("💻️ Could not determine remote IP address for a wallet payment notification. The request is rejected");
-        return HttpResponse::Unauthorized().finish();
+    let peer_addr = match (get_remote_ip(&req, use_x_forwarded_for, use_forwarded), disable_whitelist) {
+        (Some(ip), _) => Some(ip),
+        (None, true) => {
+            info!(
+                "💻️ Could not determine remote IP address for a wallet payment confirmation. The whitelist is \
+                 disabled, so the request is allowed, but it could not be logged."
+            );
+            None
+        },
+        (None, false) => {
+            warn!(
+                "💻️ Could not determine remote IP address for a wallet payment confirmation. The request is rejected"
+            );
+            return HttpResponse::Unauthorized().finish();
+        },
     };
     // Log the payment
-    info!("💻️ New transaction confirmation received from IP {peer_addr}.");
+    info!("💻️ New transaction confirmation received from IP {peer_addr:?}.");
     info!("💻️ Confirmation: {}", serde_json::to_string(&confirmation).unwrap_or_else(|e| format!("{e}")));
     info!("💻️ Auth: {}", serde_json::to_string(&auth).unwrap_or_else(|e| format!("{e}")));
     trace!("💻️ Verifying wallet signature");
     if !auth.is_valid(&confirmation) {
-        warn!("💻️ Invalid wallet signature received from {peer_addr}. The request is rejected.");
+        warn!("💻️ Invalid wallet signature received from {peer_addr:?}. The request is rejected.");
         return HttpResponse::Unauthorized().finish();
     }
     let auth_api = auth_api.as_ref();
-    if let Err(e) = auth_api.authenticate_wallet(auth, &peer_addr, &confirmation).await {
-        warn!("💻️ Unauthorized wallet signature received from {peer_addr}. Reason: {e}. The request is rejected.");
+    if let Err(e) = auth_api.authenticate_wallet(auth, peer_addr.as_ref(), &confirmation, disable_whitelist).await {
+        warn!("💻️ Unauthorized wallet signature received from {peer_addr:?}. Reason: {e}. The request is rejected.");
         return HttpResponse::Unauthorized().finish();
     }
     // -- from here on, we trust that the notification is legitimate.
