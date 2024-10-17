@@ -55,8 +55,9 @@ impl Default for Profile {
             secret_key: None,
             secret_key_envar: None,
             roles: vec![Role::User],
-            server: Url::parse("http://localhost:4444")
-                .expect("Hardcoded Url (lh4) is invalid. Report this to the developers"),
+            server: default_server_url().expect(
+                "Invalid default server URL. Check your TPG_HOST, TPG_PORT and TPG_SCHEMA environment variables",
+            ),
         }
     }
 }
@@ -105,4 +106,18 @@ pub fn write_config(config: &UserData) -> anyhow::Result<()> {
     let config_str = toml::to_string(config)?;
     fs::write(config_path, config_str)?;
     Ok(())
+}
+
+pub fn default_server_url() -> anyhow::Result<Url> {
+    let schema = std::env::var("TPG_SCHEMA").unwrap_or_else(|_| "http".to_string());
+    let port = std::env::var("TPG_PORT").ok();
+    let host = std::env::var("TPG_HOST").ok();
+    let server = match (host, port) {
+        (Some(host), Some(port)) => format!("{schema}://{host}:{port}"),
+        (Some(host), None) => format!("{schema}://{host}"),
+        (None, Some(port)) => format!("{schema}://localhost:{port}"),
+        (None, None) => format!("{schema}://localhost:4444"),
+    };
+    let url = Url::parse(&server)?;
+    Ok(url)
 }
