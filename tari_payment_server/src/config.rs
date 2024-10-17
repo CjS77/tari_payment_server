@@ -37,6 +37,8 @@ pub struct ServerConfig {
     /// If true, the X-Forwarded-Proto header will be used to determine the client's protocol, rather than the
     /// connection's remote address.
     pub use_forwarded: bool,
+    /// If true, the server will not validate payment API calls against a whitelist of wallet addresses. **DANGER**
+    pub disable_wallet_whitelist: bool,
     /// The time before an unclaimed order is considered abandoned and marked as expired.
     pub unclaimed_order_timeout: Duration,
     /// The time before an unpaid order is considered expired and marked as such.
@@ -71,6 +73,7 @@ impl Default for ServerConfig {
             auth: AuthConfig::default(),
             use_x_forwarded_for: false,
             use_forwarded: false,
+            disable_wallet_whitelist: false,
             unclaimed_order_timeout: DEFAULT_UNCLAIMED_ORDER_TIMEOUT,
             unpaid_order_timeout: DEFAULT_UNPAID_ORDER_TIMEOUT,
             shopify_config: ShopifyConfig::default(),
@@ -122,6 +125,8 @@ impl ServerConfig {
         let shopify_config = ShopifyConfig::from_env_or_defaults();
         let use_x_forwarded_for = env::var("TPG_USE_X_FORWARDED_FOR").map(|s| &s == "1" || &s == "true").is_ok();
         let use_forwarded = env::var("TPG_USE_FORWARDED").map(|s| &s == "1" || &s == "true").is_ok();
+        let disable_wallet_whitelist =
+            env::var("TPG_DISABLE_WALLET_WHITELIST").map(|s| &s == "1" || &s == "true").is_ok();
         let (unclaimed_order_timeout, unpaid_order_timeout) = configure_order_timeouts();
         Self {
             host,
@@ -131,6 +136,7 @@ impl ServerConfig {
             database_url,
             use_forwarded,
             use_x_forwarded_for,
+            disable_wallet_whitelist,
             unclaimed_order_timeout,
             unpaid_order_timeout,
         }
@@ -326,10 +332,15 @@ impl AuthConfig {
 pub struct ProxyConfig {
     pub use_x_forwarded_for: bool,
     pub use_forwarded: bool,
+    pub disable_wallet_whitelist: bool,
 }
 
 impl ProxyConfig {
     pub fn from_config(config: &ServerConfig) -> Self {
-        Self { use_x_forwarded_for: config.use_x_forwarded_for, use_forwarded: config.use_forwarded }
+        Self {
+            use_x_forwarded_for: config.use_x_forwarded_for,
+            use_forwarded: config.use_forwarded,
+            disable_wallet_whitelist: config.disable_wallet_whitelist,
+        }
     }
 }

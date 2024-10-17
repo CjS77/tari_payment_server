@@ -50,8 +50,9 @@ where B: WalletAuth
     pub async fn authenticate_wallet<T: Serialize>(
         &self,
         sig: WalletSignature,
-        remote_ip: &IpAddr,
+        remote_ip: Option<&IpAddr>,
         payload: &T,
+        disable_ip_check: bool,
     ) -> Result<(), WalletAuthApiError> {
         if !sig.is_valid(payload) {
             return Err(WalletAuthApiError::InvalidSignature);
@@ -67,7 +68,8 @@ where B: WalletAuth
         if wallet_info.last_nonce >= sig.nonce {
             return Err(WalletAuthApiError::InvalidNonce);
         }
-        if wallet_info.ip_address != *remote_ip {
+        let ip_matches = remote_ip.map(|ip| wallet_info.ip_address != *ip).unwrap_or(false);
+        if !disable_ip_check && ip_matches {
             return Err(WalletAuthApiError::InvalidIpAddress);
         }
         self.update_wallet_nonce(address, sig.nonce).await?;
