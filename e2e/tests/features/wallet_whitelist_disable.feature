@@ -14,7 +14,7 @@ Feature: Wallet whitelist disable
       }
     """
 
-  Scenario: Wallet Authorization from wrong IP address fails
+  Scenario: Wallet Authorization from wrong IP address passes because whitelists are disabled
     When a payment arrives from x-forwarded-for 1.2.3.4
     """
     {"payment": {
