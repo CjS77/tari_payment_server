@@ -1,6 +1,6 @@
 use std::{fmt::Debug, net::IpAddr};
 
-use log::trace;
+use log::{info, trace};
 use serde::Serialize;
 use tari_common_types::tari_address::TariAddress;
 
@@ -69,6 +69,9 @@ where B: WalletAuth
             return Err(WalletAuthApiError::InvalidNonce);
         }
         let ip_matches = remote_ip.map(|ip| wallet_info.ip_address != *ip).unwrap_or(false);
+        if disable_ip_check {
+            info!("Wallet whitelist checks are DISABLED.");
+        }
         if !disable_ip_check && ip_matches {
             return Err(WalletAuthApiError::InvalidIpAddress);
         }
