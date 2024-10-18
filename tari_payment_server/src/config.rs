@@ -39,6 +39,9 @@ pub struct ServerConfig {
     pub use_forwarded: bool,
     /// If true, the server will not validate payment API calls against a whitelist of wallet addresses. **DANGER**
     pub disable_wallet_whitelist: bool,
+    /// If true, the server will not require signed messages in memo fields, but will accept naked order ids.
+    /// **DANGER**
+    pub disable_memo_signature_check: bool,
     /// The time before an unclaimed order is considered abandoned and marked as expired.
     pub unclaimed_order_timeout: Duration,
     /// The time before an unpaid order is considered expired and marked as such.
@@ -74,6 +77,7 @@ impl Default for ServerConfig {
             use_x_forwarded_for: false,
             use_forwarded: false,
             disable_wallet_whitelist: false,
+            disable_memo_signature_check: false,
             unclaimed_order_timeout: DEFAULT_UNCLAIMED_ORDER_TIMEOUT,
             unpaid_order_timeout: DEFAULT_UNPAID_ORDER_TIMEOUT,
             shopify_config: ShopifyConfig::default(),
@@ -127,6 +131,8 @@ impl ServerConfig {
         let use_forwarded = env::var("TPG_USE_FORWARDED").map(|s| &s == "1" || &s == "true").is_ok();
         let disable_wallet_whitelist =
             env::var("TPG_DISABLE_WALLET_WHITELIST").map(|s| &s == "1" || &s == "true").is_ok();
+        let disable_memo_signature_check =
+            env::var("TPG_DISABLE_MEMO_SIGNATURE_CHECK").map(|s| &s == "1" || &s == "true").is_ok();
         let (unclaimed_order_timeout, unpaid_order_timeout) = configure_order_timeouts();
         Self {
             host,
@@ -137,6 +143,7 @@ impl ServerConfig {
             use_forwarded,
             use_x_forwarded_for,
             disable_wallet_whitelist,
+            disable_memo_signature_check,
             unclaimed_order_timeout,
             unpaid_order_timeout,
         }
@@ -333,6 +340,8 @@ pub struct ProxyConfig {
     pub use_x_forwarded_for: bool,
     pub use_forwarded: bool,
     pub disable_wallet_whitelist: bool,
+    pub disable_memo_signature_check: bool,
+    pub shopify_order_field: OrderIdField,
 }
 
 impl ProxyConfig {
@@ -341,6 +350,8 @@ impl ProxyConfig {
             use_x_forwarded_for: config.use_x_forwarded_for,
             use_forwarded: config.use_forwarded,
             disable_wallet_whitelist: config.disable_wallet_whitelist,
+            disable_memo_signature_check: config.disable_memo_signature_check,
+            shopify_order_field: config.shopify_config.order_id_field,
         }
     }
 }

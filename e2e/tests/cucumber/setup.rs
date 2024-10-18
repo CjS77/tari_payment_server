@@ -274,6 +274,7 @@ async fn server_configuration(world: &mut TPGWorld, step: &Step) {
             "use_x_forwarded_for" => world.config.use_x_forwarded_for = value == "true",
             "use_forwarded" => world.config.use_forwarded = value == "true",
             "disable_wallet_whitelist" => world.config.disable_wallet_whitelist = value == "true",
+            "disable_memo_signature_check" => world.config.disable_memo_signature_check = value == "true",
             "order_id_field" => {
                 world.config.shopify_config.order_id_field =
                     if value == "name" { OrderIdField::Name } else { OrderIdField::Id }

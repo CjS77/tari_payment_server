@@ -67,7 +67,7 @@ use crate::{
         UpdatePriceParams,
     },
     errors::ServerError,
-    helpers::get_remote_ip,
+    helpers::{get_remote_ip, try_extract_order_id},
 };
 
 // Web-actix cannot handle generics in handlers, so it's implemented manually using the `route!` macro
@@ -827,6 +827,7 @@ where
     let use_x_forwarded_for = config.use_x_forwarded_for;
     let use_forwarded = config.use_forwarded;
     let disable_whitelist = config.disable_wallet_whitelist;
+    let require_memo_signature = !config.disable_memo_signature_check;
     // Log the payment
     trace!("💻️ Extracting remote IP address. {req:?}. {:?}", req.connection_info());
     let peer_addr = match (get_remote_ip(&req, use_x_forwarded_for, use_forwarded), disable_whitelist) {
@@ -860,7 +861,7 @@ where
     }
     // -- from here on, we trust that the notification is legitimate.
     // -- extract the order_id from the memo signature, if present
-    match payment.try_extract_order_id() {
+    match try_extract_order_id(&mut payment, require_memo_signature, config.shopify_order_field) {
         Some(true) => {
             let id = payment.order_id.as_ref().map(|o| o.as_str()).unwrap_or_else(|| "??");
             info!("💻️ Payment memo contains a valid claim for order {id}");

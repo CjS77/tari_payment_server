@@ -1,10 +1,13 @@
 use std::str::FromStr;
 
 use blake2::{Blake2b512, Digest};
-use log::error;
+use log::{error, warn};
+use regex::Regex;
 use tari_common::configuration::Network;
 use tari_common_types::tari_address::{TariAddress, TariAddressFeatures};
 use tari_crypto::{ristretto::RistrettoPublicKey, tari_utilities::ByteArray};
+
+use crate::db_types::OrderId;
 
 pub const DONATION_WALLET_ADDRESS: &str = "143UtnSymZykCAm95xAKKKe8nowL6zif8qb1h7yHxgtD9XZ";
 
@@ -53,6 +56,34 @@ pub fn get_payment_wallet_address() -> TariAddress {
                 .ok()
         })
         .unwrap_or_else(|| TariAddress::from_str(DONATION_WALLET_ADDRESS).unwrap())
+}
+
+/// Checks if a payment id or memo note is a forbidden pattern, such as a telephone number
+pub fn is_forbidden_pattern(payment_id_str: &str) -> bool {
+    // Empty strings are not allowed
+    if payment_id_str.is_empty() {
+        warn!("Payment id was empty");
+        return true;
+    }
+    // Check for phone numbers
+    let regex = Regex::new(r#"^[^\d]*\d{3}-\d{3}-\d{4}$"#).expect("Invalid hardcoded regex");
+    if regex.is_match(payment_id_str) {
+        warn!("Payment id looked like a phone number: {payment_id_str}");
+        return true;
+    }
+    false
+}
+
+/// Extract the order name from a payment id string. The payment id string is expected to be in the format `#1234` or
+/// `1234`.
+pub fn extract_order_id_from_str(payment_id_str: &str, prefix: &str) -> Option<OrderId> {
+    // In future, we'll need to have some storefront-specific logic here
+    // Currently Shopify is the only store, and the only distinction is whether to use the order.id or the order.name
+    // as the order identifier, which the caller will implicitly provide via the prefix.
+    let order_id_regex = Regex::new(r#"#?(\d+)"#).expect("Invalid hardcoded regex");
+    let s =
+        order_id_regex.captures(payment_id_str).and_then(|c| c.get(1)).map(|s| format!("{prefix}{}", s.as_str()))?;
+    Some(OrderId::new(s))
 }
 
 #[cfg(test)]

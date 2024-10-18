@@ -13,7 +13,7 @@ use thiserror::Error;
 use tpg_common::MicroTari;
 
 use crate::{
-    helpers::{extract_and_verify_memo_signature, MemoSignature, MemoSignatureError},
+    helpers::{extract_and_verify_memo_signature, MemoSignatureError},
     tpe_api::order_objects::{address_to_base58, str_to_address},
 };
 
@@ -408,25 +408,6 @@ impl NewPayment {
     pub fn with_memo<S: Into<String>>(&mut self, memo: S) {
         self.memo = Some(memo.into());
     }
-
-    /// Tries to extract the order number from the memo.
-    ///
-    /// For this to succeed,
-    /// 1. The memo bust be a valid JSON object.
-    /// 2. The `claim` field must be present.
-    /// 3. The `claim` field must be a valid JSON object containing a valid `MemoSignature`.
-    pub fn try_extract_order_id(&mut self) -> Option<bool> {
-        self.memo.as_ref().map(|m| match serde_json::from_str::<MemoSignature>(m) {
-            Ok(m) => {
-                let result = m.is_valid();
-                if result {
-                    self.order_id = Some(OrderId::new(m.order_id));
-                }
-                result
-            },
-            Err(_) => false,
-        })
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -690,30 +671,5 @@ impl CustomerOrderBalance {
         let total_expired = balances.iter().filter(|b| b.status == Expired).map(|b| b.total_orders).sum();
         let total_cancelled = balances.iter().filter(|b| b.status == Cancelled).map(|b| b.total_orders).sum();
         Self { customer_id, total_current, total_paid, total_expired, total_cancelled }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use serde_json::json;
-
-    use super::*;
-
-    #[test]
-    fn extract_order_id() {
-        let mut payment = NewPayment::new(
-            TariAddress::from_str("14s9vDTwrweZvWEgQ9gNhXXPX68DPXSSAHNFWYEPi5JsBQY").unwrap(),
-            MicroTari::from_tari(100),
-            "txid111111".to_string(),
-        );
-        payment.with_memo(json!({
-            "address": "14s9vDTwrweZvWEgQ9gNhXXPX68DPXSSAHNFWYEPi5JsBQY",
-            "order_id": "oid554432",
-            "signature": "74236918f5815383ad7a889fa2c26037418b217f983575b5b5cfde21c7bcf3094ca6ff09c43fca8d4040a38e60b57fea622d5919979fae4ccfea93883df6bd00"
-            }).to_string()
-        );
-        let result = payment.try_extract_order_id();
-        assert!(matches!(result, Some(true)));
-        assert_eq!(payment.order_id.unwrap().as_str(), "oid554432");
     }
 }
