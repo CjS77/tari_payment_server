@@ -52,6 +52,7 @@ impl Default for TPGWorld {
             use_x_forwarded_for: false,
             use_forwarded: false,
             disable_wallet_whitelist: false,
+            disable_memo_signature_check: false,
             unclaimed_order_timeout: Duration::seconds(2),
             unpaid_order_timeout: Duration::seconds(4),
             shopify_config: Default::default(),

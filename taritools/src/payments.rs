@@ -10,7 +10,7 @@ use tari_crypto::{
 };
 use tari_payment_engine::{
     db_types::{NewPayment, OrderId, SerializedTariAddress},
-    helpers::WalletSignature,
+    helpers::{extract_order_id_from_str, is_forbidden_pattern, WalletSignature},
 };
 use tari_payment_server::{config::OrderIdField, data_objects::TransactionConfirmation};
 use tpg_common::MicroTari;
@@ -129,27 +129,9 @@ fn order_id_from_payment_id_str(payment_id_str: &str, format: OrderIdField) -> O
         },
         OrderIdField::Name => {
             debug!("We're configured to use the order name as the payment id");
-            let order_id_regex = Regex::new(r#"#?(\d+)"#).expect("Invalid hardcoded regex");
-            let s =
-                order_id_regex.captures(payment_id_str).and_then(|c| c.get(1)).map(|s| format!("#{}", s.as_str()))?;
-            Some(OrderId::new(s))
+            extract_order_id_from_str(payment_id_str, "#")
         },
     }
-}
-
-fn is_forbidden_pattern(payment_id_str: &str) -> bool {
-    // Empty strings are not allowed
-    if payment_id_str.is_empty() {
-        warn!("Payment id was empty");
-        return true;
-    }
-    // Check for phone numbers
-    let regex = Regex::new(r#"^[^\d]*\d{3}-\d{3}-\d{4}$"#).expect("Invalid hardcoded regex");
-    if regex.is_match(payment_id_str) {
-        warn!("Payment id looked like a phone number: {payment_id_str}");
-        return true;
-    }
-    false
 }
 
 #[derive(Debug, Args)]
