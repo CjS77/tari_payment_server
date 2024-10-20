@@ -19,7 +19,6 @@ use tari_payment_engine::{
 use tpg_common::MicroTari;
 
 use crate::{
-    config::OrderIdField,
     data_objects::{ExchangeRateUpdate, JsonResponse},
     errors::ServerError,
     integrations::shopify::{new_order_from_shopify_order, OrderConversionError},
@@ -32,7 +31,6 @@ pub async fn shopify_webhook<BPay, BFx>(
     body: web::Json<ShopifyOrder>,
     api: web::Data<OrderFlowApi<BPay>>,
     fx: web::Data<ExchangeRateApi<BFx>>,
-    order_id_field: web::Data<OrderIdField>,
 ) -> HttpResponse
 where
     BPay: PaymentGatewayDatabase,
@@ -41,8 +39,7 @@ where
     trace!("🛍️️ Received webhook request: {}", req.uri());
     let order = body.into_inner();
     // Webhook responses must always be in 200 range, otherwise Shopify will retry
-    let id_field = *order_id_field.into_inner();
-    let result = match new_order_from_shopify_order(order, &fx, id_field).await {
+    let result = match new_order_from_shopify_order(order, &fx).await {
         Err(OrderConversionError::FormatError(s)) => {
             warn!("🛍️️ Could not convert order. {s}");
             JsonResponse::failure(s)

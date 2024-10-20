@@ -241,6 +241,7 @@ pub struct OrderStatus {
 pub struct Order {
     pub id: i64,
     pub order_id: OrderId,
+    pub alt_id: Option<OrderId>,
     pub customer_id: String,
     pub memo: Option<String>,
     pub total_price: MicroTari,
@@ -267,6 +268,8 @@ impl Eq for Order {}
 pub struct NewOrder {
     /// The order_id as assigned by Shopify
     pub order_id: OrderId,
+    /// An alternative order_id that can be used to reference the order
+    pub alt_order_id: Option<OrderId>,
     /// The customer_id as assigned by Shopify
     pub customer_id: String,
     /// An optional description supplied by the user for the order. Useful for matching orders with payments
@@ -287,6 +290,7 @@ impl NewOrder {
     pub fn new(order_id: OrderId, customer_id: String, total_price: MicroTari) -> Self {
         Self {
             order_id,
+            alt_order_id: None,
             customer_id,
             memo: None,
             total_price,
@@ -307,6 +311,7 @@ impl NewOrder {
 
     pub fn is_equivalent(&self, order: &Order) -> bool {
         self.order_id == order.order_id &&
+            self.alt_order_id == order.alt_id &&
             self.customer_id == order.customer_id &&
             self.memo == order.memo &&
             self.total_price == order.total_price &&
@@ -317,9 +322,13 @@ impl NewOrder {
 
 impl Display for NewOrder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let alt_str = match &self.alt_order_id {
+            Some(alt) => format!(" ({alt})"),
+            None => "".to_string(),
+        };
         write!(
             f,
-            "Order #{order_id} @ \"{customer_id}\". {total_price} ({created_at})",
+            "Order {order_id}{alt_str} @ \"{customer_id}\". {total_price} ({created_at})",
             order_id = self.order_id,
             customer_id = self.customer_id,
             total_price = self.total_price,

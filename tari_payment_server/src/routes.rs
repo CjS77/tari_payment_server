@@ -1,6 +1,6 @@
 //! Request handler definitions
 //!
-//! Define each route and it handler here.
+//! Define each  and it handler here.
 //! Handlers that are more than a line or two MUST go into a separate module. Keep this module neat and tidy 🙏
 //!
 //! A note about performance:
@@ -54,7 +54,7 @@ use tari_payment_engine::{
 
 use crate::{
     auth::{check_login_token_signature, JwtClaims, TokenIssuer},
-    config::ProxyConfig,
+    config::ServerOptions,
     data_objects::{
         ExchangeRateResult,
         JsonResponse,
@@ -433,7 +433,7 @@ pub async fn order_by_id<B: AccountManagement>(
     // OR they have the `ReadAll`/`SuperAdmin` role
     let is_admin = claims.roles.contains(&Role::ReadAll) || claims.roles.contains(&Role::SuperAdmin);
     if is_admin {
-        let order = api.as_ref().fetch_order_by_order_id(&order_id).await.map_err(|e| {
+        let order = api.as_ref().fetch_order_by_id_or_alt(&order_id).await.map_err(|e| {
             debug!("💻️ Could not fetch order. {e}");
             ServerError::BackendError(e.to_string())
         })?;
@@ -458,6 +458,7 @@ route!(claim_order => Post "/order/claim" impl PaymentGatewayDatabase);
 pub async fn claim_order<B: PaymentGatewayDatabase>(
     body: web::Json<MemoSignature>,
     api: web::Data<OrderFlowApi<B>>,
+    config: web::Data<ServerOptions>,
 ) -> Result<HttpResponse, ServerError> {
     let memo_signature = body.into_inner();
     debug!(
@@ -465,7 +466,7 @@ pub async fn claim_order<B: PaymentGatewayDatabase>(
         memo_signature.address.as_address(),
         memo_signature.order_id
     );
-    let result = api.claim_order(&memo_signature).await.map_err(|e| {
+    let result = api.claim_order(&memo_signature, config.strict_mode).await.map_err(|e| {
         debug!("💻️ Order claim failed. {e}");
         e
     })?;
@@ -521,6 +522,7 @@ pub async fn addresses<B: AccountManagement>(
 }
 
 route!(settle_address => Post "/settle/address/{address}" impl PaymentGatewayDatabase where requires [Role::Write]);
+/// Forces a check for whether any orders for `address` are able to be paid.
 pub async fn settle_address<B: PaymentGatewayDatabase>(
     path: web::Path<SerializedTariAddress>,
     api: web::Data<OrderFlowApi<B>>,
@@ -535,6 +537,7 @@ pub async fn settle_address<B: PaymentGatewayDatabase>(
 }
 
 route!(settle_customer => Post "/settle/customer/{customer_id}" impl PaymentGatewayDatabase where requires [Role::Write]);
+/// Forces a check for whether any orders for `customer_id` are able to be paid.
 pub async fn settle_customer<B: PaymentGatewayDatabase>(
     path: web::Path<String>,
     api: web::Data<OrderFlowApi<B>>,
@@ -549,6 +552,7 @@ pub async fn settle_customer<B: PaymentGatewayDatabase>(
 }
 
 route!(settle_my_account => Post "/settle" impl PaymentGatewayDatabase);
+/// Forces a check for whether any orders for the authenticated user are able to be paid.
 pub async fn settle_my_account<B: PaymentGatewayDatabase>(
     claims: JwtClaims,
     api: web::Data<OrderFlowApi<B>>,
@@ -651,10 +655,11 @@ route!(fulfil_order => Post "/fulfill" impl PaymentGatewayDatabase where require
 pub async fn fulfil_order<B: PaymentGatewayDatabase>(
     body: web::Json<ModifyOrderParams>,
     api: web::Data<OrderFlowApi<B>>,
+    config: web::Data<ServerOptions>,
 ) -> Result<HttpResponse, ServerError> {
     let ModifyOrderParams { order_id, reason } = body.into_inner();
     debug!("💻️ Fulfilment request for {order_id} with reason: {reason}");
-    let order = api.mark_new_order_as_paid(&order_id, &reason).await.map_err(|e| {
+    let order = api.mark_new_order_as_paid(&order_id, &reason, config.strict_mode).await.map_err(|e| {
         debug!("💻️ Could not fulfil order. {e}");
         e
     })?;
@@ -677,13 +682,17 @@ route!(cancel_order => Post "/cancel" impl PaymentGatewayDatabase where requires
 pub async fn cancel_order<B: PaymentGatewayDatabase>(
     body: web::Json<ModifyOrderParams>,
     api: web::Data<OrderFlowApi<B>>,
+    config: web::Data<ServerOptions>,
 ) -> Result<HttpResponse, ServerError> {
     let ModifyOrderParams { order_id, reason } = body.into_inner();
     info!("💻️ Cancel order request for {order_id}. Reason: {reason}");
-    let order = api.cancel_or_expire_order(&order_id, OrderStatusType::Cancelled, &reason).await.map_err(|e| {
-        debug!("💻️ Could not cancel order. {e}");
-        e
-    })?;
+    let order = api
+        .cancel_or_expire_order(&order_id, OrderStatusType::Cancelled, &reason, config.strict_mode)
+        .await
+        .map_err(|e| {
+            debug!("💻️ Could not cancel order. {e}");
+            e
+        })?;
     Ok(HttpResponse::Ok().json(order))
 }
 
@@ -711,11 +720,12 @@ route!(update_order_memo => Patch "/order_memo" impl PaymentGatewayDatabase wher
 pub async fn update_order_memo<B: PaymentGatewayDatabase>(
     body: web::Json<UpdateMemoParams>,
     api: web::Data<OrderFlowApi<B>>,
+    config: web::Data<ServerOptions>,
 ) -> Result<HttpResponse, ServerError> {
     let UpdateMemoParams { order_id, new_memo, reason } = body.into_inner();
     let reason = reason.unwrap_or_else(|| "No reason provided".to_string());
     info!("💻️ Update order memos request for {order_id}. Reason: {reason}");
-    let order = api.update_memo_for_order(&order_id, &new_memo).await.map_err(|e| {
+    let order = api.update_memo_for_order(&order_id, &new_memo, config.strict_mode).await.map_err(|e| {
         debug!("💻️ Could not update order memo. {e}");
         e
     })?;
@@ -736,11 +746,12 @@ route!(update_price => Patch "/order_price" impl PaymentGatewayDatabase where re
 pub async fn update_price<B: PaymentGatewayDatabase>(
     body: web::Json<UpdatePriceParams>,
     api: web::Data<OrderFlowApi<B>>,
+    config: web::Data<ServerOptions>,
 ) -> Result<HttpResponse, ServerError> {
     let UpdatePriceParams { order_id, new_price, reason } = body.into_inner();
     let reason = reason.unwrap_or_else(|| "No reason provided".to_string());
     info!("💻️ Update order price request for {order_id}. Reason: {reason}");
-    let order = api.update_price_for_order(&order_id, new_price).await.map_err(|e| {
+    let order = api.update_price_for_order(&order_id, new_price, config.strict_mode).await.map_err(|e| {
         debug!("💻️ Could not update order price. {e}");
         e
     })?;
@@ -748,7 +759,7 @@ pub async fn update_price<B: PaymentGatewayDatabase>(
 }
 
 route!(reassign_order => Patch "/reassign_order" impl PaymentGatewayDatabase where requires [Role::Write]);
-/// Provides an endpoint for admins to adjust the price of an order.
+/// Provides an endpoint for admins to reassign an order to a different customer id.
 /// Admins can call `PATCH /api/reassign_order` with the order_id, new customer_id, and a reason to reassign an order
 /// to a different customer.
 ///
@@ -758,21 +769,23 @@ route!(reassign_order => Patch "/reassign_order" impl PaymentGatewayDatabase whe
 /// ```json
 /// {
 ///     "orders": { "new_order": {}, "old_order": {} },
-///     "old_account_id": 1000,
-///     "new_account_id": 1200,
-///     "is_filled": false
+///     "settlements": [
+///       { "order_id": "12345", "amount": 240, "status": "Settled", ... }
+///     ]
 ///  }
 /// ```
 pub async fn reassign_order<B: PaymentGatewayDatabase>(
     body: web::Json<MoveOrderParams>,
     api: web::Data<OrderFlowApi<B>>,
+    config: web::Data<ServerOptions>,
 ) -> Result<HttpResponse, ServerError> {
     let MoveOrderParams { order_id, new_customer_id, reason } = body.into_inner();
     info!("💻️ Assigning existing order {order_id} to customer {new_customer_id}. Reason: {reason}");
-    let order = api.assign_order_to_new_customer(&order_id, &new_customer_id).await.map_err(|e| {
-        debug!("💻️ Could not assign order. {e}");
-        e
-    })?;
+    let order =
+        api.assign_order_to_new_customer(&order_id, &new_customer_id, config.strict_mode).await.map_err(|e| {
+            debug!("💻️ Could not assign order. {e}");
+            e
+        })?;
     Ok(HttpResponse::Ok().json(order))
 }
 
@@ -813,7 +826,7 @@ pub async fn reset_order<B: PaymentGatewayDatabase>() -> Result<HttpResponse, Se
 route!(incoming_payment_notification => Post "/incoming_payment" impl PaymentGatewayDatabase, WalletAuth );
 pub async fn incoming_payment_notification<BOrder, BAuth>(
     req: HttpRequest,
-    config: web::Data<ProxyConfig>,
+    config: web::Data<ServerOptions>,
     auth_api: web::Data<WalletAuthApi<BAuth>>,
     order_api: web::Data<OrderFlowApi<BOrder>>,
     body: web::Json<PaymentNotification>,
@@ -828,6 +841,7 @@ where
     let use_forwarded = config.use_forwarded;
     let disable_whitelist = config.disable_wallet_whitelist;
     let require_memo_signature = !config.disable_memo_signature_check;
+    let strict_mode = config.strict_mode;
     // Log the payment
     trace!("💻️ Extracting remote IP address. {req:?}. {:?}", req.connection_info());
     let peer_addr = match (get_remote_ip(&req, use_x_forwarded_for, use_forwarded), disable_whitelist) {
@@ -869,7 +883,7 @@ where
         Some(false) => debug!("💻️ Payment memo does not contain a valid claim for an order."),
         None => debug!("💻️ Payment memo was empty and did thus did not contain a claim for an order"),
     }
-    let result = match order_api.process_new_payment(payment).await {
+    let result = match order_api.process_new_payment(payment, strict_mode).await {
         Ok(payment) => {
             info!("💻️ Incoming payment processed successfully for {}.", payment.sender);
             let body = serde_json::to_string(&payment).unwrap_or_else(|e| format!("{e}"));
@@ -894,7 +908,7 @@ where
 route!(tx_confirmation_notification => Post "/tx_confirmation" impl PaymentGatewayDatabase, WalletAuth );
 pub async fn tx_confirmation_notification<BOrder, BAuth>(
     req: HttpRequest,
-    config: web::Data<ProxyConfig>,
+    config: web::Data<ServerOptions>,
     auth_api: web::Data<WalletAuthApi<BAuth>>,
     order_api: web::Data<OrderFlowApi<BOrder>>,
     body: web::Json<TransactionConfirmationNotification>,
@@ -936,7 +950,10 @@ where
     }
     let auth_api = auth_api.as_ref();
     if let Err(e) = auth_api.authenticate_wallet(auth, peer_addr.as_ref(), &confirmation, disable_whitelist).await {
-        warn!("💻️ Unauthorized wallet signature received from {peer_addr:?}. Reason: {e}. The request is rejected.");
+        warn!(
+            "💻️ Unauthorized wallet signature received from {peer_addr:?} for payment confirmation. Reason: {e}. The \
+             request is rejected."
+        );
         return HttpResponse::Unauthorized().finish();
     }
     // -- from here on, we trust that the notification is legitimate.

@@ -130,6 +130,7 @@ pub(crate) async fn orders_for_address(
     SELECT
         orders.id as id,
         orders.order_id as order_id,
+        orders.alt_d as alt_id,
         orders.customer_id as customer_id,
         orders.memo as memo,
         orders.total_price as total_price,

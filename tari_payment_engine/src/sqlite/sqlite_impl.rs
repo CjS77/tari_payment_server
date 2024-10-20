@@ -5,7 +5,7 @@ use std::{cmp::Reverse, fmt::Debug};
 
 use chrono::Duration;
 use log::*;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 use tari_common_types::tari_address::TariAddress;
 use tpg_common::MicroTari;
 
@@ -30,6 +30,7 @@ use crate::{
         TransferStatus,
     },
     order_objects::{ModifyOrderRequest, OrderChanged, OrderQueryFilter},
+    sqlite::db::orders::{fetch_order_by_id_or_alt, fetch_order_by_order_id},
     tpe_api::{
         account_objects::{AddressHistory, CustomerHistory, Pagination},
         exchange_objects::ExchangeRate,
@@ -72,9 +73,14 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         self.url.as_str()
     }
 
-    async fn claim_order(&self, order_id: &OrderId, address: &TariAddress) -> Result<Order, PaymentGatewayError> {
+    async fn claim_order(
+        &self,
+        order_id: &OrderId,
+        address: &TariAddress,
+        strict_mode: bool,
+    ) -> Result<Order, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
-        let order = self.claim_order_with_conn(order_id, address, &mut tx).await?;
+        let order = self.claim_order_with_conn(order_id, address, strict_mode, &mut tx).await?;
         tx.commit().await?;
         Ok(order)
     }
@@ -115,7 +121,11 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     /// * Adds the payment amount to the account's total received, and total pending
     ///
     /// Returns the newly created Payment record.
-    async fn process_new_payment(&self, payment: NewPayment) -> Result<Payment, PaymentGatewayError> {
+    async fn process_new_payment(
+        &self,
+        payment: NewPayment,
+        strict_mode: bool,
+    ) -> Result<Payment, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
         let maybe_order_id = payment.order_id.clone();
         debug!("🗃️ Payment {} received from [{}]", payment.txid, payment.sender.as_address());
@@ -126,7 +136,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
                 "🗃️ The payment {} contains an order id ({order_id}), so I'm going to try and claim an existing order",
                 payment.txid
             );
-            match self.claim_order_with_conn(&order_id, payment.sender.as_address(), &mut tx).await {
+            match self.claim_order_with_conn(&order_id, payment.sender.as_address(), strict_mode, &mut tx).await {
                 Ok(_) => info!("🗃️ Address {} linked to order {order_id}", payment.sender.as_address()),
                 Err(PaymentGatewayError::OrderNotFound(id)) => {
                     info!(
@@ -296,7 +306,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         );
         // Claim the order for the credit note address
         if order.status == OrderStatusType::Unclaimed {
-            self.claim_order_with_conn(&order.order_id, &address, &mut tx).await?;
+            self.claim_order_with_conn(&order.order_id, &address, true, &mut tx).await?;
         }
         let result = self.pay_orders_for_address_with_conn(&address, &[&order], &mut tx).await?;
         if result.is_none() {
@@ -322,14 +332,13 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     /// * The total orders for the account are updated.
     async fn cancel_or_expire_order(
         &self,
-        order_id: &OrderId,
+        id: &OrderId,
         new_status: OrderStatusType,
         reason: &str,
+        strict_mode: bool,
     ) -> Result<Order, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
-        let order = orders::fetch_order_by_order_id(order_id, &mut tx)
-            .await?
-            .ok_or_else(|| AccountApiError::OrderDoesNotExist(order_id.clone()))?;
+        let order = Self::fetch_order_by_id(id, strict_mode, &mut tx).await?;
         if !&[OrderStatusType::New, OrderStatusType::Unclaimed].contains(&order.status) {
             error!("🗃️ Order {} is not in 'New' status. Cannot call cancel_or_expire_order", order.id);
             return Err(PaymentGatewayError::OrderModificationForbidden);
@@ -383,29 +392,28 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     /// - If the order status is already `Paid`, an error is returned.
     async fn modify_customer_id_for_order(
         &self,
-        order_id: &OrderId,
+        id: &OrderId,
         new_cid: &str,
+        strict_mode: bool,
     ) -> Result<OrderMovedResult, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
-        let old_order = orders::fetch_order_by_order_id(order_id, &mut tx)
-            .await?
-            .ok_or_else(|| AccountApiError::OrderDoesNotExist(order_id.clone()))?;
+        let old_order = Self::fetch_order_by_id(id, strict_mode, &mut tx).await?;
         // Cannot change customer id on orders that have already been paid
         if matches!(old_order.status, OrderStatusType::Paid) {
             return Err(PaymentGatewayError::OrderModificationForbidden);
         }
         if new_cid == old_order.customer_id {
-            debug!("🗃️ Order {order_id} is being reassigned to the same customer. No action taken.");
+            debug!("🗃️ Order {id} is being reassigned to the same customer. No action taken.");
             tx.rollback().await?;
             return Err(PaymentGatewayError::OrderModificationNoOp);
         }
         let update = ModifyOrderRequest::default().with_new_customer_id(new_cid);
-        let mut new_order = orders::update_order(order_id, update, &mut tx).await?.ok_or_else(|| {
+        let mut new_order = orders::update_order(&old_order.order_id, update, &mut tx).await?.ok_or_else(|| {
             error!(
-                "Order {order_id} does not exist, but we fetched it within this same transaction. This should not \
-                 happen. There's a data race of sorts happening here and should be sorted out."
+                "Order {id} does not exist, but we fetched it within this same transaction. This should not happen. \
+                 There's a data race of sorts happening here and should be sorted out."
             );
-            AccountApiError::OrderDoesNotExist(order_id.clone())
+            AccountApiError::OrderDoesNotExist(id.clone())
         })?;
         // Order is either expired, cancelled or new by now. If expired or cancelled, we don't need to make any
         // adjustments but new orders need to be accounted for.
@@ -422,8 +430,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
                 Ok(None) => { /* noop */ },
                 Err(PaymentGatewayError::AccountError(AccountApiError::InsufficientFunds)) => {
                     debug!(
-                        "🗃️ There weren't enough funds to pay for order {order_id} from the new customer id {} \
-                         immediately",
+                        "🗃️ There weren't enough funds to pay for order {id} from the new customer id {} immediately",
                         new_cid
                     );
                 },
@@ -461,26 +468,25 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     /// - If the order status was `Expired`, or `Cancelled` or `Paid`.
     async fn modify_total_price_for_order(
         &self,
-        order_id: &OrderId,
+        id: &OrderId,
         new_total_price: MicroTari,
+        strict_mode: bool,
     ) -> Result<OrderChanged, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
-        let old_order = orders::fetch_order_by_order_id(order_id, &mut tx)
-            .await?
-            .ok_or_else(|| AccountApiError::OrderDoesNotExist(order_id.clone()))?;
+        let old_order = Self::fetch_order_by_id(id, strict_mode, &mut tx).await?;
         if !matches!(old_order.status, OrderStatusType::New) {
-            info!("🗃️ Order {order_id}'s price cannot be changed since it is already {}", old_order.status);
+            info!("🗃️ Order {id}'s price cannot be changed since it is already {}", old_order.status);
             return Err(PaymentGatewayError::OrderModificationForbidden);
         }
         if old_order.total_price == new_total_price {
-            info!("🗃️ Order {order_id}'s price is already {new_total_price}. No action taken.");
+            info!("🗃️ Order {id}'s price is already {new_total_price}. No action taken.");
             return Err(PaymentGatewayError::OrderModificationNoOp);
         }
         let update = ModifyOrderRequest::default().with_new_total_price(new_total_price);
-        let new_order = orders::update_order(order_id, update, &mut tx).await?.ok_or_else(|| {
+        let new_order = orders::update_order(&old_order.order_id, update, &mut tx).await?.ok_or_else(|| {
             let msg = format!(
-                "Order {order_id} does not exist, but we fetched in within this same transaction. This represents a \
-                 bug and the transaction will be rolled back"
+                "Order {id} does not exist, but we fetched in within this same transaction. This represents a bug and \
+                 the transaction will be rolled back"
             );
             error!("{msg}");
             PaymentGatewayError::DatabaseError(msg)
@@ -518,6 +524,18 @@ impl AccountManagement for SqliteDatabase {
     async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, AccountApiError> {
         let mut conn = self.pool.acquire().await?;
         let order = orders::fetch_order_by_order_id(order_id, &mut conn).await?;
+        Ok(order)
+    }
+
+    async fn fetch_order_by_alt_id(&self, alt: &OrderId) -> Result<Option<Order>, AccountApiError> {
+        let mut conn = self.pool.acquire().await?;
+        let order = orders::fetch_order_by_alt_id(alt, &mut conn).await?;
+        Ok(order)
+    }
+
+    async fn fetch_order_by_id_or_alt(&self, id: &OrderId) -> Result<Option<Order>, AccountApiError> {
+        let mut conn = self.pool.acquire().await?;
+        let order = orders::fetch_order_by_id_or_alt(id, &mut conn).await?;
         Ok(order)
     }
 
@@ -764,15 +782,23 @@ impl SqliteDatabase {
         Ok(result)
     }
 
+    async fn fetch_order_by_id(
+        id: &OrderId,
+        strict_mode: bool,
+        conn: &mut SqliteConnection,
+    ) -> Result<Order, AccountApiError> {
+        if strict_mode { fetch_order_by_order_id(id, conn).await? } else { fetch_order_by_id_or_alt(id, conn).await? }
+            .ok_or_else(|| AccountApiError::OrderDoesNotExist(id.clone()))
+    }
+
     async fn claim_order_with_conn(
         &self,
-        order_id: &OrderId,
+        id: &OrderId,
         address: &TariAddress,
+        strict_mode: bool,
         tx: &mut sqlx::SqliteConnection,
     ) -> Result<Order, PaymentGatewayError> {
-        let order = orders::fetch_order_by_order_id(order_id, tx)
-            .await?
-            .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
+        let order = Self::fetch_order_by_id(id, strict_mode, tx).await?;
         let addr58 = address.to_base58();
         if order.status != OrderStatusType::Unclaimed {
             warn!(

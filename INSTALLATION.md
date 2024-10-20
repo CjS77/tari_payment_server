@@ -91,6 +91,7 @@ Storefront environment variables are explained in the relevant storefront integr
 - `TPG_DATABASE_URL`: This variable is used to set the URL for the TPG database. If not set, an error message will be 
   logged, and the value will be set to an empty string.
   It's of the form `sqlite://<path to database file>` or `postgres://<username>:<password>@<host>/<database>`.
+- `TPG_STRICT_MODE`: Enable strict mode. When `1` or `true`, _only_ the order_id field will be used to identify orders.
 
 **Do:** Set `TPG_PAYMENT_WALLET_ADDRESS` to the public key of the wallet that will receive payments. 
 This key must be present in the Authorized Wallet list in the database. (Note: This envar will be deprecated in future)

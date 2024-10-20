@@ -70,6 +70,13 @@ pub trait AccountManagement {
     async fn fetch_orders_for_address(&self, address: &TariAddress) -> Result<Vec<Order>, AccountApiError>;
 
     async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, AccountApiError>;
+    async fn fetch_order_by_alt_id(&self, alt: &OrderId) -> Result<Option<Order>, AccountApiError>;
+    async fn fetch_order_by_id_or_alt(&self, id: &OrderId) -> Result<Option<Order>, AccountApiError>;
+
+    async fn fetch_order_by_id(&self, id: &OrderId, strict_mode: bool) -> Result<Order, AccountApiError> {
+        if strict_mode { self.fetch_order_by_order_id(id).await? } else { self.fetch_order_by_id_or_alt(id).await? }
+            .ok_or_else(|| AccountApiError::OrderDoesNotExist(id.clone()))
+    }
 
     async fn fetch_payments_for_address(&self, address: &TariAddress) -> Result<Vec<Payment>, AccountApiError>;
 

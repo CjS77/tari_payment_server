@@ -37,6 +37,9 @@ pub struct ServerConfig {
     /// If true, the X-Forwarded-Proto header will be used to determine the client's protocol, rather than the
     /// connection's remote address.
     pub use_forwarded: bool,
+    /// When true, _only_ the order_id field will be used to identify orders. When _false_, either the order_id or the
+    /// alt_id can be used.
+    pub strict_mode: bool,
     /// If true, the server will not validate payment API calls against a whitelist of wallet addresses. **DANGER**
     pub disable_wallet_whitelist: bool,
     /// If true, the server will not require signed messages in memo fields, but will accept naked order ids.
@@ -76,6 +79,7 @@ impl Default for ServerConfig {
             auth: AuthConfig::default(),
             use_x_forwarded_for: false,
             use_forwarded: false,
+            strict_mode: true,
             disable_wallet_whitelist: false,
             disable_memo_signature_check: false,
             unclaimed_order_timeout: DEFAULT_UNCLAIMED_ORDER_TIMEOUT,
@@ -127,12 +131,14 @@ impl ServerConfig {
             AuthConfig::default()
         });
         let shopify_config = ShopifyConfig::from_env_or_defaults();
-        let use_x_forwarded_for = env::var("TPG_USE_X_FORWARDED_FOR").map(|s| &s == "1" || &s == "true").is_ok();
-        let use_forwarded = env::var("TPG_USE_FORWARDED").map(|s| &s == "1" || &s == "true").is_ok();
+        let use_x_forwarded_for =
+            env::var("TPG_USE_X_FORWARDED_FOR").map(|s| &s == "1" || &s == "true").unwrap_or(false);
+        let use_forwarded = env::var("TPG_USE_FORWARDED").map(|s| &s == "1" || &s == "true").unwrap_or(false);
         let disable_wallet_whitelist =
-            env::var("TPG_DISABLE_WALLET_WHITELIST").map(|s| &s == "1" || &s == "true").is_ok();
+            env::var("TPG_DISABLE_WALLET_WHITELIST").map(|s| &s == "1" || &s == "true").unwrap_or(false);
+        let strict_mode = env::var("TPG_STRICT_MODE").map(|s| &s != "0" && &s != "false").unwrap_or(true);
         let disable_memo_signature_check =
-            env::var("TPG_DISABLE_MEMO_SIGNATURE_CHECK").map(|s| &s == "1" || &s == "true").is_ok();
+            env::var("TPG_DISABLE_MEMO_SIGNATURE_CHECK").map(|s| &s == "1" || &s == "true").unwrap_or(false);
         let (unclaimed_order_timeout, unpaid_order_timeout) = configure_order_timeouts();
         Self {
             host,
@@ -142,6 +148,7 @@ impl ServerConfig {
             database_url,
             use_forwarded,
             use_x_forwarded_for,
+            strict_mode,
             disable_wallet_whitelist,
             disable_memo_signature_check,
             unclaimed_order_timeout,
@@ -334,17 +341,20 @@ impl AuthConfig {
     }
 }
 
-//-------------------------------------------------  ProxyConfig  -----------------------------------------------------
+//-------------------------------------------------  ServerOptions  ----------------------------------------------------
+/// A subset of the server configuration that is used to configure the server's behaviour. Generally we try to keep this
+/// as small as possible, and exclude secrets to avoid passing sensitive information around the system.
 #[derive(Clone, Copy, Debug, FromRequest)]
-pub struct ProxyConfig {
+pub struct ServerOptions {
     pub use_x_forwarded_for: bool,
     pub use_forwarded: bool,
     pub disable_wallet_whitelist: bool,
     pub disable_memo_signature_check: bool,
     pub shopify_order_field: OrderIdField,
+    pub strict_mode: bool,
 }
 
-impl ProxyConfig {
+impl ServerOptions {
     pub fn from_config(config: &ServerConfig) -> Self {
         Self {
             use_x_forwarded_for: config.use_x_forwarded_for,
@@ -352,6 +362,7 @@ impl ProxyConfig {
             disable_wallet_whitelist: config.disable_wallet_whitelist,
             disable_memo_signature_check: config.disable_memo_signature_check,
             shopify_order_field: config.shopify_config.order_id_field,
+            strict_mode: config.strict_mode,
         }
     }
 }

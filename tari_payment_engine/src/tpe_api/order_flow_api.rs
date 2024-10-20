@@ -62,7 +62,7 @@ where B: PaymentGatewayDatabase
         }
         if let Some(address) = &address {
             debug!("🔄️📦️ Order [{id}] has an address attached. Claiming immediately.");
-            order = self.db.claim_order(&order.order_id, address).await?;
+            order = self.db.claim_order(&order.order_id, address, true).await?;
             info!("🔄️📦️ Order [{id}] has been claimed immediately by address {}", address.to_base58());
         }
         self.call_new_order_hook(&order).await;
@@ -112,14 +112,18 @@ where B: PaymentGatewayDatabase
     /// * The wallet address is linked with the customer ID
     /// * the order is `Claimed`
     /// * The OrderClaimed event is fired.
-    pub async fn claim_order(&self, signature: &MemoSignature) -> Result<ClaimedOrder, PaymentGatewayError> {
+    pub async fn claim_order(
+        &self,
+        signature: &MemoSignature,
+        strict_mode: bool,
+    ) -> Result<ClaimedOrder, PaymentGatewayError> {
         if !signature.is_valid() {
             return Err(PaymentGatewayError::InvalidSignature);
         }
         let order_id = OrderId(signature.order_id.clone());
         let address = signature.address.as_address();
         debug!("🖇️️ Claiming order [{order_id}] for address {}", address.to_base58());
-        let mut order = self.db.claim_order(&order_id, address).await?;
+        let mut order = self.db.claim_order(&order_id, address, strict_mode).await?;
         self.call_order_claimed_hook(&order, address).await;
         // If payment is successful, order OrderPaid trigger will fire implicitly.
         trace!("🖇️📦️ Checking if order [{}] can be fulfilled immediately", order.order_id);
@@ -208,9 +212,13 @@ where B: PaymentGatewayDatabase
     /// New payments are always unconfirmed, so no orders can be paid at this point, so no checking of orders is done.
     ///
     /// The newly inserted payment record is returned.
-    pub async fn process_new_payment(&self, payment: NewPayment) -> Result<Payment, PaymentGatewayError> {
+    pub async fn process_new_payment(
+        &self,
+        payment: NewPayment,
+        strict_mode: bool,
+    ) -> Result<Payment, PaymentGatewayError> {
         let txid = payment.txid.clone();
-        let payment = self.db.process_new_payment(payment.clone()).await?;
+        let payment = self.db.process_new_payment(payment.clone(), strict_mode).await?;
         info!("🔄️💰️ Payment [{txid}] for {} processed.", payment.sender.as_base58());
         self.call_payment_received_hook(&payment).await;
         Ok(payment)
@@ -286,23 +294,23 @@ where B: PaymentGatewayDatabase
     /// * A credit note for the `total_price` is created,
     /// * The engine tries to pay for the order. Barring an odd data race, this should always succeed.
     /// * The order paid trigger is called.
-    pub async fn mark_new_order_as_paid(&self, order_id: &OrderId, reason: &str) -> Result<Order, PaymentGatewayError> {
-        let order = self
-            .db
-            .fetch_order_by_order_id(order_id)
-            .await?
-            .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
+    pub async fn mark_new_order_as_paid(
+        &self,
+        id: &OrderId,
+        reason: &str,
+        strict_mode: bool,
+    ) -> Result<Order, PaymentGatewayError> {
+        let order = self.db.fetch_order_by_id(id, strict_mode).await?;
         // We don't call self.issue_credit_note() here because we want to force this specific order to get paid
         // The former lets any valid order be paid once the credit is issued.
         let updated_order = self.db.mark_new_or_unclaimed_order_as_paid(order, reason).await?;
         if updated_order.status == OrderStatusType::Paid {
             self.call_order_paid_hook(&[updated_order.clone()]).await;
             info!(
-                "🔄️💲️ Order [{order_id}] was manually marked as paid and customer was credited with the full order \
-                 amount."
+                "🔄️💲️ Order [{id}] was manually marked as paid and customer was credited with the full order amount."
             );
         } else {
-            error!("🔄️💲️ Order [{order_id}] was not marked as paid. This almost certainly a bug.");
+            error!("🔄️💲️ Order [{id}] was not marked as paid. This almost certainly a bug.");
         }
         Ok(updated_order)
     }
@@ -321,11 +329,12 @@ where B: PaymentGatewayDatabase
     /// * An audit log entry is made.
     pub async fn cancel_or_expire_order(
         &self,
-        order_id: &OrderId,
+        id: &OrderId,
         new_status: OrderStatusType,
         reason: &str,
+        strict_mode: bool,
     ) -> Result<Order, PaymentGatewayError> {
-        let updated_order = self.db.cancel_or_expire_order(order_id, new_status, reason).await?;
+        let updated_order = self.db.cancel_or_expire_order(id, new_status, reason, strict_mode).await?;
         self.call_order_annulled_hook(&updated_order).await;
         Ok(updated_order)
     }
@@ -421,10 +430,11 @@ where B: PaymentGatewayDatabase
     /// - If the order status is already `Paid`, the method returns an error.
     pub async fn assign_order_to_new_customer(
         &self,
-        order_id: &OrderId,
+        id: &OrderId,
         new_cust_id: &str,
+        strict_mode: bool,
     ) -> Result<OrderMovedResult, PaymentGatewayError> {
-        let move_result = self.db.modify_customer_id_for_order(order_id, new_cust_id).await?;
+        let move_result = self.db.modify_customer_id_for_order(id, new_cust_id, strict_mode).await?;
         self.call_order_modified_hook("customer_id", move_result.orders.clone()).await;
         if let Some(order) = move_result.filled_order() {
             self.call_order_paid_hook(&[order]).await;
@@ -444,20 +454,16 @@ where B: PaymentGatewayDatabase
     /// The modified order
     pub async fn update_memo_for_order(
         &self,
-        order_id: &OrderId,
+        id: &OrderId,
         new_memo: &str,
+        strict_mode: bool,
     ) -> Result<Order, PaymentGatewayError> {
-        debug!("🔄️📦️ Changing memo for order [{}]", order_id);
-        let old_order = self
-            .db
-            .fetch_order_by_order_id(order_id)
-            .await?
-            .ok_or_else(|| PaymentGatewayError::OrderNotFound(order_id.clone()))?;
-        let new_order = self.db.modify_memo_for_order(order_id, new_memo).await?;
+        debug!("🔄️📦️ Changing memo for order [{id}]");
+        let old_order = self.db.fetch_order_by_id(id, strict_mode).await?;
+        let new_order = self.db.modify_memo_for_order(&old_order.order_id, new_memo).await?;
         let changes = OrderChanged::new(old_order, new_order.clone());
         info!(
-            "🔄️📦️ Memo for order [{}] changed from '{}' to '{}'",
-            order_id,
+            "🔄️📦️ Memo for order [{id}] changed from '{}' to '{}'",
             changes.old_order.memo.clone().unwrap_or_default(),
             new_memo
         );
@@ -484,20 +490,22 @@ where B: PaymentGatewayDatabase
     /// The modified order
     pub async fn update_price_for_order(
         &self,
-        order_id: &OrderId,
+        id: &OrderId,
         new_price: MicroTari,
+        strict_mode: bool,
     ) -> Result<Order, PaymentGatewayError> {
         if new_price < MicroTari::from(0) {
-            warn!("🔄️💲️ An attempt was made to set order [{order_id}] to a negative value ({new_price})");
+            warn!("🔄️💲️ An attempt was made to set order [{id}] to a negative value ({new_price})");
             return Err(PaymentGatewayError::OrderModificationForbidden);
         }
-        debug!("🔄️💲️ Changing price for order [{}]", order_id);
+        debug!("🔄️💲️ Changing price for order [{id}]");
         let OrderChanged { old_order, mut new_order } =
-            self.db.modify_total_price_for_order(order_id, new_price).await?;
+            self.db.modify_total_price_for_order(id, new_price, strict_mode).await?;
         let direction = if old_order.total_price > new_order.total_price { "DECREASED" } else { "INCREASED" };
+        let alt = new_order.alt_id.as_ref().map(|a| format!("({})", a)).unwrap_or_default();
         info!(
-            "🔄️💲️ Price for order [{order_id}] {direction} from {} to {}",
-            old_order.total_price, new_order.total_price
+            "🔄️💲️ Price for order [{}]{alt} {direction} from {} to {}",
+            old_order.order_id, old_order.total_price, new_order.total_price
         );
         if let Some(payments) = self.try_pay_order(&new_order).await? {
             // can panic, but try_pay_order should return None if there are no paid orders
