@@ -47,18 +47,22 @@ pub(crate) async fn balances_for_customer_id(
 
 pub(crate) async fn balances_for_order_id(
     order_id: &OrderId,
+    alt_id: Option<&OrderId>,
     conn: &mut SqliteConnection,
 ) -> Result<Vec<AddressBalance>, AccountApiError> {
-    let addresses: Vec<AddressBalance> = sqlx::query_as(
-        r#"
-    SELECT * FROM address_balance
-    WHERE address in (SELECT sender from payments WHERE order_id = $1)
-    ORDER BY last_update DESC
-    "#,
-    )
-    .bind(order_id.as_str())
-    .fetch_all(conn)
-    .await?;
+    let where_clause = match alt_id {
+        None => "order_id = $1",
+        Some(_) => "order_id = $1 OR order_id = $2",
+    };
+    let q_str = format!(
+        "SELECT * FROM address_balance WHERE address in (SELECT sender from payments WHERE {where_clause}) ORDER BY \
+         last_update DESC"
+    );
+    let mut query = sqlx::query_as(&q_str).bind(order_id.as_str());
+    if let Some(alt_id) = alt_id {
+        query = query.bind(alt_id.as_str());
+    }
+    let addresses: Vec<AddressBalance> = query.fetch_all(conn).await?;
     Ok(addresses)
 }
 
@@ -130,6 +134,7 @@ pub(crate) async fn orders_for_address(
     SELECT
         orders.id as id,
         orders.order_id as order_id,
+        orders.alt_id as alt_id,
         orders.customer_id as customer_id,
         orders.memo as memo,
         orders.total_price as total_price,

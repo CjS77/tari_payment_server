@@ -18,8 +18,6 @@ use tari_payment_engine::{
 use thiserror::Error;
 use tpg_common::TARI_CURRENCY_CODE;
 
-use crate::config::OrderIdField;
-
 #[derive(Debug, Error)]
 #[error("Could not convert shopify order into a new order. {0}.")]
 pub enum OrderConversionError {
@@ -34,7 +32,6 @@ pub enum OrderConversionError {
 pub async fn new_order_from_shopify_order<B: ExchangeRates>(
     value: ShopifyOrder,
     fx: &ExchangeRateApi<B>,
-    id_field: OrderIdField,
 ) -> Result<NewOrder, OrderConversionError> {
     trace!("Converting ShopifyOrder to NewOrder: {:?}", value);
     let currency = value.currency.as_str().to_uppercase();
@@ -55,12 +52,9 @@ pub async fn new_order_from_shopify_order<B: ExchangeRates>(
     let timestamp =
         value.created_at.parse::<DateTime<Utc>>().map_err(|e| OrderConversionError::FormatError(e.to_string()))?;
     let memo = value.note;
-    let order_id = match id_field {
-        OrderIdField::Id => OrderId(value.id.to_string()),
-        OrderIdField::Name => OrderId(value.name.to_string()),
-    };
     let mut order = NewOrder {
-        order_id,
+        order_id: OrderId::from(value.id),
+        alt_order_id: Some(OrderId::from(value.name)),
         customer_id: value.customer.id.to_string(),
         currency: value.currency,
         original_price: Some(value.total_price),

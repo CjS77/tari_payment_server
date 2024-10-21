@@ -93,6 +93,7 @@ fn orders_response(_: &TariAddress) -> Result<Vec<Order>, AccountApiError> {
         Order {
             id: 0,
             order_id: OrderId("0000001".into()),
+            alt_id: Some(OrderId("#1001".into())),
             customer_id: "1".to_string(),
             memo: None,
             total_price: MicroTari::from(100),
@@ -105,6 +106,7 @@ fn orders_response(_: &TariAddress) -> Result<Vec<Order>, AccountApiError> {
         Order {
             id: 1,
             order_id: OrderId("0000002".into()),
+            alt_id: Some(OrderId("#1002".into())),
             customer_id: "1".to_string(),
             memo: None,
             total_price: MicroTari::from(150),
@@ -117,4 +119,4 @@ fn orders_response(_: &TariAddress) -> Result<Vec<Order>, AccountApiError> {
     ])
 }
 
-const ORDERS_JSON: &str = r#"{"address":"14AYt2hhhn4VydAXNJ6i7ZfRNZGoGSp713dHjMYCoK5hYw2","total_orders":250,"orders":[{"id":0,"order_id":"0000001","customer_id":"1","memo":null,"total_price":100,"original_price":null,"currency":"XTR","created_at":"2024-02-29T13:30:00Z","updated_at":"2024-02-29T13:30:00Z","status":"Paid"},{"id":1,"order_id":"0000002","customer_id":"1","memo":null,"total_price":150,"original_price":null,"currency":"XTR","created_at":"2024-03-15T18:30:00Z","updated_at":"2024-03-16T11:20:00Z","status":"Cancelled"}]}"#;
+const ORDERS_JSON: &str = r##"{"address":"14AYt2hhhn4VydAXNJ6i7ZfRNZGoGSp713dHjMYCoK5hYw2","total_orders":250,"orders":[{"id":0,"order_id":"0000001","alt_id":"#1001","customer_id":"1","memo":null,"total_price":100,"original_price":null,"currency":"XTR","created_at":"2024-02-29T13:30:00Z","updated_at":"2024-02-29T13:30:00Z","status":"Paid"},{"id":1,"order_id":"0000002","alt_id":"#1002","customer_id":"1","memo":null,"total_price":150,"original_price":null,"currency":"XTR","created_at":"2024-03-15T18:30:00Z","updated_at":"2024-03-16T11:20:00Z","status":"Cancelled"}]}"##;

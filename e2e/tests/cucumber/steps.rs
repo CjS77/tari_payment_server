@@ -121,7 +121,8 @@ async fn payment_notification(world: &mut TPGWorld, step: &Step, ip_source: Stri
 async fn confirm_payment(world: &mut TPGWorld, txid: String) {
     let db = world.db.as_ref().expect("No database connection").clone();
     let api = OrderFlowApi::new(db, EventProducers::default());
-    let orders = api.confirm_payment(txid).await.expect("Failed to confirm transaction");
+    let strict = world.config.strict_mode;
+    let orders = api.confirm_payment(txid, strict).await.expect("Failed to confirm transaction");
     debug!("Paid orders: {}", serde_json::to_string(&orders).expect("Failed to serialize orders"));
 }
 
@@ -265,6 +266,7 @@ async fn place_order(
         .request(Method::POST, "/shopify/webhook/checkout_create", |req| {
             let mut order = ShopifyOrder::default();
             order.created_at = created_at;
+            order.name = format!("#{order_id}");
             order.id = order_id;
             order.note = memo;
             order.currency = "XTR".to_string();
@@ -364,7 +366,7 @@ async fn instapay(world: &mut TPGWorld, amount: i64, sender: TariAddress, txid: 
     let amount = MicroTari::from_tari(amount);
     let db = world.db.as_ref().expect("No database connection");
     let payment = NewPayment::new(sender, amount, txid);
-    let payment = db.process_new_payment(payment).await.expect("Failed to process payment");
+    let payment = db.process_new_payment(payment, true).await.expect("Failed to process payment");
     info!("Processed payment: {payment:?}");
     confirm_payment(world, payment.txid).await;
 }
@@ -387,7 +389,7 @@ async fn direct_payment(world: &mut TPGWorld, amount: i64, user: String) {
     let db = world.db.as_ref().expect("No database connection");
     let txid = format!("direct-{}-{}", user.username, chrono::Utc::now().timestamp_micros());
     let payment = NewPayment::new(address, MicroTari::from_tari(amount), txid.clone());
-    let payment = db.process_new_payment(payment).await.expect("Failed to process payment");
+    let payment = db.process_new_payment(payment, true).await.expect("Failed to process payment");
     info!("Processed payment: {payment:?}");
     db.update_payment_status(&txid, TransferStatus::Confirmed).await.expect("Failed to confirm payment");
 }

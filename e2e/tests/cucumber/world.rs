@@ -56,6 +56,7 @@ impl Default for TPGWorld {
             unclaimed_order_timeout: Duration::seconds(2),
             unpaid_order_timeout: Duration::seconds(4),
             shopify_config: Default::default(),
+            strict_mode: true,
         };
         Self {
             config,

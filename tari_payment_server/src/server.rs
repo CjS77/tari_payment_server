@@ -24,7 +24,7 @@ use tari_payment_engine::{
 
 use crate::{
     auth::{build_tps_authority, TokenIssuer},
-    config::{ProxyConfig, ServerConfig},
+    config::{ServerConfig, ServerOptions},
     errors::{AuthError, ServerError, ServerError::AuthenticationError},
     expiry_worker::start_expiry_worker,
     helpers::get_remote_ip,
@@ -113,7 +113,7 @@ pub fn create_server_instance(
     db: SqliteDatabase,
     producers: EventProducers,
 ) -> Result<Server, ServerError> {
-    let proxy_config = ProxyConfig::from_config(&config);
+    let proxy_config = ServerOptions::from_config(&config);
     let shopify_config = config.shopify_config.shopify_api_config();
     let order_id_field = config.shopify_config.order_id_field;
     let shopify_api = ShopifyApi::new(shopify_config).map_err(|e| {

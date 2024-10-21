@@ -35,17 +35,19 @@ async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<Or
         r#"
             INSERT INTO orders (
                 order_id,
+                alt_id,
                 customer_id,
                 memo,
                 total_price,
                 original_price,
                 currency,
                 created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *;
         "#,
     )
     .bind(order.order_id)
+    .bind(order.alt_order_id)
     .bind(order.customer_id)
     .bind(order.memo)
     .bind(order.total_price.value())
@@ -68,6 +70,23 @@ pub async fn fetch_order_by_order_id(
     Ok(order)
 }
 
+/// Returns the last entry in the orders table for the corresponding `alt_order_id`
+pub async fn fetch_order_by_alt_id(alt: &OrderId, conn: &mut SqliteConnection) -> Result<Option<Order>, sqlx::Error> {
+    let order =
+        sqlx::query_as("SELECT * FROM orders WHERE alt_id = $1").bind(alt.as_str()).fetch_optional(conn).await?;
+    Ok(order)
+}
+
+/// Returns the last entry in the orders table for the corresponding `order_id` or `alt_id`.
+/// If an order_id and alt_id match on different orders, then the one matching the order_id is returned.
+pub async fn fetch_order_by_id_or_alt(id: &OrderId, conn: &mut SqliteConnection) -> Result<Option<Order>, sqlx::Error> {
+    let order = sqlx::query_as("SELECT * FROM orders WHERE order_id = $1 or alt_id = $1 ORDER BY alt_id limit 1")
+        .bind(id.as_str())
+        .fetch_optional(conn)
+        .await?;
+    Ok(order)
+}
+
 /// Checks whether the order with the given `OrderId` already exists in the database. If it does exist, the `id` of the
 /// order is returned. If it does not exist, `None` is returned.
 pub async fn order_exists(order_id: &OrderId, conn: &mut SqliteConnection) -> Result<Option<i64>, PaymentGatewayError> {
@@ -81,8 +100,7 @@ pub async fn order_exists(order_id: &OrderId, conn: &mut SqliteConnection) -> Re
 pub async fn search_orders(query: OrderQueryFilter, conn: &mut SqliteConnection) -> Result<Vec<Order>, sqlx::Error> {
     let mut builder = QueryBuilder::new(
         r#"
-    SELECT id, order_id, customer_id, memo, total_price, original_price, currency, created_at, updated_at, status
-    FROM orders
+    SELECT * FROM orders
     "#,
     );
     if !query.is_empty() {
@@ -96,6 +114,10 @@ pub async fn search_orders(query: OrderQueryFilter, conn: &mut SqliteConnection)
     if let Some(order_id) = query.order_id {
         where_clause.push("order_id = ");
         where_clause.push_bind_unseparated(order_id.to_string());
+    }
+    if let Some(alt_id) = query.alt_id {
+        where_clause.push("alt_id = ");
+        where_clause.push_bind_unseparated(alt_id.to_string());
     }
     if let Some(cid) = query.customer_id {
         where_clause.push("customer_id=");
@@ -207,8 +229,8 @@ pub(crate) async fn expire_orders(
     Ok(rows)
 }
 
-/// Fetches all payable orders for the given address. A payable order is one that is "New", i.e. it has not been paid
-/// and has been claimed by any account associated with the address.
+/// Fetches all payable orders for the given address. A payable order is one that is "New" or "Unclaimed"
+/// i.e. it has not been paid and is associated with the address.
 pub(crate) async fn fetch_payable_orders_for_address(
     address: &TariAddress,
     conn: &mut SqliteConnection,
@@ -218,6 +240,7 @@ pub(crate) async fn fetch_payable_orders_for_address(
         SELECT
             orders.id as id,
             order_id,
+            alt_id,
             orders.customer_id as customer_id,
             memo,
             total_price,
@@ -228,7 +251,7 @@ pub(crate) async fn fetch_payable_orders_for_address(
             status
         FROM orders JOIN address_customer_id_link ON orders.customer_id = address_customer_id_link.customer_id
         WHERE
-         status = 'New' AND
+         status in ('New', 'Unclaimed') AND
          address = $1"#,
     )
     .bind(address.to_base58())

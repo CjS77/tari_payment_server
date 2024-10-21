@@ -37,6 +37,14 @@ where B: AccountManagement
         self.db.fetch_order_by_order_id(order_id).await
     }
 
+    pub async fn fetch_order_by_alt_id(&self, order_id: &OrderId) -> Result<Option<Order>, AccountApiError> {
+        self.db.fetch_order_by_alt_id(order_id).await
+    }
+
+    pub async fn fetch_order_by_id_or_alt(&self, order_id: &OrderId) -> Result<Option<Order>, AccountApiError> {
+        self.db.fetch_order_by_id_or_alt(order_id).await
+    }
+
     /// Fetches all orders associated with the given Tari address, and wraps them in an `OrderResult`, which includes
     /// the metadata of the address and the sum of the orders' values.
     pub async fn orders_for_address(&self, address: &TariAddress) -> Result<OrderResult, AccountApiError> {

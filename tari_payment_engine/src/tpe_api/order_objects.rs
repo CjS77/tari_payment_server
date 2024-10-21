@@ -43,6 +43,7 @@ where D: serde::Deserializer<'de> {
 pub struct OrderQueryFilter {
     pub memo: Option<String>,
     pub order_id: Option<OrderId>,
+    pub alt_id: Option<OrderId>,
     pub customer_id: Option<String>,
     pub currency: Option<String>,
     pub since: Option<DateTime<Utc>>,
@@ -79,6 +80,11 @@ impl OrderQueryFilter {
 
     pub fn with_order_id(mut self, order_id: OrderId) -> Self {
         self.order_id = Some(order_id);
+        self
+    }
+
+    pub fn with_alt_id(mut self, alt_id: OrderId) -> Self {
+        self.alt_id = Some(alt_id);
         self
     }
 
@@ -124,6 +130,9 @@ impl Display for OrderQueryFilter {
         }
         if let Some(order_id) = &self.order_id {
             write!(f, "order_id: {order_id}. ")?;
+        }
+        if let Some(alt_id) = &self.alt_id {
+            write!(f, "alt_id: {alt_id}. ")?;
         }
         if let Some(customer_id) = &self.customer_id {
             write!(f, "customer_id: {customer_id}. ")?;

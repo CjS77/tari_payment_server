@@ -11,6 +11,8 @@ mock! {
     pub AccountManager {}
     impl AccountManagement for AccountManager {
         async fn fetch_order_by_order_id(&self, order_id: &OrderId) -> Result<Option<Order>, AccountApiError>;
+        async fn fetch_order_by_alt_id(&self, order_id: &OrderId) -> Result<Option<Order>, AccountApiError>;
+        async fn fetch_order_by_id_or_alt(&self, order_id: &OrderId) -> Result<Option<Order>, AccountApiError>;
         async fn fetch_payments_for_address(&self, address: &TariAddress) -> Result<Vec<Payment>, AccountApiError>;
         async fn history_for_address(&self, address: &TariAddress) -> Result<AddressHistory, AccountApiError>;
         async fn search_orders(&self, query: OrderQueryFilter) -> Result<Vec<Order>, AccountApiError>;

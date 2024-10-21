@@ -23,6 +23,7 @@ fn seed_orders() -> [NewOrder; 5] {
     [
         NewOrder {
             order_id: OrderId::new("1"),
+            alt_order_id: Some(OrderId::new("#1")),
             currency: "XTR".into(),
             customer_id: "alice".into(),
             memo: Some("Manually inserted by Keith".into()),
@@ -33,6 +34,7 @@ fn seed_orders() -> [NewOrder; 5] {
         },
         NewOrder {
             order_id: OrderId::new("2"),
+            alt_order_id: Some(OrderId::new("#2")),
             currency: "XTR".into(),
             customer_id: "bob".into(),
             memo: Some("Manually inserted by Charlie".into()),
@@ -43,6 +45,7 @@ fn seed_orders() -> [NewOrder; 5] {
         },
         NewOrder {
             order_id: OrderId::new("3"),
+            alt_order_id: Some(OrderId::new("#3")),
             currency: "XTR".into(),
             customer_id: "alice".into(),
             memo: Some("Manually inserted by Sam".into()),
@@ -53,6 +56,7 @@ fn seed_orders() -> [NewOrder; 5] {
         },
         NewOrder {
             order_id: OrderId::new("4"),
+            alt_order_id: Some(OrderId::new("#4")),
             currency: "XTR".into(),
             customer_id: "bob".into(),
             memo: Some("Manually inserted by Ray".into()),
@@ -63,6 +67,7 @@ fn seed_orders() -> [NewOrder; 5] {
         },
         NewOrder {
             order_id: OrderId::new("5"),
+            alt_order_id: Some(OrderId::new("#5")),
             currency: "XMR".into(),
             customer_id: "admin".into(),
             memo: Some("Manually inserted by Charlie".into()),
@@ -195,7 +200,7 @@ async fn fresh_database(world: &mut TPGWorld) {
         let id = order.order_id.clone();
         let address = order.address.as_ref().unwrap().clone();
         db.insert_order(order).await.unwrap();
-        db.claim_order(&id, &address).await.unwrap();
+        db.claim_order(&id, &address, true).await.unwrap();
     }
     world.start_server().await;
 }
@@ -204,7 +209,7 @@ async fn fresh_database(world: &mut TPGWorld) {
 async fn payments_received(world: &mut TPGWorld) {
     let db = world.database();
     for payment in seed_payments() {
-        db.process_new_payment(payment).await.expect("Error persisting payment");
+        db.process_new_payment(payment, true).await.expect("Error persisting payment");
     }
 }
 
@@ -279,6 +284,7 @@ async fn server_configuration(world: &mut TPGWorld, step: &Step) {
                 world.config.shopify_config.order_id_field =
                     if value == "name" { OrderIdField::Name } else { OrderIdField::Id }
             },
+            "strict_mode" => world.config.strict_mode = value == "true",
             _ => warn!("Unknown configuration key: {key}"),
         }
     });

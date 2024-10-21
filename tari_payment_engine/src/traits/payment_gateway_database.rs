@@ -26,18 +26,27 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     fn url(&self) -> &str;
 
     /// Claim the order, identified by `order_id` for the given wallet `address`.
-    ///
+    /// If `strict_mode` is false, the order can also be matched by `alt_id`.
     /// The order must currently be `Unclaimed`.
     ///
     /// The customer id in the order will be associated with the address as part of the claim.
     /// Returns the updated order record.
-    async fn claim_order(&self, order_id: &OrderId, address: &TariAddress) -> Result<Order, PaymentGatewayError>;
+    async fn claim_order(
+        &self,
+        order_id: &OrderId,
+        address: &TariAddress,
+        strict_mode: bool,
+    ) -> Result<Order, PaymentGatewayError>;
 
     /// Attempt to automatically claim the order, by looking for any addresses that are already associated
     /// with the customer id in the order. If there are multiple addresses, the most recent one is used.
     ///
     /// The order status must be `Unclaimed`, and will be set to `New` if the claim is successful.
-    async fn auto_claim_order(&self, order: &Order) -> Result<Option<(TariAddress, Order)>, PaymentGatewayError>;
+    async fn auto_claim_order(
+        &self,
+        order: &Order,
+        strict_mode: bool,
+    ) -> Result<Option<(TariAddress, Order)>, PaymentGatewayError>;
 
     /// Takes a new order, and in a single atomic transaction, stores the order in the database.
     /// This call is idempotent
@@ -48,9 +57,12 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// * calls `save_payment` to store the payment in the database. If the payment already exists, nothing further is
     ///   done.
     /// * The payment is marked as `Unconfirmed`
+    /// * If an order id is present in the metadata, we check if existing orders can be claimed by the payment. If
+    ///   `strict_mode` is true, only `order_id`s are check. If false, `alt_ids` are also checked.
     ///
     /// Returns the newly created Payment record.
-    async fn process_new_payment(&self, payment: NewPayment) -> Result<Payment, PaymentGatewayError>;
+    async fn process_new_payment(&self, payment: NewPayment, strict_mode: bool)
+        -> Result<Payment, PaymentGatewayError>;
 
     /// Fetches all pending payments for the given address.
     async fn fetch_pending_payments_for_address(
@@ -74,7 +86,11 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// Tries to pay for an order using any addresses associated with the customer id attached to this order.
     /// If you've claimed an order, or otherwise know which address you want to pay from, use
     /// [`try_pay_orders_from_address`] instead.
-    async fn try_pay_order(&self, order: &Order) -> Result<Option<MultiAccountPayment>, PaymentGatewayError>;
+    async fn try_pay_order(
+        &self,
+        order: &Order,
+        strict_mode: bool,
+    ) -> Result<Option<MultiAccountPayment>, PaymentGatewayError>;
 
     /// Tries to fulfil the orders using the address as payment source.
     ///
@@ -123,9 +139,10 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// * An audit log entry is made.
     async fn cancel_or_expire_order(
         &self,
-        order: &OrderId,
+        id: &OrderId,
         new_status: OrderStatusType,
         reason: &str,
+        strict_mode: bool,
     ) -> Result<Order, PaymentGatewayError>;
 
     /// Manually reset an order from `Expired` or `Cancelled` status to `New` status.
@@ -159,8 +176,9 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// - If the order status is already `Paid`, an error is returned.
     async fn modify_customer_id_for_order(
         &self,
-        order_id: &OrderId,
+        id: &OrderId,
         new_customer_id: &str,
+        strict_mode: bool,
     ) -> Result<OrderMovedResult, PaymentGatewayError>;
 
     /// Changes the memo field for an order.
@@ -191,6 +209,7 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
         &self,
         order_id: &OrderId,
         new_total_price: MicroTari,
+        strict_mode: bool,
     ) -> Result<OrderChanged, PaymentGatewayError>;
 
     /// Since only XTR is supported currently, this method will always return an error.
