@@ -35,17 +35,19 @@ async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<Or
         r#"
             INSERT INTO orders (
                 order_id,
+                alt_id,
                 customer_id,
                 memo,
                 total_price,
                 original_price,
                 currency,
                 created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *;
         "#,
     )
     .bind(order.order_id)
+    .bind(order.alt_order_id)
     .bind(order.customer_id)
     .bind(order.memo)
     .bind(order.total_price.value())
@@ -227,8 +229,8 @@ pub(crate) async fn expire_orders(
     Ok(rows)
 }
 
-/// Fetches all payable orders for the given address. A payable order is one that is "New", i.e. it has not been paid
-/// and has been claimed by any account associated with the address.
+/// Fetches all payable orders for the given address. A payable order is one that is "New" or "Unclaimed"
+/// i.e. it has not been paid and is associated with the address.
 pub(crate) async fn fetch_payable_orders_for_address(
     address: &TariAddress,
     conn: &mut SqliteConnection,
@@ -249,7 +251,7 @@ pub(crate) async fn fetch_payable_orders_for_address(
             status
         FROM orders JOIN address_customer_id_link ON orders.customer_id = address_customer_id_link.customer_id
         WHERE
-         status = 'New' AND
+         status in ('New', 'Unclaimed') AND
          address = $1"#,
     )
     .bind(address.to_base58())

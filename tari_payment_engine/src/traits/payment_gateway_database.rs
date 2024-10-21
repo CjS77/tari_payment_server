@@ -42,7 +42,11 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// with the customer id in the order. If there are multiple addresses, the most recent one is used.
     ///
     /// The order status must be `Unclaimed`, and will be set to `New` if the claim is successful.
-    async fn auto_claim_order(&self, order: &Order) -> Result<Option<(TariAddress, Order)>, PaymentGatewayError>;
+    async fn auto_claim_order(
+        &self,
+        order: &Order,
+        strict_mode: bool,
+    ) -> Result<Option<(TariAddress, Order)>, PaymentGatewayError>;
 
     /// Takes a new order, and in a single atomic transaction, stores the order in the database.
     /// This call is idempotent
@@ -82,7 +86,11 @@ pub trait PaymentGatewayDatabase: Clone + AccountManagement {
     /// Tries to pay for an order using any addresses associated with the customer id attached to this order.
     /// If you've claimed an order, or otherwise know which address you want to pay from, use
     /// [`try_pay_orders_from_address`] instead.
-    async fn try_pay_order(&self, order: &Order) -> Result<Option<MultiAccountPayment>, PaymentGatewayError>;
+    async fn try_pay_order(
+        &self,
+        order: &Order,
+        strict_mode: bool,
+    ) -> Result<Option<MultiAccountPayment>, PaymentGatewayError>;
 
     /// Tries to fulfil the orders using the address as payment source.
     ///

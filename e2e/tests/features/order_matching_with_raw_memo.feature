@@ -3,7 +3,7 @@ Feature: Order id using order name
   Background:
     Given a server configuration
       | use_x_forwarded_for          | true |
-      | order_id_field               | name |
+      | order_id_field               | id   |
       | disable_memo_signature_check | true |
     Given a blank slate
     Given an authorized wallet with secret df158b8389c68aac01a91276b742d2527f951d3c7289e4ccdecfa0672947270e
@@ -40,7 +40,7 @@ Feature: Order id using order name
       }
     }
     """
-    When Customer #1 ["alice"] places order with name "#12345" for 2400 XTR
-    Then order "#12345" is in state Paid
+    When Customer #1 ["alice"] places order "12345" for 2400 XTR, with memo
+    Then order "12345" is in state Paid
     And account for customer 1 has a current balance of 100 XTR
 

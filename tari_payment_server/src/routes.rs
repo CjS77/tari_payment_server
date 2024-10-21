@@ -526,10 +526,11 @@ route!(settle_address => Post "/settle/address/{address}" impl PaymentGatewayDat
 pub async fn settle_address<B: PaymentGatewayDatabase>(
     path: web::Path<SerializedTariAddress>,
     api: web::Data<OrderFlowApi<B>>,
+    config: web::Data<ServerOptions>,
 ) -> Result<HttpResponse, ServerError> {
     let address = path.into_inner().to_address();
     debug!("💻️ GET settle_address for {address}");
-    let result = api.settle_orders_for_address(&address).await.map_err(|e| {
+    let result = api.settle_orders_for_address(&address, config.strict_mode).await.map_err(|e| {
         debug!("💻️ Could not settle address. {e}");
         e
     })?;
@@ -541,10 +542,11 @@ route!(settle_customer => Post "/settle/customer/{customer_id}" impl PaymentGate
 pub async fn settle_customer<B: PaymentGatewayDatabase>(
     path: web::Path<String>,
     api: web::Data<OrderFlowApi<B>>,
+    config: web::Data<ServerOptions>,
 ) -> Result<HttpResponse, ServerError> {
     let customer_id = path.into_inner();
     debug!("💻️ GET settle_customer for {customer_id}");
-    let result = api.settle_orders_for_customer_id(&customer_id).await.map_err(|e| {
+    let result = api.settle_orders_for_customer_id(&customer_id, config.strict_mode).await.map_err(|e| {
         debug!("💻️ Could not settle customer. {e}");
         e
     })?;
@@ -556,10 +558,11 @@ route!(settle_my_account => Post "/settle" impl PaymentGatewayDatabase);
 pub async fn settle_my_account<B: PaymentGatewayDatabase>(
     claims: JwtClaims,
     api: web::Data<OrderFlowApi<B>>,
+    config: web::Data<ServerOptions>,
 ) -> Result<HttpResponse, ServerError> {
     let address = claims.address;
     debug!("💻️ GET settle_address for {address}");
-    let result = api.settle_orders_for_address(&address).await.map_err(|e| {
+    let result = api.settle_orders_for_address(&address, config.strict_mode).await.map_err(|e| {
         debug!("💻️ Could not settle address. {e}");
         e
     })?;
@@ -635,10 +638,11 @@ route!(issue_credit => Post "/credit" impl PaymentGatewayDatabase where requires
 pub async fn issue_credit<B: PaymentGatewayDatabase>(
     body: web::Json<CreditNote>,
     api: web::Data<OrderFlowApi<B>>,
+    config: web::Data<ServerOptions>,
 ) -> Result<HttpResponse, ServerError> {
     let note = body.into_inner();
     debug!("💻️ Credit note request for {note:?}");
-    let result = api.issue_credit_note(note).await.map_err(|e| {
+    let result = api.issue_credit_note(note, config.strict_mode).await.map_err(|e| {
         debug!("💻️ Could not issue credit. {e}");
         ServerError::BackendError(e.to_string())
     })?;
@@ -958,7 +962,7 @@ where
     }
     // -- from here on, we trust that the notification is legitimate.
     let tx_id = confirmation.txid.clone();
-    let result = match order_api.confirm_payment(confirmation.txid).await {
+    let result = match order_api.confirm_payment(confirmation.txid, config.strict_mode).await {
         Err(PaymentGatewayError::PaymentModificationNoOp) => {
             info!("💻️ Payment {} already confirmed.", tx_id);
             JsonResponse::success("Payment already confirmed.")

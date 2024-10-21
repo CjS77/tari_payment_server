@@ -19,6 +19,7 @@ use tari_payment_engine::{
 use tpg_common::MicroTari;
 
 use crate::{
+    config::ServerOptions,
     data_objects::{ExchangeRateUpdate, JsonResponse},
     errors::ServerError,
     integrations::shopify::{new_order_from_shopify_order, OrderConversionError},
@@ -31,6 +32,7 @@ pub async fn shopify_webhook<BPay, BFx>(
     body: web::Json<ShopifyOrder>,
     api: web::Data<OrderFlowApi<BPay>>,
     fx: web::Data<ExchangeRateApi<BFx>>,
+    config: web::Data<ServerOptions>,
 ) -> HttpResponse
 where
     BPay: PaymentGatewayDatabase,
@@ -52,7 +54,7 @@ where
             info!("🛍️️ Unsupported currency in incoming order. {cur}");
             JsonResponse::failure(format!("Unsupported currency: {cur}"))
         },
-        Ok(new_order) => match api.process_new_order(new_order.clone(), true).await {
+        Ok(new_order) => match api.process_new_order(new_order.clone(), true, config.strict_mode).await {
             Ok(order) => {
                 info!(
                     "🛍️️ Order {} for {} processed successfully. Current status is {}",

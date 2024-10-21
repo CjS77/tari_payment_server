@@ -38,7 +38,7 @@ fn burst_transfers() {
             let amount = MicroTari::from((i + 1) as i64 * 1_000_000);
 
             let payment = NewPayment::new(pk.clone(), amount, format!("taritx-00-{i}"));
-            let _res = api.process_new_payment(payment).await.expect("Error processing payment");
+            let _res = api.process_new_payment(payment, true).await.expect("Error processing payment");
         }
     });
 }

@@ -52,7 +52,12 @@ where B: PaymentGatewayDatabase
     ///
     /// If `auto_claim` is set to `true`, we will look for any existing wallets that are associated with the customer
     /// id on the order and immediately claim the order.
-    pub async fn process_new_order(&self, order: NewOrder, auto_claim: bool) -> Result<Order, PaymentGatewayError> {
+    pub async fn process_new_order(
+        &self,
+        order: NewOrder,
+        auto_claim: bool,
+        strict_mode: bool,
+    ) -> Result<Order, PaymentGatewayError> {
         let address = order.address.clone();
         let (mut order, inserted) = self.db.insert_order(order.clone()).await?;
         let id = order.order_id.clone();
@@ -78,7 +83,7 @@ where B: PaymentGatewayDatabase
             }
         }
         if auto_claim && order.status == OrderStatusType::Unclaimed {
-            if let Some((address, updated_order)) = self.db.auto_claim_order(&order).await? {
+            if let Some((address, updated_order)) = self.db.auto_claim_order(&order, strict_mode).await? {
                 info!("🔄️📦️ Order [{id}] has been auto-claimed by address {}", address.to_base58());
                 order = updated_order;
                 if let Some(mut payments) = self.try_pay_orders_from_address(&address, &[&order]).await? {
@@ -227,6 +232,7 @@ where B: PaymentGatewayDatabase
     pub async fn issue_credit_note(
         &self,
         note: CreditNote,
+        strict_mode: bool,
     ) -> Result<Option<MultiAccountPayment>, PaymentGatewayError> {
         let cust_id = note.customer_id.clone();
         debug!("🔄️💰️ Issuing credit note for customer {cust_id}");
@@ -234,17 +240,17 @@ where B: PaymentGatewayDatabase
         info!("🔄️💰️ Credit note issued for customer {cust_id}");
         self.call_payment_received_hook(&payment).await;
         // A credit note is a confirmed payment so do the same things we would do for a confirmed payment
-        let payment = self.post_confirm(&payment, false).await?;
+        let payment = self.post_confirm(&payment, false, strict_mode).await?;
         Ok(payment)
     }
 
     /// Update the status of a payment to "Confirmed". This happens when a transaction in the blockchain is deep enough
     /// in the chain that a re-org and invalidation of the payment is unlikely.
-    pub async fn confirm_payment(&self, txid: String) -> Result<Payment, PaymentGatewayError> {
+    pub async fn confirm_payment(&self, txid: String, strict_mode: bool) -> Result<Payment, PaymentGatewayError> {
         trace!("🔄️✅️ Payment {txid} is being marked as confirmed");
         let payment = self.db.update_payment_status(&txid, TransferStatus::Confirmed).await?;
         // Setting isolated mode to true here, but we might want this to be false? Need feedback from users.
-        let paid_orders = self.post_confirm(&payment, true).await?;
+        let paid_orders = self.post_confirm(&payment, true, strict_mode).await?;
         let n = paid_orders.map(|p| p.orders_paid.len()).unwrap_or(0);
         info!("🔄️✅️ Payment {txid} was confirmed. {n} orders were paid as a result.");
         Ok(payment)
@@ -256,6 +262,7 @@ where B: PaymentGatewayDatabase
         &self,
         payment: &Payment,
         isolated: bool,
+        strict_mode: bool,
     ) -> Result<Option<MultiAccountPayment>, PaymentGatewayError> {
         debug!("🔄️✅️ Executing post-payment confirmation actions for {}", payment.txid);
         let address = payment.sender.as_address();
@@ -267,7 +274,7 @@ where B: PaymentGatewayDatabase
             self.try_pay_orders_from_address(address, &orders).await?
         } else {
             info!("🔄️✅️ Paying for orders using any address associated with the orders");
-            self.try_pay_orders(&orders).await?
+            self.try_pay_orders(&orders, strict_mode).await?
         };
         let txid = &payment.txid;
         let mut log_msg = format!("[{txid}] confirmed.");
@@ -355,7 +362,7 @@ where B: PaymentGatewayDatabase
         let mut changes = self.db.reset_order(order_id).await?;
         self.call_order_modified_hook("status", changes.clone()).await;
         self.call_new_order_hook(&changes.new_order).await;
-        if let Some(mut paid_order) = self.try_pay_order(&changes.new_order).await? {
+        if let Some(mut paid_order) = self.try_pay_order(&changes.new_order, true).await? {
             changes.new_order = paid_order.orders_paid.remove(0);
         }
         Ok(changes)
@@ -364,8 +371,12 @@ where B: PaymentGatewayDatabase
     /// Tries to pay for an order using any addresses associated with the customer id attached to this order.
     /// If you've claimed an order, or otherwise know which address you want to pay from, use
     /// [`try_pay_orders_from_address`] instead.
-    pub async fn try_pay_order(&self, order: &Order) -> Result<Option<MultiAccountPayment>, PaymentGatewayError> {
-        match self.db.try_pay_order(order).await {
+    pub async fn try_pay_order(
+        &self,
+        order: &Order,
+        strict_mode: bool,
+    ) -> Result<Option<MultiAccountPayment>, PaymentGatewayError> {
+        match self.db.try_pay_order(order, strict_mode).await {
             Ok(None) => Ok(None),
             Ok(Some(result)) => {
                 if result.orders_paid.is_empty() {
@@ -387,10 +398,14 @@ where B: PaymentGatewayDatabase
     /// the orders that were paid for.
     ///
     /// If no orders were paid, the function returns `Ok(None)`.
-    pub async fn try_pay_orders(&self, orders: &[&Order]) -> Result<Option<MultiAccountPayment>, PaymentGatewayError> {
+    pub async fn try_pay_orders(
+        &self,
+        orders: &[&Order],
+        strict_mode: bool,
+    ) -> Result<Option<MultiAccountPayment>, PaymentGatewayError> {
         let mut payments = Vec::new();
         for order in orders {
-            if let Some(o) = self.try_pay_order(order).await? {
+            if let Some(o) = self.try_pay_order(order, strict_mode).await? {
                 payments.push(o);
             }
         }
@@ -507,7 +522,7 @@ where B: PaymentGatewayDatabase
             "🔄️💲️ Price for order [{}]{alt} {direction} from {} to {}",
             old_order.order_id, old_order.total_price, new_order.total_price
         );
-        if let Some(payments) = self.try_pay_order(&new_order).await? {
+        if let Some(payments) = self.try_pay_order(&new_order, strict_mode).await? {
             // can panic, but try_pay_order should return None if there are no paid orders
             let paid_order = payments.to_order();
             debug!("🔄️💲️ Price change has led to order {} being Paid", paid_order.order_id);
@@ -546,13 +561,14 @@ where B: PaymentGatewayDatabase
     pub async fn settle_orders_for_address(
         &self,
         address: &TariAddress,
+        strict_mode: bool,
     ) -> Result<Option<MultiAccountPayment>, PaymentGatewayError> {
         let customer_ids = self.db.fetch_customer_ids_for_address(address).await?;
         let addr = address.to_base58();
         debug!("🔄️⚖️ {} customer ids found for address {addr}. Starting order settlement...", customer_ids.len());
         let mut maybe_paid_orders = vec![None];
         for cust_id in customer_ids {
-            let orders_paid = self.settle_orders_for_customer_id(&cust_id).await?;
+            let orders_paid = self.settle_orders_for_customer_id(&cust_id, strict_mode).await?;
             if let Some(o) = &orders_paid {
                 debug!("🔄️⚖️ {} orders settled for customer id {} for {addr}", o.order_count(), cust_id);
             } else {
@@ -569,6 +585,7 @@ where B: PaymentGatewayDatabase
     pub async fn settle_orders_for_customer_id(
         &self,
         customer_id: &str,
+        strict_mode: bool,
     ) -> Result<Option<MultiAccountPayment>, PaymentGatewayError> {
         let query = OrderQueryFilter::default()
             .with_customer_id(customer_id.to_string())
@@ -576,7 +593,7 @@ where B: PaymentGatewayDatabase
             .with_status(OrderStatusType::Unclaimed);
         let orders = self.db.search_orders(query).await?;
         let orders_ref = orders.iter().collect::<Vec<&Order>>();
-        let result = self.try_pay_orders(&orders_ref).await?;
+        let result = self.try_pay_orders(&orders_ref, strict_mode).await?;
         Ok(result)
     }
 

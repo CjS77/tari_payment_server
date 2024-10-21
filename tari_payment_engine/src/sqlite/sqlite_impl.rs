@@ -85,14 +85,25 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         Ok(order)
     }
 
-    async fn auto_claim_order(&self, order: &Order) -> Result<Option<(TariAddress, Order)>, PaymentGatewayError> {
+    async fn auto_claim_order(
+        &self,
+        order: &Order,
+        strict_mode: bool,
+    ) -> Result<Option<(TariAddress, Order)>, PaymentGatewayError> {
         if order.status != OrderStatusType::Unclaimed {
             error!("🖇️️ Order {} is not 'Unclaimed' and cannot be auto-claimed", order.order_id);
             return Err(PaymentGatewayError::OrderModificationForbidden);
         }
         let mut tx = self.pool.begin().await?;
         let cust_id = &order.customer_id;
-        let mut address = accounts::balances_for_order_id(&order.order_id, &mut tx).await?;
+        let alt_id = if strict_mode { None } else { order.alt_id.as_ref() };
+        trace!(
+            "🖇️️ Checking balances for order {} ({:?}, strict mode: {strict_mode}) for customer {}",
+            order.order_id,
+            alt_id,
+            cust_id
+        );
+        let mut address = accounts::balances_for_order_id(&order.order_id, alt_id, &mut tx).await?;
         if address.is_empty() {
             address = accounts::balances_for_customer_id(cust_id, &mut tx).await?;
         }
@@ -133,7 +144,8 @@ impl PaymentGatewayDatabase for SqliteDatabase {
         // If the order id is already known, link the address and customer_id
         if let Some(order_id) = maybe_order_id {
             info!(
-                "🗃️ The payment {} contains an order id ({order_id}), so I'm going to try and claim an existing order",
+                "🗃️ The payment {} contains an order id ({order_id}), so I'm going to try and claim an existing order \
+                 with strict mode: {strict_mode}",
                 payment.txid
             );
             match self.claim_order_with_conn(&order_id, payment.sender.as_address(), strict_mode, &mut tx).await {
@@ -182,10 +194,15 @@ impl PaymentGatewayDatabase for SqliteDatabase {
     ///
     /// It's possible to pay for the order from multiple wallets, in which case the settlement type will be `Multiple`,
     /// with the sum total of the payments being equal to the order's total price.
-    async fn try_pay_order(&self, order: &Order) -> Result<Option<MultiAccountPayment>, PaymentGatewayError> {
+    async fn try_pay_order(
+        &self,
+        order: &Order,
+        strict_mode: bool,
+    ) -> Result<Option<MultiAccountPayment>, PaymentGatewayError> {
         let mut tx = self.pool.begin().await?;
         // First check for any payments that contain the order id
-        let order_balances = accounts::balances_for_order_id(&order.order_id, &mut tx).await?;
+        let alt_id = if strict_mode { order.alt_id.as_ref() } else { None };
+        let order_balances = accounts::balances_for_order_id(&order.order_id, alt_id, &mut tx).await?;
         debug!("🗃️ Found {} payments explicitly lined to order {}", order_balances.len(), order.order_id);
         let mut balances = accounts::balances_for_customer_id(&order.customer_id, &mut tx).await?;
         balances.extend(order_balances);
@@ -421,7 +438,7 @@ impl PaymentGatewayDatabase for SqliteDatabase {
 
         let mut settlements = Vec::new();
         if let OrderStatusType::New = new_order.status {
-            match self.try_pay_order(&new_order).await {
+            match self.try_pay_order(&new_order, strict_mode).await {
                 Ok(Some(payment)) => {
                     let mut orders_paid;
                     MultiAccountPayment { settlements, orders_paid, .. } = payment;
@@ -786,9 +803,9 @@ impl SqliteDatabase {
         id: &OrderId,
         strict_mode: bool,
         conn: &mut SqliteConnection,
-    ) -> Result<Order, AccountApiError> {
+    ) -> Result<Order, PaymentGatewayError> {
         if strict_mode { fetch_order_by_order_id(id, conn).await? } else { fetch_order_by_id_or_alt(id, conn).await? }
-            .ok_or_else(|| AccountApiError::OrderDoesNotExist(id.clone()))
+            .ok_or_else(|| PaymentGatewayError::OrderNotFound(id.clone()))
     }
 
     async fn claim_order_with_conn(
