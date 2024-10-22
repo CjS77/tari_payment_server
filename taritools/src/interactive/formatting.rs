@@ -75,6 +75,7 @@ pub fn format_orders(orders: &[Order]) -> String {
     table.set_titles(row![
         "ID",
         "Order id",
+        "Alt id",
         "Amount",
         "Status",
         "Original price",
@@ -95,6 +96,7 @@ pub fn format_orders(orders: &[Order]) -> String {
         table.add_row(row![
             order.id,
             order.order_id,
+            order.alt_id.as_ref().map(|o| o.to_string()).unwrap_or_default(),
             order.total_price.to_string(),
             order.status.to_string(),
             order.original_price.as_deref().unwrap_or_default(),
@@ -115,9 +117,13 @@ pub fn format_orders(orders: &[Order]) -> String {
 }
 
 pub fn format_order(order: &Order, f: &mut dyn Write) -> Result<()> {
+    let alt = match order.alt_id {
+        Some(ref alt) => format!("({alt})"),
+        None => String::default(),
+    };
     writeln!(
         f,
-        "Order id: {id:15}          Created {created}",
+        "Order id: {id:15} {alt}         Created {created}",
         id = order.order_id.to_string(),
         created = order.created_at,
     )?;
@@ -226,7 +232,11 @@ pub fn format_address_with_qr_code(address: &TariAddress) -> (String, String, St
 pub fn format_claimed_order(order: &ClaimedOrder) -> Result<String> {
     let mut f = String::new();
     writeln!(f, "## Claimed order details")?;
-    writeln!(f, "Order id: {:<25} Status: {}", order.order_id.as_str(), order.status)?;
+    let alt = match order.alt_id {
+        Some(ref alt) => format!("({alt})"),
+        None => String::default(),
+    };
+    writeln!(f, "Order id: {:<25}{alt} Status: {}", order.order_id.as_str(), order.status)?;
     writeln!(f, "Amount: {}", order.total_price)?;
     writeln!(f, "Payment due before: {}", order.expires_at)?;
     let (hex, emoji, qr) = format_address_with_qr_code(&order.send_to);

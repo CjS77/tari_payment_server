@@ -232,6 +232,7 @@ impl OrderChanged {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClaimedOrder {
     pub order_id: OrderId,
+    pub alt_id: Option<OrderId>,
     pub total_price: MicroTari,
     pub expires_at: DateTime<Utc>,
     pub status: OrderStatusType,
@@ -239,10 +240,11 @@ pub struct ClaimedOrder {
 }
 
 impl ClaimedOrder {
-    pub fn new(order_id: OrderId, total_price: MicroTari) -> Self {
+    pub fn new(order_id: OrderId, alt_id: Option<OrderId>, total_price: MicroTari) -> Self {
         let expires_at = Utc::now() + chrono::Duration::hours(48);
         Self {
             order_id,
+            alt_id,
             total_price,
             expires_at,
             status: OrderStatusType::New,
@@ -259,7 +261,7 @@ impl From<Order> for ClaimedOrder {
             OrderStatusType::Unclaimed => o.updated_at + chrono::Duration::hours(2),
             _ => o.updated_at,
         };
-        let mut result = ClaimedOrder::new(o.order_id, o.total_price);
+        let mut result = ClaimedOrder::new(o.order_id, o.alt_id, o.total_price);
         result.expires_at = expires_at;
         result.status = o.status;
         result
