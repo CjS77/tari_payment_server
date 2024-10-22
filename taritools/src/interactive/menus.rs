@@ -37,6 +37,7 @@ pub mod commands {
     pub const PAYMENTS_FOR_ADDRESS: &str = "Payments for Address";
     pub const REASSIGN_ORDER: &str = "Reassign Order";
     pub const REMOVE_AUTH_WALLETS: &str = "Remove authorized wallets";
+    pub const RESCAN_OPEN_ORDERS: &str = "Re-import Open Orders";
     pub const RESET_ORDER: &str = "Reset Order";
     pub const SERVER_HEALTH: &str = "Server health";
     pub const SHOPIFY_OPEN_ORDERS: &str = "Open Orders";
@@ -47,7 +48,7 @@ pub use commands::*;
 
 pub const TOP_MENU: [&str; 5] = [NAV_TO_ADMIN_MENU, NAV_TO_USER_MENU, NAV_TO_SHOPIFY_MENU, LOGOUT, EXIT];
 
-pub const ADMIN_MENU: [&str; 23] = [
+pub const ADMIN_MENU: [&str; 24] = [
     CANCEL,
     MARK_ORDER_PAID,
     RESET_ORDER,
@@ -66,6 +67,7 @@ pub const ADMIN_MENU: [&str; 23] = [
     HISTORY_FOR_ACCOUNT_ID,
     EDIT_MEMO,
     REASSIGN_ORDER,
+    RESCAN_OPEN_ORDERS,
     ADD_AUTH_WALLET,
     REMOVE_AUTH_WALLETS,
     LIST_AUTH_WALLETS,
@@ -87,7 +89,7 @@ pub const USER_MENU: [&str; 11] = [
     LIST_PAYMENT_ADDRESSES,
 ];
 
-pub const SHOPIFY_MENU: [&str; 3] = [SHOPIFY_OPEN_ORDERS, NAV_BACK, EXIT];
+pub const SHOPIFY_MENU: [&str; 4] = [SHOPIFY_OPEN_ORDERS, NAV_BACK, RESCAN_OPEN_ORDERS, EXIT];
 
 pub fn top_menu() -> &'static Menu {
     &("Main", &TOP_MENU)

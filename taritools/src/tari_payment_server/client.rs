@@ -38,6 +38,7 @@ use tari_payment_engine::{
 use tari_payment_server::data_objects::{
     ExchangeRateResult,
     ExchangeRateUpdate,
+    JsonResponse,
     ModifyOrderParams,
     MoveOrderParams,
     PaymentNotification,
@@ -279,6 +280,18 @@ impl PaymentServerClient {
 
     pub async fn orders_for_address(&self, address: TariAddress) -> Result<OrderResult> {
         self.auth_get_request(&format!("/api/orders/{}", address.to_base58())).await
+    }
+
+    pub async fn rescan_open_orders(&self) -> Result<Vec<JsonResponse>> {
+        let url = self.url("/api/rescan_open_orders")?;
+        let res = self.client.post(url).header("tpg_access_token", self.access_token.clone()).send().await?;
+        match res.status() {
+            StatusCode::OK => Ok({ res.json().await? }),
+            code => {
+                let msg = res.text().await?;
+                Err(anyhow!("Error rescanning open orders: {code}, {msg}."))
+            },
+        }
     }
 
     pub async fn order_by_id(&self, order_id: &OrderId) -> Result<Option<Order>> {

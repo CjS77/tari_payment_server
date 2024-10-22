@@ -41,7 +41,21 @@ where
     trace!("🛍️️ Received webhook request: {}", req.uri());
     let order = body.into_inner();
     // Webhook responses must always be in 200 range, otherwise Shopify will retry
-    let result = match new_order_from_shopify_order(order, &fx).await {
+    let result = handle_shopify_order(order, &fx, &api, &config).await;
+    HttpResponse::Ok().json(result)
+}
+
+pub async fn handle_shopify_order<BPay, BFx>(
+    order: ShopifyOrder,
+    fx: &ExchangeRateApi<BFx>,
+    api: &OrderFlowApi<BPay>,
+    config: &ServerOptions,
+) -> JsonResponse
+where
+    BPay: PaymentGatewayDatabase,
+    BFx: ExchangeRates,
+{
+    match new_order_from_shopify_order(order, &fx).await {
         Err(OrderConversionError::FormatError(s)) => {
             warn!("🛍️️ Could not convert order. {s}");
             JsonResponse::failure(s)
@@ -76,8 +90,7 @@ where
                 JsonResponse::failure("Unexpected error handling order.")
             },
         },
-    };
-    HttpResponse::Ok().json(result)
+    }
 }
 
 route!(shopify_on_product_updated => Post "webhook/product_updated" impl ExchangeRates);

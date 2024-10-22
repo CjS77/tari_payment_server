@@ -26,6 +26,7 @@ use std::{ops::Deref, str::FromStr};
 use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
 use log::*;
 use serde_json::json;
+use shopify_tools::ShopifyApi;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
     db_types::{CreditNote, Order, OrderId, OrderStatusType, Role, SerializedTariAddress},
@@ -68,6 +69,7 @@ use crate::{
     },
     errors::ServerError,
     helpers::{get_remote_ip, try_extract_order_id},
+    shopify_routes::handle_shopify_order,
 };
 
 // Web-actix cannot handle generics in handlers, so it's implemented manually using the `route!` macro
@@ -95,7 +97,7 @@ macro_rules! route {
         }
     };
 
-    ($name:ident => $method:ident $path:literal impl $($bounds:ty),+) => {
+    ($name:ident => $method:ident $path:literal impl $( $bounds:ty ),+) => {
         paste::paste! { pub struct [<$name:camel Route>]< $( [< T $bounds:camel> ],)+ >( $( core::marker::PhantomData<fn() -> [< T $bounds:camel> ] >,)+ );}
         paste::paste! { impl< $( [< T $bounds:camel> ],)+ > [<$name:camel Route>]< $( [< T $bounds:camel> ],)+ > {
             #[allow(clippy::new_without_default)]
@@ -117,23 +119,23 @@ macro_rules! route {
         }}
     };
 
-    ($name:ident => $method:ident $path:literal impl $($bounds:ty),+ where requires [$($roles:ty),*])  => {
-        paste::paste! { pub struct [<$name:camel Route>]<A>(core::marker::PhantomData<fn() -> A>);}
-        paste::paste! { impl<A> [<$name:camel Route>]<A> {
+    ($name:ident => $method:ident $path:literal impl $( $bounds:ty ),+ where requires [$($roles:ty),*])  => {
+        paste::paste! { pub struct [<$name:camel Route>]< $( [< T $bounds:camel> ],)+ >( $( core::marker::PhantomData<fn() -> [< T $bounds:camel> ] >,)+ );}
+        paste::paste! { impl< $( [< T $bounds:camel> ],)+ > [<$name:camel Route>]< $( [< T $bounds:camel> ],)+ > {
             #[allow(clippy::new_without_default)]
             pub fn new() -> Self {
-                Self(core::marker::PhantomData::<fn() -> A>)
+                Self($( core::marker::PhantomData::<fn() -> [< T $bounds:camel> ] >,)+)
             }
         }}
-        paste::paste! { impl<A> actix_web::dev::HttpServiceFactory for [<$name:camel Route>]<A>
+        paste::paste! { impl<$( [< T $bounds:camel >] , )+> actix_web::dev::HttpServiceFactory for [<$name:camel Route>]<$([<T $bounds:camel>],)+>
         where
-            A: $($bounds)++ 'static,
+            $([<T $bounds:camel>]: $bounds + 'static,)+
         {
             fn register(self, config: &mut actix_web::dev::AppService) {
                 let res = actix_web::Resource::new($path)
                     .name(stringify!($name))
                     .guard(actix_web::guard::$method())
-                    .to($name::<A>)
+                    .to($name::< $( [< T $bounds:camel >], )+ >)
                     .wrap($crate::middleware::AclMiddlewareFactory::new(&[$($roles),+]));
                 actix_web::dev::HttpServiceFactory::register(res, config);
             }
@@ -824,6 +826,32 @@ pub async fn reset_order<B: PaymentGatewayDatabase>(
 #[cfg(feature = "shopify")]
 pub async fn reset_order<B: PaymentGatewayDatabase>() -> Result<HttpResponse, ServerError> {
     Err(ServerError::UnsupportedAction("Resetting orders is not supported in Shopify".to_string()))
+}
+
+route!(rescan_open_orders => Post "/rescan_open_orders" impl PaymentGatewayDatabase, ExchangeRates where requires [Role::Write]);
+pub async fn rescan_open_orders<BPay, BFx>(
+    api: web::Data<OrderFlowApi<BPay>>,
+    fx: web::Data<ExchangeRateApi<BFx>>,
+    shopify_api: web::Data<ShopifyApi>,
+    config: web::Data<ServerOptions>,
+) -> Result<HttpResponse, ServerError>
+where
+    BPay: PaymentGatewayDatabase,
+    BFx: ExchangeRates,
+{
+    info!("🛍️ Starting to re-scan all open orders from Shopify");
+    let open_orders = shopify_api.fetch_all_open_orders(None).await.map_err(|e| {
+        error!("🛍️️ Could not fetch open orders from Shopify. {e}");
+        ServerError::CannotCompleteRequest(e.to_string())
+    })?;
+    let mut results = vec![];
+    info!("🛍️ Found {} open orders in Shopify. Adding them to the database", open_orders.len());
+    for order in open_orders {
+        let result = handle_shopify_order(order, &fx, &api, &config).await;
+        results.push(result);
+    }
+    info!("🛍️ Finished re-scanning all open orders from Shopify");
+    Ok(HttpResponse::Ok().json(results))
 }
 
 //------------------------------------------   Incoming payments  ---------------------------------------------

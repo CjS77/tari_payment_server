@@ -165,6 +165,7 @@ impl InteractiveApp {
                 LIST_AUTH_WALLETS => handle_response(self.list_authorized_wallets().await),
                 ADD_PROFILE => handle_response(self.add_profile().await),
                 SHOPIFY_OPEN_ORDERS => handle_response(self.shopify_open_orders().await),
+                RESCAN_OPEN_ORDERS => handle_response(self.rescan_open_orders().await),
                 LOGOUT => self.logout(),
                 NAV_BACK => self.pop_menu(),
                 EXIT => break,
@@ -412,6 +413,15 @@ impl InteractiveApp {
         let address = self.select_address().await?;
         let client = self.client().expect("User is logged in. Client should not be None");
         client.orders_for_address(address).await.and_then(format_order_result)
+    }
+
+    async fn rescan_open_orders(&mut self) -> Result<String> {
+        let _unused = self.login().await?;
+        let client = self.client().expect("User is logged in. Client should not be None");
+        let result = client.rescan_open_orders().await?;
+        let result =
+            result.into_iter().map(|r| format!("{}: {}", r.success, r.message)).collect::<Vec<String>>().join("\n");
+        Ok(result)
     }
 
     async fn payments_for_order(&mut self) -> Result<String> {
