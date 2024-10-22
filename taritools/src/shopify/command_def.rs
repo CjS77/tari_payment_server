@@ -39,6 +39,8 @@ pub enum OrdersCommand {
         #[arg(required = true, index = 1)]
         id: u64,
     },
+    /// Fetch open orders
+    Open,
     /// Cancel the order with the given ID
     Cancel {
         #[arg(required = true, index = 1)]

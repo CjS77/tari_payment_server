@@ -12,6 +12,7 @@ pub async fn handle_shopify_command(command: ShopifyCommand) {
     match command {
         Orders(orders_command) => match orders_command {
             OrdersCommand::Get { id } => fetch_shopify_order(id).await,
+            OrdersCommand::Open => fetch_open_shopify_orders().await,
             OrdersCommand::Cancel { id } => cancel_shopify_order(id).await,
             OrdersCommand::Pay { id, amount, currency } => mark_order_as_paid(id, amount, currency).await,
             OrdersCommand::Modify => {
@@ -34,7 +35,7 @@ pub async fn handle_shopify_command(command: ShopifyCommand) {
     }
 }
 
-fn new_shopify_api() -> ShopifyApi {
+pub fn new_shopify_api() -> ShopifyApi {
     let config = ShopifyConfig::new_from_env_or_default();
     match ShopifyApi::new(config) {
         Ok(api) => api,
@@ -55,6 +56,20 @@ pub async fn fetch_shopify_order(id: u64) {
         },
         Err(e) => {
             eprintln!("Error fetching order #{id}: {e}");
+        },
+    }
+}
+
+pub async fn fetch_open_shopify_orders() {
+    let api = new_shopify_api();
+    match api.fetch_all_open_orders(None).await {
+        Ok(order) => {
+            let json = serde_json::to_string_pretty(&order)
+                .unwrap_or_else(|e| format!("Could not represent order as JSON. {e}"));
+            println!("{json}");
+        },
+        Err(e) => {
+            eprintln!("Error fetching orders: {e}");
         },
     }
 }

@@ -30,6 +30,7 @@ pub mod commands {
     pub const MY_PAYMENTS: &str = "My Payments";
     pub const NAV_BACK: &str = "Back";
     pub const NAV_TO_ADMIN_MENU: &str = "Admin Menu";
+    pub const NAV_TO_SHOPIFY_MENU: &str = "Shopify Menu";
     pub const NAV_TO_USER_MENU: &str = "User Menu";
     pub const ORDER_BY_ID: &str = "Order by Id";
     pub const ORDERS_FOR_ADDRESS: &str = "Orders for Address";
@@ -38,12 +39,13 @@ pub mod commands {
     pub const REMOVE_AUTH_WALLETS: &str = "Remove authorized wallets";
     pub const RESET_ORDER: &str = "Reset Order";
     pub const SERVER_HEALTH: &str = "Server health";
+    pub const SHOPIFY_OPEN_ORDERS: &str = "Open Orders";
     pub const SET_PRICE: &str = "Set Tari price";
 }
 
 pub use commands::*;
 
-pub const TOP_MENU: [&str; 4] = [NAV_TO_ADMIN_MENU, NAV_TO_USER_MENU, LOGOUT, EXIT];
+pub const TOP_MENU: [&str; 5] = [NAV_TO_ADMIN_MENU, NAV_TO_USER_MENU, NAV_TO_SHOPIFY_MENU, LOGOUT, EXIT];
 
 pub const ADMIN_MENU: [&str; 23] = [
     CANCEL,
@@ -85,6 +87,8 @@ pub const USER_MENU: [&str; 11] = [
     LIST_PAYMENT_ADDRESSES,
 ];
 
+pub const SHOPIFY_MENU: [&str; 3] = [SHOPIFY_OPEN_ORDERS, NAV_BACK, EXIT];
+
 pub fn top_menu() -> &'static Menu {
     &("Main", &TOP_MENU)
 }
@@ -95,4 +99,8 @@ pub fn admin_menu() -> &'static Menu {
 
 pub fn user_menu() -> &'static Menu {
     &("User", &USER_MENU)
+}
+
+pub fn shopify_menu() -> &'static Menu {
+    &("Shopify", &SHOPIFY_MENU)
 }

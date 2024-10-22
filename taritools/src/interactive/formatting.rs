@@ -9,6 +9,7 @@ use prettytable::{
     Table,
 };
 use qrcode::{render::unicode, QrCode};
+use shopify_tools::ShopifyOrder;
 use tari_common_types::tari_address::TariAddress;
 use tari_payment_engine::{
     db_types::{
@@ -133,6 +134,42 @@ pub fn format_order(order: &Order, f: &mut dyn Write) -> Result<()> {
     writeln!(f, "Memo: {memo}", memo = order.memo.as_deref().unwrap_or("No memo"))?;
     writeln!(f, "-----------------------------------------------------------------------------\n")?;
     Ok(())
+}
+
+pub fn format_shopify_orders(orders: &[ShopifyOrder]) -> String {
+    if orders.is_empty() {
+        return "No open orders".to_string();
+    }
+    let mut table = Table::new();
+    table.set_titles(row!["id", "name", "Customer id", "Total price", "Cur", "Note", "Created At", "Updated At"]);
+    let mut memos = Vec::new();
+    orders.iter().for_each(|order| {
+        let memo_note = match order.note {
+            Some(ref memo) => {
+                memos.push(memo.clone());
+                format!("{}^", memos.len())
+            },
+            None => String::default(),
+        };
+        table.add_row(row![
+            order.id,
+            order.name,
+            order.customer.id.to_string(),
+            format!("{:>11}", order.total_price),
+            order.currency,
+            memo_note,
+            order.created_at,
+            order.updated_at
+        ]);
+    });
+    markdown_style(&mut table);
+    let memo_notes =
+        memos.iter().enumerate().map(|(i, memo)| format!("^{}: {}", i + 1, memo)).collect::<Vec<String>>().join("\n");
+    if memo_notes.is_empty() {
+        format!("{table}\n")
+    } else {
+        format!("{table}\n## Memos\n{memo_notes}")
+    }
 }
 
 pub fn format_wallet_list(wallets: &[WalletInfo]) -> String {

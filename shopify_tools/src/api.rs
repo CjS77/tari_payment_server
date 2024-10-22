@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use chrono::Utc;
 use graphql_parser::parse_query;
 use log::*;
 use reqwest::{
@@ -13,8 +14,9 @@ use tpg_common::MicroTari;
 
 use crate::{
     config::ShopifyConfig,
-    data_objects::{NewWebhook, ProductVariant, ProductVariants, Webhook},
+    data_objects::{NewWebhook, PageInfo, ProductVariant, ProductVariants, Webhook},
     helpers::{parse_shopify_price, tari_shopify_price},
+    Customer,
     ExchangeRate,
     ExchangeRates,
     ShopifyApiError,
@@ -31,6 +33,8 @@ pub struct ShopifyApi {
 const VARIANT_DEF: &str =
     "{ id product { id title } metafield(namespace: \"custom\" key: \"tari_price\") { id updatedAt value } price }";
 
+const ORDER_DEF: &str = "{ id name createdAt updatedAt note currencyCode presentmentCurrencyCode confirmed \
+                         totalDiscounts totalPrice totalTax subtotalPrice customer { id } }";
 impl ShopifyApi {
     pub fn new(config: ShopifyConfig) -> Result<Self, ShopifyApiError> {
         let mut headers = HeaderMap::with_capacity(2);
@@ -353,4 +357,100 @@ impl ShopifyApi {
         info!("Updated webhook: {:?}", result.webhook.id);
         Ok(result.webhook)
     }
+
+    pub async fn fetch_all_open_orders(
+        &self,
+        since: Option<chrono::DateTime<Utc>>,
+    ) -> Result<Vec<ShopifyOrder>, ShopifyApiError> {
+        let mut orders = vec![];
+        let mut cursor = None;
+        loop {
+            debug!("Fetching next page of open orders");
+            let (mut page, page_info) = self.fetch_open_orders(since, cursor, 25).await?;
+            orders.append(&mut page);
+            if !page_info.has_next_page {
+                break;
+            }
+            cursor = Some(page_info.end_cursor);
+        }
+        Ok(orders)
+    }
+
+    pub async fn fetch_open_orders(
+        &self,
+        since: Option<chrono::DateTime<Utc>>,
+        cursor: Option<String>,
+        count: u64,
+    ) -> Result<(Vec<ShopifyOrder>, PageInfo), ShopifyApiError> {
+        #[derive(Deserialize)]
+        struct OpenOrdersResponse {
+            #[serde(rename = "orders")]
+            orders: GraphQLOrders,
+        }
+        #[derive(Deserialize)]
+        struct GraphQLOrders {
+            nodes: Vec<Value>,
+            #[serde(rename = "pageInfo")]
+            page_info: PageInfo,
+        }
+        let after = cursor.map(|s| format!("after:\"{s}\",")).unwrap_or_default();
+        let query = match since {
+            Some(since) => format!("status:open AND created_at:>=\"{}\"", since.to_rfc3339()),
+            None => "status:open".to_string(),
+        };
+        let query = format!(
+            "query {{orders(first:{count},{after} query: \"{query}\") {{ pageInfo {{ endCursor hasNextPage }} nodes \
+             {ORDER_DEF} }}}}"
+        );
+        let result = self.graphql_query::<OpenOrdersResponse>(&query, None).await?;
+        debug!(
+            "Fetched {} open orders. PageInfo: {} HasNextPage: {}",
+            result.orders.nodes.len(),
+            result.orders.page_info.end_cursor,
+            result.orders.page_info.has_next_page
+        );
+        let orders = result.orders.nodes.into_iter().map(node_to_order).collect();
+        let page_info = result.orders.page_info;
+        Ok((orders, page_info))
+    }
+}
+
+// subtotalPrice customer { id }
+fn node_to_order(node: Value) -> ShopifyOrder {
+    let mut customer = Customer::default();
+    if let Some(gid) = node["customer"]["id"].as_str() {
+        customer.id = id_from_gid(gid)
+    }
+    ShopifyOrder {
+        id: id_from_gid(node["id"].as_str().unwrap_or_else(|| "0".into())).to_string(),
+        token: "".to_string(),
+        name: node["name"].as_str().unwrap_or_default().to_string(),
+        created_at: node["createdAt"].as_str().unwrap_or_default().to_string(),
+        updated_at: node["updatedAt"].as_str().unwrap_or_default().to_string(),
+        note: node["note"].as_str().map(|s| s.to_string()),
+        currency: node["currencyCode"].as_str().unwrap_or_default().to_string(),
+        presentment_currency: node["presentmentCurrencyCode"].as_str().unwrap_or_default().to_string(),
+        confirmed: node["confirmed"].as_bool().unwrap_or_default(),
+        total_discounts: node["totalDiscounts"].as_str().unwrap_or_default().to_string(),
+        total_price: node["totalPrice"].as_str().unwrap_or_default().to_string(),
+        total_tax: node["totalTax"].as_str().unwrap_or_default().to_string(),
+        subtotal_price: node["subtotalPrice"].as_str().unwrap_or_default().to_string(),
+        cancel_reason: None,
+        cart_token: None,
+        email: None,
+        cancelled_at: None,
+        checkout_id: None,
+        checkout_token: None,
+        closed_at: None,
+        user_id: None,
+        total_line_items_price: "".to_string(),
+        customer,
+        buyer_accepts_marketing: false,
+        fulfillment_status: None,
+        source_name: "".to_string(),
+    }
+}
+
+fn id_from_gid(gid: &str) -> i64 {
+    gid.split('/').last().map_or(0, |s| s.parse::<i64>().unwrap_or_default())
 }

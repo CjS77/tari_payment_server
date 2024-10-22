@@ -8,6 +8,7 @@ use anyhow::Result;
 use dialoguer::{console::Style, theme::ColorfulTheme, Confirm, FuzzySelect, MultiSelect, Select};
 use indicatif::{ProgressBar, ProgressStyle};
 use menus::commands::*;
+use shopify_tools::ShopifyApi;
 use tari_common::configuration::Network;
 use tari_common_types::tari_address::{TariAddress, TariAddressFeatures};
 use tari_crypto::{
@@ -16,7 +17,8 @@ use tari_crypto::{
     tari_utilities::hex::Hex,
 };
 use tari_payment_engine::{
-    db_types::{OrderId, Role, SerializedTariAddress},
+    db_types::{Order, OrderId, Role, SerializedTariAddress},
+    events::EventType::NewOrder,
     helpers::MemoSignature,
     traits::NewWalletInfo,
 };
@@ -40,6 +42,7 @@ use crate::{
             format_orders,
             format_payments,
             format_payments_result,
+            format_shopify_orders,
             format_wallet_list,
             print_order,
         },
@@ -48,6 +51,7 @@ use crate::{
         selector::{AddressSelector, CustomerSelector},
     },
     profile_manager::{read_config, write_config, Profile},
+    shopify::{fetch_open_shopify_orders, new_shopify_api},
     tari_payment_server::client::PaymentServerClient,
 };
 
@@ -139,6 +143,7 @@ impl InteractiveApp {
                 MY_ACCOUNT_HISTORY => handle_response(self.my_history().await),
                 NAV_TO_ADMIN_MENU => self.select_menu(menus::admin_menu()),
                 NAV_TO_USER_MENU => self.select_menu(menus::user_menu()),
+                NAV_TO_SHOPIFY_MENU => self.select_menu(menus::shopify_menu()),
                 CANCEL => handle_response(self.cancel_order().await),
                 CREDITORS => handle_response(self.creditors().await),
                 RESET_ORDER => handle_response(self.reset_order().await),
@@ -159,6 +164,7 @@ impl InteractiveApp {
                 REMOVE_AUTH_WALLETS => handle_response(self.remove_authorized_wallet().await),
                 LIST_AUTH_WALLETS => handle_response(self.list_authorized_wallets().await),
                 ADD_PROFILE => handle_response(self.add_profile().await),
+                SHOPIFY_OPEN_ORDERS => handle_response(self.shopify_open_orders().await),
                 LOGOUT => self.logout(),
                 NAV_BACK => self.pop_menu(),
                 EXIT => break,
@@ -547,6 +553,12 @@ impl InteractiveApp {
         let signature = MemoSignature::create(address, order_id.to_string(), &key)?;
         let order = client.claim_order(&signature).await?;
         format_claimed_order(&order)
+    }
+
+    async fn shopify_open_orders(&mut self) -> Result<String> {
+        let api = new_shopify_api();
+        let shopify_orders = api.fetch_all_open_orders(None).await?;
+        Ok(format_shopify_orders(&shopify_orders))
     }
 }
 
