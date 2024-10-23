@@ -64,13 +64,16 @@ impl From<ReceivedPaymentParams> for NewPayment {
         });
         let amount = params.amount;
         let memo = params.memo;
-        let order_id = params.payment_id.and_then(|s| extract_order_id_from_payment_id(&s));
+        let order_id = params.payment_id.and_then(|s| {
+            let format = shopify::order_id_field_from_env();
+            extract_order_id_from_payment_id(&s, format)
+        });
         let txid = params.txid;
         NewPayment { sender, amount, memo, order_id, txid }
     }
 }
 
-fn extract_order_id_from_payment_id(payment_id: &str) -> Option<OrderId> {
+fn extract_order_id_from_payment_id(payment_id: &str, format: OrderIdField) -> Option<OrderId> {
     if payment_id == "None" {
         debug!("No Payment id was provided");
         return None;
@@ -104,7 +107,6 @@ fn extract_order_id_from_payment_id(payment_id: &str) -> Option<OrderId> {
             return None;
         },
     };
-    let format = shopify::order_id_field_from_env();
     order_id_from_payment_id_str(&order_id, format)
 }
 
@@ -238,16 +240,29 @@ mod test {
     #[test]
     pub fn extract_order_id() {
         env_logger::try_init().ok();
-        assert!(extract_order_id_from_payment_id("").is_none());
-        assert!(extract_order_id_from_payment_id("None").is_none());
-        assert!(extract_order_id_from_payment_id("u64(12345)").is_none());
+        assert!(extract_order_id_from_payment_id("", OrderIdField::Id).is_none());
+        assert!(extract_order_id_from_payment_id("None", OrderIdField::Id).is_none());
+        assert!(extract_order_id_from_payment_id("u64(12345)", OrderIdField::Id).is_none());
         // The payment id comes in hex-encoded
-        assert!(extract_order_id_from_payment_id("data(12345)").is_none());
-        assert!(extract_order_id_from_payment_id("order_id: 12345").is_none());
+        assert!(extract_order_id_from_payment_id("data(12345)", OrderIdField::Id).is_none());
+        assert!(extract_order_id_from_payment_id("order_id: 12345", OrderIdField::Id).is_none());
         // abcde1234568 is not valid UTF-8
-        assert!(extract_order_id_from_payment_id("abcde1234568").is_none());
+        assert!(extract_order_id_from_payment_id("abcde1234568", OrderIdField::Id).is_none());
         // accidentally valid utf8
-        assert_eq!(extract_order_id_from_payment_id("data(48656c6c6f20576f726c64)").unwrap().as_str(), "Hello World");
+        assert_eq!(
+            extract_order_id_from_payment_id("data(48656c6c6f20576f726c64)", OrderIdField::Id).unwrap().as_str(),
+            "Hello World"
+        );
+    }
+
+    #[test]
+    pub fn extract_address_and_data() {
+        env_logger::try_init().ok();
+        let pid = "address_and_data(345UiW1KVM6L1KaffXbipcWV9c9BkFztDsyMEkj8fQABpYN8SXk7UCTLZfiZEArHNBtbcBsaUMD8q1yJG9X98J1TwoA,4f72646572233130383020)";
+        let order_id = extract_order_id_from_payment_id(pid, OrderIdField::Name).unwrap();
+        assert_eq!(order_id.as_str(), "#1080");
+        let order_id = extract_order_id_from_payment_id(pid, OrderIdField::Id).unwrap();
+        assert_eq!(order_id.as_str(), "Order#1080");
     }
 
     #[test]
