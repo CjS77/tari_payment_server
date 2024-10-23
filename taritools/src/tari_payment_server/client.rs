@@ -286,7 +286,7 @@ impl PaymentServerClient {
         let url = self.url("/api/rescan_open_orders")?;
         let res = self.client.post(url).header("tpg_access_token", self.access_token.clone()).send().await?;
         match res.status() {
-            StatusCode::OK => Ok({ res.json().await? }),
+            StatusCode::OK => Ok(res.json().await?),
             code => {
                 let msg = res.text().await?;
                 Err(anyhow!("Error rescanning open orders: {code}, {msg}."))

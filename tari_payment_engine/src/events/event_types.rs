@@ -88,6 +88,7 @@ impl From<Payment> for PaymentEvent {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum EventType {
     NewOrder(OrderEvent),
     OrderPaid(OrderEvent),

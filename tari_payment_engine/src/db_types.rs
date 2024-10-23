@@ -353,6 +353,7 @@ pub struct Payment {
     pub memo: Option<String>,
     pub payment_type: PaymentType,
     pub status: TransferStatus,
+    pub order_id: Option<OrderId>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]

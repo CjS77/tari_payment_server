@@ -218,6 +218,7 @@ pub fn payment_to_row(payment: &Payment) -> Row {
         Cell::new(&payment.amount.to_string()),
         Cell::new(&payment.status.to_string()),
         Cell::new(&payment.sender.as_base58()),
+        Cell::new(&payment.order_id.as_ref().map(|o| o.to_string()).unwrap_or_default()),
         Cell::new(&payment.memo.clone().unwrap_or_default()),
         Cell::new(&payment.created_at.to_string()),
         Cell::new(&payment.updated_at.to_string()),
