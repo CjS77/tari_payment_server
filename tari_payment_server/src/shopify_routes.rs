@@ -55,7 +55,7 @@ where
     BPay: PaymentGatewayDatabase,
     BFx: ExchangeRates,
 {
-    match new_order_from_shopify_order(order, &fx).await {
+    match new_order_from_shopify_order(order, fx).await {
         Err(OrderConversionError::FormatError(s)) => {
             warn!("🛍️️ Could not convert order. {s}");
             JsonResponse::failure(s)

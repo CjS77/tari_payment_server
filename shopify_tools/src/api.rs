@@ -422,7 +422,7 @@ fn node_to_order(node: Value) -> ShopifyOrder {
         customer.id = id_from_gid(gid)
     }
     ShopifyOrder {
-        id: id_from_gid(node["id"].as_str().unwrap_or_else(|| "0".into())).to_string(),
+        id: id_from_gid(node["id"].as_str().unwrap_or("0")).to_string(),
         token: "".to_string(),
         name: node["name"].as_str().unwrap_or_default().to_string(),
         created_at: node["createdAt"].as_str().unwrap_or_default().to_string(),

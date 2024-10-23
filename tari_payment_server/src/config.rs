@@ -26,6 +26,7 @@ const DEFAULT_UNCLAIMED_ORDER_TIMEOUT: Duration = Duration::hours(2);
 const DEFAULT_UNPAID_ORDER_TIMEOUT: Duration = Duration::hours(48);
 
 #[derive(Clone, Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
@@ -345,6 +346,7 @@ impl AuthConfig {
 /// A subset of the server configuration that is used to configure the server's behaviour. Generally we try to keep this
 /// as small as possible, and exclude secrets to avoid passing sensitive information around the system.
 #[derive(Clone, Copy, Debug, FromRequest)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct ServerOptions {
     pub use_x_forwarded_for: bool,
     pub use_forwarded: bool,

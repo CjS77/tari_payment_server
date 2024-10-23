@@ -109,6 +109,7 @@ pub async fn run_server(config: ServerConfig) -> Result<(), ServerError> {
     srv.await.map_err(|e| ServerError::Unspecified(e.to_string()))
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn create_server_instance(
     config: ServerConfig,
     db: SqliteDatabase,

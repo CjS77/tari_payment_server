@@ -8,7 +8,6 @@ use anyhow::Result;
 use dialoguer::{console::Style, theme::ColorfulTheme, Confirm, FuzzySelect, MultiSelect, Select};
 use indicatif::{ProgressBar, ProgressStyle};
 use menus::commands::*;
-use shopify_tools::ShopifyApi;
 use tari_common::configuration::Network;
 use tari_common_types::tari_address::{TariAddress, TariAddressFeatures};
 use tari_crypto::{
@@ -17,8 +16,7 @@ use tari_crypto::{
     tari_utilities::hex::Hex,
 };
 use tari_payment_engine::{
-    db_types::{Order, OrderId, Role, SerializedTariAddress},
-    events::EventType::NewOrder,
+    db_types::{OrderId, Role, SerializedTariAddress},
     helpers::MemoSignature,
     traits::NewWalletInfo,
 };
@@ -51,7 +49,7 @@ use crate::{
         selector::{AddressSelector, CustomerSelector},
     },
     profile_manager::{read_config, write_config, Profile},
-    shopify::{fetch_open_shopify_orders, new_shopify_api},
+    shopify::new_shopify_api,
     tari_payment_server::client::PaymentServerClient,
 };
 
