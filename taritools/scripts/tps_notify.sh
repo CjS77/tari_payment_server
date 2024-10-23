@@ -8,16 +8,24 @@ BINPATH=${TARITOOLS_PATH:-$HOME/.cargo/bin}
 BIN=$BINPATH/taritools
 PROFILE="TPS Hot Wallet"
 LOGFILE=$HOME/.taritools/tps_notify.log
+REPLAYFILE=$HOME/.taritools/tps_notify_replay.log
 
 register_received_payment() {
+  # Log the command we're about to invoke for replays
+  echo "# Payment received $(date)" >>$REPLAYFILE
+  echo ${BIN} wallet received --profile \"$PROFILE\" --amount \"$2\" --txid $3 --memo \"$4\" --sender $6 --payment_id \"$5\" &>>$REPLAYFILE
   ${BIN} wallet received --profile "$PROFILE" --amount "$2" --txid $3 --memo "$4" --sender $6 --payment_id "$5" &>>$LOGFILE
   echo "Registering payment received is complete" >> $LOGFILE
 }
 
 register_confirmation() {
   echo "Signalling payment (possibly again)"
+  echo "# Payment received $(date)" >>$REPLAYFILE
+  echo ${BIN} wallet received --profile \"$PROFILE\" --amount \"$2\" --txid $3 --memo \"$4\" --sender $6 --payment_id \"$5\" &>>$REPLAYFILE
   ${BIN} wallet received --profile "$PROFILE" --amount "$2" --txid $3 --memo "$4" --sender $6 --payment_id "$5" &>>$LOGFILE
   sleep 2
+  echo "# Confirmation received $(date)" >>$REPLAYFILE
+  echo ${BIN} wallet confirmed --profile \"$PROFILE\" --txid $3 &>>$REPLAYFILE
   ${BIN} wallet confirmed --profile "$PROFILE" --txid $3 &>>$LOGFILE
   echo "Registering confirmation received is complete" >> $LOGFILE
 }
