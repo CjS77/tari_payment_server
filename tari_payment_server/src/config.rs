@@ -1,4 +1,4 @@
-use std::{env, io::Write, net::IpAddr};
+use std::{env, fmt::Display, io::Write, net::IpAddr, str::FromStr};
 
 use actix_jwt_auth_middleware::FromRequest;
 use chrono::Duration;
@@ -69,6 +69,8 @@ pub struct ShopifyConfig {
     pub admin_access_token: Secret<String>,
     pub storefront_access_token: Secret<String>,
     pub order_id_field: OrderIdField,
+    /// The field in the ShopifyOrder object to interpret as the price for the order
+    pub price_field: ShopifyPriceField,
 }
 
 impl Default for ServerConfig {
@@ -87,6 +89,46 @@ impl Default for ServerConfig {
             unpaid_order_timeout: DEFAULT_UNPAID_ORDER_TIMEOUT,
             shopify_config: ShopifyConfig::default(),
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum ShopifyPriceField {
+    /// Use the sum of actual items in the cart as the total price (before order-level discounts, shipping and taxes)
+    LineItemsPrice,
+    /// Use the total before taxes as the total price
+    SubtotalPrice,
+    /// Use the final price, net of taxes, discounts and shipping as the total price (default)
+    TotalPrice,
+}
+
+impl FromStr for ShopifyPriceField {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "line_items" | "line" => Ok(Self::LineItemsPrice),
+            "subtotal" => Ok(Self::SubtotalPrice),
+            "total" => Ok(Self::TotalPrice),
+            _ => Err(format!("🪛️ Invalid value for Shopify Price Field: {s}")),
+        }
+    }
+}
+
+impl Display for ShopifyPriceField {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Self::LineItemsPrice => "line_items".to_string(),
+            Self::SubtotalPrice => "subtotal".to_string(),
+            Self::TotalPrice => "total".to_string(),
+        };
+        write!(f, "{str}")
+    }
+}
+
+impl Default for ShopifyPriceField {
+    fn default() -> Self {
+        Self::TotalPrice
     }
 }
 
@@ -217,6 +259,13 @@ impl ShopifyConfig {
                 OrderIdField::Id
             },
         };
+        let price_field = env::var("TPG_SHOPIFY_PRICE_FIELD")
+            .map_err(|_| "🪛️ TPG_SHOPIFY_PRICE_FIELD is not set. Using the default value of 'total'.".to_string())
+            .and_then(|s| s.as_str().parse::<ShopifyPriceField>())
+            .unwrap_or_else(|e| {
+                warn!("{e}");
+                ShopifyPriceField::TotalPrice
+            });
         Self {
             shop: api_config.shop,
             api_version: api_config.api_version,
@@ -228,6 +277,7 @@ impl ShopifyConfig {
             admin_access_token: api_config.admin_access_token,
             storefront_access_token: api_config.storefront_access_token,
             order_id_field,
+            price_field,
         }
     }
 
@@ -353,6 +403,7 @@ pub struct ServerOptions {
     pub disable_wallet_whitelist: bool,
     pub disable_memo_signature_check: bool,
     pub shopify_order_field: OrderIdField,
+    pub shopify_price_field: ShopifyPriceField,
     pub strict_mode: bool,
 }
 
@@ -364,6 +415,7 @@ impl ServerOptions {
             disable_wallet_whitelist: config.disable_wallet_whitelist,
             disable_memo_signature_check: config.disable_memo_signature_check,
             shopify_order_field: config.shopify_config.order_id_field,
+            shopify_price_field: config.shopify_config.price_field,
             strict_mode: config.strict_mode,
         }
     }
