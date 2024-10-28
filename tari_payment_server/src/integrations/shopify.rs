@@ -1,3 +1,4 @@
+use actix_web::web::trace;
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
 use log::*;
@@ -18,6 +19,8 @@ use tari_payment_engine::{
 use thiserror::Error;
 use tpg_common::TARI_CURRENCY_CODE;
 
+use crate::config::ShopifyPriceField;
+
 #[derive(Debug, Error)]
 #[error("Could not convert shopify order into a new order. {0}.")]
 pub enum OrderConversionError {
@@ -31,6 +34,7 @@ pub enum OrderConversionError {
 
 pub async fn new_order_from_shopify_order<B: ExchangeRates>(
     value: ShopifyOrder,
+    price_field: ShopifyPriceField,
     fx: &ExchangeRateApi<B>,
 ) -> Result<NewOrder, OrderConversionError> {
     trace!("Converting ShopifyOrder to NewOrder: {:?}", value);
@@ -45,10 +49,21 @@ pub async fn new_order_from_shopify_order<B: ExchangeRates>(
         info!("Shopify order is not in Tari. Using a conversion rate of {rate}");
         rate
     };
+    debug!(
+        "Order {}({}) price information. Total: {}, Line Items: {}, Subtotal: {}",
+        value.id, value.name, value.total_price, value.total_line_items_price, value.subtotal_price
+    );
+    debug!("Using price field: {price_field}");
+    let price_field = match price_field {
+        ShopifyPriceField::TotalPrice => value.total_price,
+        ShopifyPriceField::LineItemsPrice => value.total_line_items_price,
+        ShopifyPriceField::SubtotalPrice => value.subtotal_price,
+    };
     // Net price in cents.
     let total_price =
-        parse_shopify_price(&value.total_price).map_err(|e| OrderConversionError::FormatError(e.to_string()))?;
+        parse_shopify_price(&price_field).map_err(|e| OrderConversionError::FormatError(e.to_string()))?;
     let total_price = rate.convert_to_tari_from_cents(total_price);
+    trace!("Interpreting order price as: {total_price}");
     let timestamp =
         value.created_at.parse::<DateTime<Utc>>().map_err(|e| OrderConversionError::FormatError(e.to_string()))?;
     let memo = value.note;
@@ -57,7 +72,7 @@ pub async fn new_order_from_shopify_order<B: ExchangeRates>(
         alt_order_id: Some(OrderId::from(value.name)),
         customer_id: value.customer.id.to_string(),
         currency: value.currency,
-        original_price: Some(value.total_price),
+        original_price: Some(price_field),
         memo,
         address: None,
         created_at: timestamp,

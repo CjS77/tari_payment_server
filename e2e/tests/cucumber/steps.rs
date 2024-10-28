@@ -250,6 +250,43 @@ async fn place_order_with_name(world: &mut TPGWorld, user: i64, email: String, o
     world.response = Some(res);
 }
 
+#[when(expr = "Customer #{int} [{string}] places order \"{word}\" with price details:")]
+async fn place_order_with_prices(world: &mut TPGWorld, user: i64, email: String, order_id: String, step: &Step) {
+    let Some(table) = step.table() else {
+        panic!("Price configuration is incorrect");
+    };
+    let mut order = ShopifyOrder::default();
+    order.name = format!("#{order_id}");
+    order.id = order_id;
+    order.created_at = chrono::Utc::now().to_rfc3339();
+    order.currency = "USD".to_string();
+    order.user_id = Some(user);
+    order.email = Some(email);
+    order.customer.id = user;
+    table.rows.iter().for_each(|row| {
+        let key = row[0].as_str();
+        let value = row[1].parse::<i64>().expect("Invalid price value");
+        let value = format!("{value}.00");
+        match key {
+            "total" => order.total_price = value,
+            "subtotal" => order.subtotal_price = value,
+            "line_items" => order.total_line_items_price = value,
+            _ => {
+                panic!("Invalid price key: {key}");
+            },
+        }
+    });
+    world.response = None;
+    let res = world
+        .request(Method::POST, "/shopify/webhook/checkout_create", |req| {
+            let order = serde_json::to_string(&order).expect("Failed to serialize order");
+            req.body(order).header("Content-Type", "application/json")
+        })
+        .await;
+    trace!("Got Response: {} {}", res.0, res.1);
+    world.response = Some(res);
+}
+
 #[when(expr = "Customer #{int} [{string}] places order \"{word}\" for {int} XTR at {string}, with memo")]
 async fn place_order(
     world: &mut TPGWorld,

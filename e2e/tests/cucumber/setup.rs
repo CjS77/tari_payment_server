@@ -12,7 +12,8 @@ use tari_jwt::{
 };
 use tari_payment_engine::{
     db_types::{LoginToken, NewOrder, NewPayment, OrderId, Role},
-    traits::{AuthManagement, NewWalletInfo, PaymentGatewayDatabase, WalletManagement},
+    tpe_api::exchange_objects::ExchangeRate,
+    traits::{AuthManagement, ExchangeRates, NewWalletInfo, PaymentGatewayDatabase, WalletManagement},
 };
 use tari_payment_server::config::OrderIdField;
 use tpg_common::MicroTari;
@@ -213,6 +214,13 @@ async fn payments_received(world: &mut TPGWorld) {
     }
 }
 
+#[given(expr = "the exchange rate is {int} Tari per {word}")]
+async fn set_exchange_rate(world: &mut TPGWorld, rate: i64, currency: String) {
+    let db = world.db.as_ref().expect("No database connection");
+    let rate = ExchangeRate::new(currency, MicroTari::from_tari(rate), None);
+    db.set_exchange_rate(&rate).await.expect("Failed to set exchange rate");
+}
+
 #[given("the user is not logged in")]
 async fn user_not_logged_in(_world: &mut TPGWorld) {
     // No-op
@@ -285,6 +293,7 @@ async fn server_configuration(world: &mut TPGWorld, step: &Step) {
                     if value == "name" { OrderIdField::Name } else { OrderIdField::Id }
             },
             "strict_mode" => world.config.strict_mode = value == "true",
+            "price_field" => world.config.shopify_config.price_field = value.parse().expect("Invalid price field"),
             _ => warn!("Unknown configuration key: {key}"),
         }
     });
