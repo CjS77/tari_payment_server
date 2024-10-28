@@ -35,6 +35,7 @@ for f in ${CARGO_FILES[@]}; do
 done
 REL_VER="v${NEW_VER}"
 git checkout -b "release-${REL_VER}"
+cargo update
 git commit -am "Updated version to $REL_VER"
 echo "Tagging new release: $REL_VER"
 git tag ${REL_VER}
