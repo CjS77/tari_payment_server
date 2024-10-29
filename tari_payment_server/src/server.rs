@@ -139,7 +139,7 @@ pub fn create_server_instance(
         );
 
         let mut app = App::new()
-            .wrap(Logger::new(LOG_FORMAT).log_target("access_log"))
+            .wrap(Logger::new(LOG_FORMAT).log_target("access_log").exclude("/health"))
             .app_data(web::Data::new(orders_api))
             .app_data(web::Data::new(accounts_api))
             .app_data(web::Data::new(shopify_api.clone()))
