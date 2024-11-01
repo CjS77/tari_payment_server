@@ -35,6 +35,7 @@ use crate::{
             format_customer_history,
             format_customer_orders,
             format_exchange_rate,
+            format_multi_account_payment,
             format_order,
             format_order_result,
             format_orders,
@@ -164,6 +165,9 @@ impl InteractiveApp {
                 ADD_PROFILE => handle_response(self.add_profile().await),
                 SHOPIFY_OPEN_ORDERS => handle_response(self.shopify_open_orders().await),
                 RESCAN_OPEN_ORDERS => handle_response(self.rescan_open_orders().await),
+                SETTLE_CUSTOMER => handle_response(self.settle_customer().await),
+                SETTLE_ADDRESS => handle_response(self.settle_address().await),
+                SETTLE_MY_ACCOUNT => handle_response(self.settle_my_account().await),
                 LOGOUT => self.logout(),
                 NAV_BACK => self.pop_menu(),
                 EXIT => break,
@@ -334,6 +338,40 @@ impl InteractiveApp {
         let cust_id = &self.customer_ids.items()[idx];
         let history = client.history_for_id(cust_id).await?;
         format_customer_history(&history)
+    }
+
+    async fn settle_customer(&mut self) -> Result<String> {
+        let _unused = self.login().await;
+        let client = &self.user.as_ref().expect("User is logged in. Client should not be None").client;
+        self.customer_ids.update(client).await?;
+        let idx = FuzzySelect::new().with_prompt("Select customer ID").items(self.customer_ids.items()).interact()?;
+        let cust_id = &self.customer_ids.items()[idx];
+        let result = client.settle_customer(cust_id).await?;
+        match result {
+            None => Ok("Nothing to settle".into()),
+            Some(s) => format_multi_account_payment(&s),
+        }
+    }
+
+    async fn settle_address(&mut self) -> Result<String> {
+        let _unused = self.login().await;
+        let address = self.select_address().await?;
+        let client = &self.user.as_ref().expect("User is logged in. Client should not be None").client;
+        let result = client.settle_address(&address).await?;
+        match result {
+            None => Ok("Nothing to settle".into()),
+            Some(s) => format_multi_account_payment(&s),
+        }
+    }
+
+    async fn settle_my_account(&mut self) -> Result<String> {
+        let _unused = self.login().await;
+        let client = &self.user.as_ref().expect("User is logged in. Client should not be None").client;
+        let result = client.settle_my_account().await?;
+        match result {
+            None => Ok("Nothing to settle".into()),
+            Some(s) => format_multi_account_payment(&s),
+        }
     }
 
     async fn fetch_tari_price(&mut self) {

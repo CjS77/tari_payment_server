@@ -40,6 +40,9 @@ pub mod commands {
     pub const RESCAN_OPEN_ORDERS: &str = "Re-import Open Orders";
     pub const RESET_ORDER: &str = "Reset Order";
     pub const SERVER_HEALTH: &str = "Server health";
+    pub const SETTLE_ADDRESS: &str = "Settle address payments";
+    pub const SETTLE_CUSTOMER: &str = "Settle customer account";
+    pub const SETTLE_MY_ACCOUNT: &str = "Settle my account";
     pub const SHOPIFY_OPEN_ORDERS: &str = "Open Orders";
     pub const SET_PRICE: &str = "Set Tari price";
 }
@@ -48,7 +51,7 @@ pub use commands::*;
 
 pub const TOP_MENU: [&str; 5] = [NAV_TO_ADMIN_MENU, NAV_TO_USER_MENU, NAV_TO_SHOPIFY_MENU, LOGOUT, EXIT];
 
-pub const ADMIN_MENU: [&str; 24] = [
+pub const ADMIN_MENU: [&str; 26] = [
     CANCEL,
     MARK_ORDER_PAID,
     RESET_ORDER,
@@ -68,6 +71,8 @@ pub const ADMIN_MENU: [&str; 24] = [
     EDIT_MEMO,
     REASSIGN_ORDER,
     RESCAN_OPEN_ORDERS,
+    SETTLE_CUSTOMER,
+    SETTLE_ADDRESS,
     ADD_AUTH_WALLET,
     REMOVE_AUTH_WALLETS,
     LIST_AUTH_WALLETS,
@@ -75,7 +80,7 @@ pub const ADMIN_MENU: [&str; 24] = [
     EXIT,
 ];
 
-pub const USER_MENU: [&str; 11] = [
+pub const USER_MENU: [&str; 12] = [
     ADD_PROFILE,
     CLAIM_ORDER,
     LOGOUT,
@@ -86,6 +91,7 @@ pub const USER_MENU: [&str; 11] = [
     MY_OPEN_ORDERS,
     MY_PAYMENTS,
     MY_ACCOUNT_HISTORY,
+    SETTLE_MY_ACCOUNT,
     LIST_PAYMENT_ADDRESSES,
 ];
 

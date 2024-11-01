@@ -26,7 +26,7 @@ use tari_payment_engine::{
         account_objects::{AddressHistory, CustomerHistory},
         payment_objects::PaymentsResult,
     },
-    traits::WalletInfo,
+    traits::{MultiAccountPayment, WalletInfo},
 };
 use tari_payment_server::data_objects::ExchangeRateResult;
 use tpg_common::MicroTari;
@@ -356,5 +356,16 @@ pub fn format_settlements(settlements: &[SettlementJournalEntry]) -> Result<Stri
     });
     markdown_style(&mut table);
     writeln!(f, "{table}")?;
+    Ok(f)
+}
+
+pub fn format_multi_account_payment(multi_account_payment: &MultiAccountPayment) -> Result<String> {
+    let mut f = String::new();
+    writeln!(f, "## Settlement report")?;
+    writeln!(f, "### Orders paid")?;
+    writeln!(f, "{}", format_orders(&multi_account_payment.orders_paid))?;
+    writeln!(f, "### Settlements")?;
+    let settlements = format_settlements(&multi_account_payment.settlements).unwrap_or_else(|_| "None".to_string());
+    f.write_str(&settlements)?;
     Ok(f)
 }

@@ -33,7 +33,7 @@ use tari_payment_engine::{
         account_objects::{AddressHistory, CustomerHistory},
         payment_objects::PaymentsResult,
     },
-    traits::{NewWalletInfo, OrderMovedResult, WalletInfo},
+    traits::{MultiAccountPayment, NewWalletInfo, OrderMovedResult, WalletInfo},
 };
 use tari_payment_server::data_objects::{
     ExchangeRateResult,
@@ -217,6 +217,39 @@ impl PaymentServerClient {
             return Err(anyhow!("Error sending payment confirmation: {msg}"));
         }
         Ok(())
+    }
+
+    pub async fn settle_my_account(&self) -> Result<Option<MultiAccountPayment>> {
+        let url = self.url("/api/settle")?;
+        let res = self.client.post(url).header("tpg_access_token", self.access_token.clone()).send().await?;
+        if !res.status().is_success() {
+            let msg = res.text().await?;
+            return Err(anyhow!("Error settling account: {msg}"));
+        }
+        let paid_orders = res.json().await?;
+        Ok(paid_orders)
+    }
+
+    pub async fn settle_address(&self, address: &TariAddress) -> Result<Option<MultiAccountPayment>> {
+        let url = self.url(&format!("/api/settle/address/{address}"))?;
+        let res = self.client.post(url).header("tpg_access_token", self.access_token.clone()).send().await?;
+        if !res.status().is_success() {
+            let msg = res.text().await?;
+            return Err(anyhow!("Error settling address: {msg}"));
+        }
+        let paid_orders = res.json().await?;
+        Ok(paid_orders)
+    }
+
+    pub async fn settle_customer(&self, customer_id: &str) -> Result<Option<MultiAccountPayment>> {
+        let url = self.url(&format!("/api/settle/customer/{customer_id}"))?;
+        let res = self.client.post(url).header("tpg_access_token", self.access_token.clone()).send().await?;
+        if !res.status().is_success() {
+            let msg = res.text().await?;
+            return Err(anyhow!("Error settling customer: {msg}"));
+        }
+        let paid_orders = res.json().await?;
+        Ok(paid_orders)
     }
 
     pub async fn my_orders(&self) -> Result<OrderResult> {
