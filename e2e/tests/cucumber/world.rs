@@ -57,6 +57,7 @@ impl Default for TPGWorld {
             unpaid_order_timeout: Duration::seconds(4),
             shopify_config: Default::default(),
             strict_mode: true,
+            max_connections: 1,
         };
         Self {
             config,

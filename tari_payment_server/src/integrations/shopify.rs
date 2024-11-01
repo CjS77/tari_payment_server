@@ -1,4 +1,3 @@
-use actix_web::web::trace;
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
 use log::*;

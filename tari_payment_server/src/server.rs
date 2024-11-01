@@ -88,7 +88,7 @@ const LOG_FORMAT: &str = concat!(
 );
 
 pub async fn run_server(config: ServerConfig) -> Result<(), ServerError> {
-    let db = SqliteDatabase::new_with_url(&config.database_url, 25)
+    let db = SqliteDatabase::new_with_url(&config.database_url, config.max_connections)
         .await
         .map_err(|e| ServerError::InitializeError(e.to_string()))?;
     // Shopify is the only supported integration at the moment. In future, this would be conditional code based on a

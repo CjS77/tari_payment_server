@@ -52,6 +52,8 @@ pub struct ServerConfig {
     pub unpaid_order_timeout: Duration,
     /// Shopify storefront configuration
     pub shopify_config: ShopifyConfig,
+    /// The maximum number of database connections to allow in the database pool
+    pub max_connections: u32,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -88,6 +90,7 @@ impl Default for ServerConfig {
             unclaimed_order_timeout: DEFAULT_UNCLAIMED_ORDER_TIMEOUT,
             unpaid_order_timeout: DEFAULT_UNPAID_ORDER_TIMEOUT,
             shopify_config: ShopifyConfig::default(),
+            max_connections: 25,
         }
     }
 }
@@ -183,6 +186,17 @@ impl ServerConfig {
         let disable_memo_signature_check =
             env::var("TPG_DISABLE_MEMO_SIGNATURE_CHECK").map(|s| &s == "1" || &s == "true").unwrap_or(false);
         let (unclaimed_order_timeout, unpaid_order_timeout) = configure_order_timeouts();
+        let max_connections = env::var("TPG_MAX_CONNECTIONS")
+            .map(|s| {
+                s.parse::<u32>().unwrap_or_else(|e| {
+                    warn!(
+                        "🪛️ {s} is not a valid value for TPG_MAX_CONNECTIONS. {e} Using the default value of 25 \
+                         instead."
+                    );
+                    25
+                })
+            })
+            .unwrap_or(25);
         Self {
             host,
             port,
@@ -196,6 +210,7 @@ impl ServerConfig {
             disable_memo_signature_check,
             unclaimed_order_timeout,
             unpaid_order_timeout,
+            max_connections,
         }
     }
 }
