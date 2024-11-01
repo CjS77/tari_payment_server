@@ -309,9 +309,9 @@ dependencies = [
 
 [[package]]
 name = "anstyle"
-version = "1.0.9"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8365de52b16c035ff4fcafe0092ba9390540e3e352870ac09933bebcaa2c8c56"
+checksum = "55cc3b69f167a1ef2e161439aa98aed94e6028e5f9a59be9a6ffb47aef1651f9"
 
 [[package]]
 name = "anstyle-parse"
@@ -1435,7 +1435,7 @@ dependencies = [
 
 [[package]]
 name = "e2e"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "actix-web",
  "chrono",
@@ -3679,7 +3679,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "shopify_tools"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "chrono",
  "graphql-parser",
@@ -4355,7 +4355,7 @@ dependencies = [
 
 [[package]]
 name = "tari_payment_engine"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "blake2",
  "chrono",
@@ -4380,7 +4380,7 @@ dependencies = [
 
 [[package]]
 name = "tari_payment_server"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "actix-http",
  "actix-jwt-auth-middleware",
@@ -4454,7 +4454,7 @@ dependencies = [
 
 [[package]]
 name = "taritools"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "anyhow",
  "blake2",
@@ -4774,7 +4774,7 @@ checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
 name = "tpg_common"
-version = "1.8.0"
+version = "1.9.0"
 dependencies = [
  "serde",
  "sqlx",
