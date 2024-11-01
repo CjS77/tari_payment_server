@@ -76,6 +76,8 @@ pub fn format_orders(orders: &[Order]) -> String {
     table.set_titles(row![
         "ID",
         "Order id",
+        "Alt id",
+        "Customer id",
         "Amount",
         "Status",
         "Original price",
@@ -96,6 +98,8 @@ pub fn format_orders(orders: &[Order]) -> String {
         table.add_row(row![
             order.id,
             order.order_id,
+            order.alt_id.as_ref().map(|o| o.to_string()).unwrap_or_default(),
+            order.customer_id,
             order.total_price.to_string(),
             order.status.to_string(),
             order.original_price.as_deref().unwrap_or_default(),
@@ -118,10 +122,12 @@ pub fn format_orders(orders: &[Order]) -> String {
 pub fn format_order(order: &Order, f: &mut dyn Write) -> Result<()> {
     writeln!(
         f,
-        "Order id: {id:15}          Created {created}",
+        "Order id: {id:15}{name:9} Created {created}",
         id = order.order_id.to_string(),
+        name = order.alt_id.as_ref().map(|s| format!("({})", s)).unwrap_or_default(),
         created = order.created_at,
     )?;
+    writeln!(f, "Customer id: {}", order.customer_id)?;
     writeln!(f, "[{:^15}]                  Updated {}", order.status.to_string(), order.updated_at)?;
     writeln!(f, "-----------------------------------------------------------------------------")?;
     writeln!(f, "Total Price:    {total}", total = order.total_price)?;
