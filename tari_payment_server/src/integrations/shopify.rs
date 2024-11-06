@@ -114,9 +114,40 @@ pub fn create_shopify_event_handlers(
     let mut hooks = EventHooks::default();
     let must_capture_payment = config.capture_payments;
     let api = ShopifyApi::new(config)?;
-    let api_clone = api.clone();
-    let tracker_clone = tracker.clone();
-    // --- On OrderPaid Handler ---
+    on_order_paid_handler(&mut hooks, must_capture_payment, api.clone(), tracker.clone());
+    on_order_annulled_handler(&mut hooks, api);
+    let handlers = EventHandlers::new(SHOPIFY_EVENT_BUFFER_SIZE, hooks);
+    Ok(handlers)
+}
+
+fn on_order_annulled_handler(hooks: &mut EventHooks, api: ShopifyApi) {
+    hooks.on_order_annulled(move |ev| {
+        let OrderAnnulledEvent { order, status } = ev;
+        let order_id = match parse_shopify_order_id(&order) {
+            Some(value) => value,
+            None => return no_op(),
+        };
+        let api_clone = api.clone();
+        debug!("🛍️ Order {order_id} has been annulled. Reason: {status}. Sending cancellation request to Shopify.");
+        Box::pin(async move {
+            match api_clone.cancel_order(order_id).await {
+                Ok(o) => info!(
+                    "🛍️ Order {order_id} has been cancelled on Shopify. Reason: {}. Timestamp: {}",
+                    o.cancel_reason.unwrap_or_default(),
+                    o.cancelled_at.unwrap_or_default()
+                ),
+                Err(e) => error!("🛍️ Error marking order {order_id} as paid on Shopify. {e}"),
+            }
+        })
+    });
+}
+
+fn on_order_paid_handler(
+    hooks: &mut EventHooks,
+    must_capture_payment: bool,
+    api: ShopifyApi,
+    tracker: ShopifyTrackerApi<SqliteDatabase>,
+) {
     hooks.on_order_paid(move |ev| {
         let order = ev.order;
         let order_id = match parse_shopify_order_id(&order) {
@@ -150,10 +181,11 @@ pub fn create_shopify_event_handlers(
                 return no_op();
             },
         };
-        let api_clone = api_clone.clone();
-        let tracker_clone = tracker_clone.clone();
+        let api_clone = api.clone();
+        let tracker_clone = tracker.clone();
         Box::pin(async move {
             if must_capture_payment {
+                #[allow(clippy::cast_possible_wrap)]
                 let oid = order_id as i64;
                 let auths = tracker_clone.fetch_payment_auth(oid).await.unwrap_or_else(|e| {
                     error!(
@@ -202,28 +234,6 @@ pub fn create_shopify_event_handlers(
             }
         })
     });
-    // --- On OrderAnnulled Handler ---
-    hooks.on_order_annulled(move |ev| {
-        let OrderAnnulledEvent { order, status } = ev;
-        let order_id = match parse_shopify_order_id(&order) {
-            Some(value) => value,
-            None => return no_op(),
-        };
-        let api_clone = api.clone();
-        debug!("🛍️ Order {order_id} has been annulled. Reason: {status}. Sending cancellation request to Shopify.");
-        Box::pin(async move {
-            match api_clone.cancel_order(order_id).await {
-                Ok(o) => info!(
-                    "🛍️ Order {order_id} has been cancelled on Shopify. Reason: {}. Timestamp: {}",
-                    o.cancel_reason.unwrap_or_default(),
-                    o.cancelled_at.unwrap_or_default()
-                ),
-                Err(e) => error!("🛍️ Error marking order {order_id} as paid on Shopify. {e}"),
-            }
-        })
-    });
-    let handlers = EventHandlers::new(SHOPIFY_EVENT_BUFFER_SIZE, hooks);
-    Ok(handlers)
 }
 
 fn parse_shopify_order_id(order: &Order) -> Option<u64> {
