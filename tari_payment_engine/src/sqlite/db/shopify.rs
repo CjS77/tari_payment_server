@@ -56,7 +56,7 @@ pub async fn capture_auth(
     conn: &mut SqliteConnection,
 ) -> Result<Vec<ShopifyAuthorization>, ShopifyAuthorizationError> {
     let result = sqlx::query_as(
-        "UPDATE shopify_transactions SET captured = $1, updated_at = $2 WHERE id = $3 AND captured != $1RETURNING *;",
+        "UPDATE shopify_transactions SET captured = $1, updated_at = $2 WHERE id = $3 AND captured != $1 RETURNING *;",
     )
     .bind(capture)
     .bind(Utc::now())

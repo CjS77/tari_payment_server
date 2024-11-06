@@ -194,6 +194,10 @@ fn on_order_paid_handler(
                     );
                     vec![]
                 });
+                // If at least one authorisation is successful, we will update the database for all authorisations related
+                // to the order. There is manual intervention needed anyway, so prefer to handle all of this on the shopify
+                // side. Simple enough to change if this is not the desired behaviour.
+                let mut update_db = false;
                 for auth in auths {
                     if !auth.captured {
                         let capture = ShopifyPaymentCapture::from(auth);
@@ -203,6 +207,7 @@ fn on_order_paid_handler(
                                     "🛍️ Order {order_id} payment captured on Shopify. Tx: {} Order: {}. Kind: {}. {}",
                                     t.id, t.order_id, t.kind, t.message
                                 );
+                                update_db = true;
                             },
                             Err(e) => {
                                 error!(
@@ -211,6 +216,15 @@ fn on_order_paid_handler(
                                 );
                             },
                         }
+                    }
+                }
+                if update_db {
+                    match tracker_clone.set_capture_flag(oid, true).await {
+                        Ok(_) => info!("🛍️ Order {order_id} payment capture flag set in the database."),
+                        Err(e) => error!(
+                            "🛍️ Error setting payment capture flag for order {order_id} in the database. {e}. Manual \
+                             intervention is required."
+                        ),
                     }
                 }
             }

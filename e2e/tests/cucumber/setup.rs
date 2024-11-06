@@ -299,6 +299,7 @@ async fn server_configuration(world: &mut TPGWorld, step: &Step) {
             },
             "strict_mode" => world.config.strict_mode = value == "true",
             "price_field" => world.config.shopify_config.price_field = value.parse().expect("Invalid price field"),
+            "capture_payments" => world.config.shopify_config.capture_payments = value == "true",
             _ => warn!("Unknown configuration key: {key}"),
         }
     });

@@ -28,9 +28,5 @@ pub trait ShopifyAuthorizations {
     async fn fetch_by_order_id(&self, order_id: i64) -> Result<Vec<ShopifyAuthorization>, ShopifyAuthorizationError>;
     /// Set all authorizations for the given order id to the given status.
     /// Returns the updated transaction records.
-    async fn capture(
-        &self,
-        order_id: i64,
-        capture: bool,
-    ) -> Result<Vec<ShopifyAuthorization>, ShopifyAuthorizationError>;
+    async fn capture(&self, order_id: i64, capture: bool) -> Result<Vec<ShopifyAuthorization>, ShopifyAuthorizationError>;
 }
