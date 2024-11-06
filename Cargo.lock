@@ -4369,6 +4369,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "shopify_tools",
  "sqlx",
  "tari_common",
  "tari_common_types",

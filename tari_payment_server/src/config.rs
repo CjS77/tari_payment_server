@@ -16,7 +16,7 @@ use tari_jwt::{
     Ristretto256VerifyingKey,
 };
 use tempfile::NamedTempFile;
-use tpg_common::Secret;
+use tpg_common::{helpers::parse_boolean_flag, Secret};
 
 use crate::errors::ServerError;
 
@@ -73,6 +73,8 @@ pub struct ShopifyConfig {
     pub order_id_field: OrderIdField,
     /// The field in the ShopifyOrder object to interpret as the price for the order
     pub price_field: ShopifyPriceField,
+    /// If true, then transactions from Shopify will the captured from the server
+    pub capture_payments: bool,
 }
 
 impl Default for ServerConfig {
@@ -177,14 +179,11 @@ impl ServerConfig {
             AuthConfig::default()
         });
         let shopify_config = ShopifyConfig::from_env_or_defaults();
-        let use_x_forwarded_for =
-            env::var("TPG_USE_X_FORWARDED_FOR").map(|s| &s == "1" || &s == "true").unwrap_or(false);
-        let use_forwarded = env::var("TPG_USE_FORWARDED").map(|s| &s == "1" || &s == "true").unwrap_or(false);
-        let disable_wallet_whitelist =
-            env::var("TPG_DISABLE_WALLET_WHITELIST").map(|s| &s == "1" || &s == "true").unwrap_or(false);
-        let strict_mode = env::var("TPG_STRICT_MODE").map(|s| &s != "0" && &s != "false").unwrap_or(true);
-        let disable_memo_signature_check =
-            env::var("TPG_DISABLE_MEMO_SIGNATURE_CHECK").map(|s| &s == "1" || &s == "true").unwrap_or(false);
+        let use_x_forwarded_for = parse_boolean_flag(env::var("TPG_USE_X_FORWARDED_FOR").ok(), false);
+        let use_forwarded = parse_boolean_flag(env::var("TPG_USE_FORWARDED").ok(), false);
+        let disable_wallet_whitelist = parse_boolean_flag(env::var("TPG_DISABLE_WALLET_WHITELIST").ok(), false);
+        let strict_mode = parse_boolean_flag(env::var("TPG_STRICT_MODE").ok(), true);
+        let disable_memo_signature_check = parse_boolean_flag(env::var("TPG_DISABLE_MEMO_SIGNATURE_CHECK").ok(), false);
         let (unclaimed_order_timeout, unpaid_order_timeout) = configure_order_timeouts();
         let max_connections = env::var("TPG_MAX_CONNECTIONS")
             .map(|s| {
@@ -281,6 +280,7 @@ impl ShopifyConfig {
                 warn!("{e}");
                 ShopifyPriceField::TotalPrice
             });
+        let capture_payments = parse_boolean_flag(std::env::var("TPG_SHOPIFY_CAPTURE_PAYMENTS").ok(), false);
         Self {
             shop: api_config.shop,
             api_version: api_config.api_version,
@@ -293,6 +293,7 @@ impl ShopifyConfig {
             storefront_access_token: api_config.storefront_access_token,
             order_id_field,
             price_field,
+            capture_payments,
         }
     }
 
@@ -303,6 +304,7 @@ impl ShopifyConfig {
             shared_secret: self.api_secret.clone(),
             admin_access_token: self.admin_access_token.clone(),
             storefront_access_token: self.storefront_access_token.clone(),
+            capture_payments: self.capture_payments,
         }
     }
 }

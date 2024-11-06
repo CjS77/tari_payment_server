@@ -30,6 +30,7 @@ pub struct ShopifyOrder {
     pub total_price: String,
     pub total_tax: String,
     pub subtotal_price: String,
+    pub total_outstanding: String,
     pub customer: Customer,
 }
 
@@ -93,6 +94,7 @@ pub struct OrderBuilder {
     total_discounts: Option<String>,
     total_line_items_price: Option<String>,
     total_price: Option<String>,
+    total_outstanding: Option<String>,
     total_tax: Option<String>,
     subtotal_price: Option<String>,
     customer: Option<Customer>,
@@ -183,6 +185,11 @@ impl OrderBuilder {
         self
     }
 
+    pub fn total_outstanding(&mut self, outstanding: String) -> &mut Self {
+        self.total_outstanding = Some(outstanding);
+        self
+    }
+
     pub fn customer(&mut self, customer: Customer) -> &mut Self {
         self.customer = Some(customer);
         self
@@ -216,6 +223,7 @@ impl OrderBuilder {
             total_line_items_price: self.total_line_items_price.unwrap_or_default(),
             total_price: self.total_price.unwrap_or_else(|| format!("{}", rng.gen_range(1_000..250_000) * 1000)),
             total_tax: self.total_tax.unwrap_or_default(),
+            total_outstanding: self.total_outstanding.unwrap_or_default(),
             subtotal_price: self.subtotal_price.unwrap_or_default(),
             customer: self.customer.unwrap_or_default(),
             checkout_token: None,

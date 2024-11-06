@@ -14,7 +14,7 @@ pub struct ShopifyTransaction {
     pub gateway: Option<String>,
     pub kind: String,
     pub message: String,
-    pub parent_id: i64,
+    pub parent_id: Option<i64>,
     pub processed_at: String,
     pub source_name: String,
     pub status: String,
@@ -43,6 +43,20 @@ pub struct OutstandingValue {
 pub struct TotalUnsettledSet {
     pub presentment_money: OutstandingValue,
     pub shop_money: OutstandingValue,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ShopifyPaymentCapture {
+    pub transaction: CaptureTransaction,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CaptureTransaction {
+    pub parent_id: i64,
+    pub kind: String,
+    pub amount: String,
+    pub currency: String,
+    pub test: bool,
 }
 
 #[cfg(test)]

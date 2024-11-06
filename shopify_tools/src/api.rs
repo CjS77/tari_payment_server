@@ -16,6 +16,7 @@ use crate::{
     config::ShopifyConfig,
     data_objects::{NewWebhook, PageInfo, ProductVariant, ProductVariants, Webhook},
     helpers::{parse_shopify_price, tari_shopify_price},
+    shopify_transaction::ShopifyPaymentCapture,
     Customer,
     ExchangeRate,
     ExchangeRates,
@@ -413,6 +414,21 @@ impl ShopifyApi {
         let page_info = result.orders.page_info;
         Ok((orders, page_info))
     }
+
+    pub async fn capture_payment(
+        &self,
+        order_id: i64,
+        auth: ShopifyPaymentCapture,
+    ) -> Result<ShopifyTransaction, ShopifyApiError> {
+        #[derive(Deserialize)]
+        struct TransactionResponse {
+            transaction: ShopifyTransaction,
+        }
+        let path = format!("/orders/{order_id}/transactions.json");
+        let result =
+            self.rest_query::<TransactionResponse, ShopifyPaymentCapture>(Method::POST, &path, &[], Some(auth)).await?;
+        Ok(result.transaction)
+    }
 }
 
 // subtotalPrice customer { id }
@@ -444,6 +460,7 @@ fn node_to_order(node: Value) -> ShopifyOrder {
         closed_at: None,
         user_id: None,
         total_line_items_price: "".to_string(),
+        total_outstanding: "0.00".to_string(),
         customer,
         buyer_accepts_marketing: false,
         fulfillment_status: None,

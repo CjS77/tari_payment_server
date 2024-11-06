@@ -1,7 +1,8 @@
 //----------------------------------------------   Checkout  ----------------------------------------------------
 
-use actix_web::{web, HttpRequest, HttpResponse};
+use actix_web::{post, web, HttpRequest, HttpResponse};
 use log::{debug, error, info, trace, warn};
+use serde_json::Value;
 use shopify_tools::{
     data_objects::ExchangeRate as ShopifyExchangeRate,
     helpers::{parse_shopify_price, tari_shopify_price},
@@ -9,11 +10,22 @@ use shopify_tools::{
     ShopifyApiError,
     ShopifyOrder,
     ShopifyProduct,
+    ShopifyTransaction,
 };
 use tari_payment_engine::{
     db_types::Role,
-    tpe_api::{exchange_objects::ExchangeRate, exchange_rate_api::ExchangeRateApi},
-    traits::{ExchangeRates, PaymentGatewayDatabase, PaymentGatewayError},
+    tpe_api::{
+        exchange_objects::ExchangeRate,
+        exchange_rate_api::ExchangeRateApi,
+        shopify_tracker_api::ShopifyTrackerApi,
+    },
+    traits::{
+        ExchangeRates,
+        PaymentGatewayDatabase,
+        PaymentGatewayError,
+        ShopifyAuthorizationError,
+        ShopifyAuthorizations,
+    },
     OrderFlowApi,
 };
 use tpg_common::MicroTari;
@@ -22,9 +34,59 @@ use crate::{
     config::ServerOptions,
     data_objects::{ExchangeRateUpdate, JsonResponse},
     errors::ServerError,
-    integrations::shopify::{new_order_from_shopify_order, OrderConversionError},
+    integrations::shopify::{new_order_from_shopify_order, shopify_auth_from_tx, OrderConversionError},
     route,
 };
+
+#[post("/webhook/no_op")]
+pub async fn webhook_noop(req: HttpRequest, body: web::Json<Value>) -> HttpResponse {
+    debug!("🛍️️ Received webhook request at no-op: {}", req.uri());
+    debug!("🛍️️ No-op body: {body}");
+    HttpResponse::Ok().finish()
+}
+
+route!(shopify_transaction_create => Post "webhook/transaction_create" impl ShopifyAuthorizations);
+pub async fn shopify_transaction_create<BSf>(
+    req: HttpRequest,
+    body: web::Json<ShopifyTransaction>,
+    api: web::Data<ShopifyTrackerApi<BSf>>,
+) -> HttpResponse
+where
+    BSf: ShopifyAuthorizations,
+{
+    info!("🛍️️ Received webhook call for a new Shopify payment authorization: {}", req.uri());
+    let tx = body.into_inner();
+    info!(
+        "🛍️️ New transaction {} for order {} detected. Amount: {}. Kind: {}, status: {}",
+        tx.id, tx.order_id, tx.amount, tx.kind, tx.status
+    );
+    if tx.kind != "authorization" {
+        info!("🛍️️ Transaction {} is not an authorization. Ignoring.", tx.id);
+        return HttpResponse::Ok().finish();
+    }
+    if tx.status != "success" {
+        info!(
+            "🛍️️ Payment capture is refused for tx {} & order {}, since payment was not successful. Status: {}",
+            tx.id, tx.order_id, tx.status
+        );
+        return HttpResponse::Ok().finish();
+    }
+    let auth = shopify_auth_from_tx(&tx);
+    match api.log_authorization(auth).await {
+        Ok(_) => {
+            info!("🛍️️ Authorization for tx {} & order {} logged successfully.", tx.id, tx.order_id);
+            HttpResponse::Ok().finish()
+        },
+        Err(ShopifyAuthorizationError::AlreadyExists(id, oid)) => {
+            info!("🛍️️ Authorization for tx {id} & order {oid} already exists.");
+            HttpResponse::Ok().finish()
+        },
+        Err(e) => {
+            error!("🛍️️ Could not log authorization for tx {} & order {}. {e}", tx.id, tx.order_id);
+            HttpResponse::ServiceUnavailable().json(JsonResponse::failure(e))
+        },
+    }
+}
 
 route!(shopify_webhook => Post "webhook/checkout_create" impl PaymentGatewayDatabase, ExchangeRates);
 pub async fn shopify_webhook<BPay, BFx>(

@@ -14,6 +14,7 @@ pub mod accounts;
 pub mod auth;
 pub mod exchange_rates;
 pub mod orders;
+pub mod shopify;
 pub mod transfers;
 pub mod wallet_auth;
 

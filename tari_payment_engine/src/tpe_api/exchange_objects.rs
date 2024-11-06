@@ -15,10 +15,10 @@ pub struct ExchangeRate {
 impl ExchangeRate {
     /// Create a new ExchangeRate object
     ///
-    /// *NB* The rate is in hundreds of the base unit (i.e. how many microTari in one cent of the base currency)
-    pub fn new(currency: String, rate_per_cent: MicroTari, updated_at: Option<DateTime<Utc>>) -> Self {
+    /// The rate, in Microtari per unit of the base currency
+    pub fn new(currency: String, rate: MicroTari, updated_at: Option<DateTime<Utc>>) -> Self {
         let updated_at = updated_at.unwrap_or_else(Utc::now);
-        Self { base_currency: currency, rate: rate_per_cent, updated_at }
+        Self { base_currency: currency, rate, updated_at }
     }
 
     /// Create a new ExchangeRate object with a rate of 1 base unit per Tari

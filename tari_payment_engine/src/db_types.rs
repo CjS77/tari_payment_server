@@ -250,6 +250,8 @@ pub struct Order {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub status: OrderStatusType,
+    /// The value outstanding on the order according to the storefront
+    pub amount_outstanding: Option<String>,
 }
 
 impl PartialEq for Order {
@@ -284,6 +286,8 @@ pub struct NewOrder {
     pub currency: String,
     /// The time the order was created on Shopify
     pub created_at: DateTime<Utc>,
+    /// The amount outstanding on the order according to the storefront
+    pub amount_outstanding: Option<String>,
 }
 
 impl NewOrder {
@@ -298,6 +302,7 @@ impl NewOrder {
             currency: "XTR".to_string(),
             created_at: Utc::now(),
             address: None,
+            amount_outstanding: None,
         }
     }
 
