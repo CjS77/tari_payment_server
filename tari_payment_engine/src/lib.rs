@@ -27,6 +27,7 @@ mod postgres;
 pub mod db_types;
 pub mod events;
 pub mod helpers;
+pub mod shopify_types;
 pub mod tpe_api;
 
 pub mod traits;

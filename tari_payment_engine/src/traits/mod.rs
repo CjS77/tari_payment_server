@@ -25,6 +25,7 @@ mod auth_management;
 
 mod exchange_rates;
 mod payment_gateway_database;
+mod shopify;
 
 mod wallet_management;
 
@@ -35,4 +36,5 @@ pub use auth_management::{AuthApiError, AuthManagement};
 pub use data_objects::{ExpiryResult, MultiAccountPayment, NewWalletInfo, OrderMovedResult, WalletInfo};
 pub use exchange_rates::{ExchangeRateError, ExchangeRates};
 pub use payment_gateway_database::{PaymentGatewayDatabase, PaymentGatewayError};
+pub use shopify::{ShopifyAuthorizationError, ShopifyAuthorizations};
 pub use wallet_management::{WalletAuth, WalletAuthApiError, WalletManagement, WalletManagementError};

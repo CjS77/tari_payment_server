@@ -142,7 +142,8 @@ pub(crate) async fn orders_for_address(
         orders.currency as currency,
         orders.created_at as created_at,
         orders.updated_at as updated_at,
-        orders.status as status
+        orders.status as status,
+        orders.amount_outstanding as amount_outstanding
     FROM orders JOIN address_customer_id_link ON orders.customer_id = address_customer_id_link.customer_id
     WHERE address = $1
     "#,

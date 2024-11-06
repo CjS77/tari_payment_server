@@ -42,5 +42,6 @@ pub mod exchange_rate_api;
 pub mod order_flow_api;
 pub mod order_objects;
 pub mod payment_objects;
+pub mod shopify_tracker_api;
 
 pub mod wallet_api;

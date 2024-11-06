@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{path::PathBuf, str::FromStr};
 
 use chrono::Duration;
 use cucumber::{gherkin::Step, given, then, when};
@@ -285,6 +285,20 @@ async fn place_order_with_prices(world: &mut TPGWorld, user: i64, email: String,
         .await;
     trace!("Got Response: {} {}", res.0, res.1);
     world.response = Some(res);
+}
+
+#[when(expr = "the shopify webhook checkout_create fires with payload from {string}")]
+async fn order_from_file(world: &mut TPGWorld, filename: String) {
+    let path = PathBuf::from_str("tests/fixtures").expect("Invalid filename").join(filename);
+    debug!("Reading order from file: {}", path.to_str().expect("Invalid path"));
+    let order = std::fs::read_to_string(path).expect("Failed to read file");
+    let (code, body) = world
+        .request(Method::POST, "/shopify/webhook/checkout_create", |req| {
+            req.body(order).header("Content-Type", "application/json")
+        })
+        .await;
+    debug!("Got Response: {code} {body}");
+    world.response = Some((code, body));
 }
 
 #[when(expr = "Customer #{int} [{string}] places order \"{word}\" for {int} XTR at {string}, with memo")]

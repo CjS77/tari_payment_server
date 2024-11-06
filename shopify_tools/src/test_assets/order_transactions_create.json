@@ -1,0 +1,176 @@
+{
+  "id": 6887976009940,
+  "order_id": 5796499259604,
+  "kind": "authorization",
+  "gateway": "shopify_payments",
+  "status": "success",
+  "message": "Transaction approved",
+  "created_at": "2024-11-04T11:02:34+00:00",
+  "test": true,
+  "authorization": "pi_3QHO3KR6Nla0yhHk1GTDaDYU",
+  "location_id": null,
+  "user_id": null,
+  "parent_id": null,
+  "processed_at": "2024-11-04T11:02:34+00:00",
+  "device_id": null,
+  "error_code": null,
+  "source_name": "checkout_one",
+  "payment_details": {
+    "credit_card_bin": "424242",
+    "avs_result_code": "Y",
+    "cvv_result_code": "M",
+    "credit_card_number": "•••• •••• •••• 4242",
+    "credit_card_company": "Visa",
+    "buyer_action_info": null,
+    "credit_card_name": "Bob",
+    "credit_card_wallet": null,
+    "credit_card_expiration_month": 2,
+    "credit_card_expiration_year": 2032,
+    "payment_method_name": "visa"
+  },
+  "receipt": {
+    "id": "pi_3QHO3KR6Nla0yhHk1GTDaDYU",
+    "object": "payment_intent",
+    "amount": 690,
+    "amount_capturable": 690,
+    "amount_received": 0,
+    "canceled_at": null,
+    "cancellation_reason": null,
+    "capture_method": "manual",
+    "charges": {
+      "object": "list",
+      "data": [
+        {
+          "id": "ch_3QHO3KR6Nla0yhHk1JzU7OaI",
+          "object": "charge",
+          "amount": 690,
+          "application_fee": null,
+          "balance_transaction": null,
+          "captured": false,
+          "created": 1730718154,
+          "currency": "usd",
+          "failure_code": null,
+          "failure_message": null,
+          "fraud_details": {},
+          "livemode": false,
+          "metadata": {
+            "email": "cj+bob@tari.com",
+            "manual_entry": "false",
+            "order_id": "r7LxCEdHT3BNmVRm4gTb10HrR",
+            "order_transaction_id": "6887976009940",
+            "payments_charge_id": "2649824592084",
+            "shop_id": "70504906964",
+            "shop_name": "Tari Merch Testing Store",
+            "shopify_payments_next": "true"
+          },
+          "outcome": {
+            "network_status": "approved_by_network",
+            "reason": null,
+            "risk_level": "normal",
+            "risk_score": 8,
+            "seller_message": "Payment complete.",
+            "type": "authorized"
+          },
+          "paid": true,
+          "payment_intent": "pi_3QHO3KR6Nla0yhHk1GTDaDYU",
+          "payment_method": "pm_1QHO3KR6Nla0yhHk0A7A72jQ",
+          "payment_method_details": {
+            "card": {
+              "amount_authorized": 690,
+              "authorization_code": null,
+              "brand": "visa",
+              "capture_before": 1733137354,
+              "checks": {
+                "address_line1_check": "pass",
+                "address_postal_code_check": "pass",
+                "cvc_check": "pass"
+              },
+              "country": "US",
+              "description": "Visa Classic",
+              "ds_transaction_id": null,
+              "exp_month": 2,
+              "exp_year": 2032,
+              "extended_authorization": {
+                "status": "enabled"
+              },
+              "fingerprint": "2M23dVRniScqT7K2",
+              "funding": "credit",
+              "iin": "424242",
+              "incremental_authorization": {
+                "status": "unavailable"
+              },
+              "installments": null,
+              "issuer": "Stripe Payments UK Limited",
+              "last4": "4242",
+              "mandate": null,
+              "moto": null,
+              "multicapture": {
+                "status": "unavailable"
+              },
+              "network": "visa",
+              "network_token": {
+                "used": false
+              },
+              "network_transaction_id": "501217186106113",
+              "overcapture": {
+                "maximum_amount_capturable": 793,
+                "status": "available"
+              },
+              "overcapture_supported": true,
+              "payment_account_reference": "xR4eIL3CZCjH9hMkhqeysHPkE5Zxs",
+              "three_d_secure": null,
+              "wallet": null
+            },
+            "type": "card"
+          },
+          "refunded": false,
+          "source": null,
+          "status": "succeeded",
+          "mit_params": {
+            "network_transaction_id": "501217186106113"
+          }
+        }
+      ],
+      "has_more": false,
+      "total_count": 1,
+      "url": "/v1/charges?payment_intent=pi_3QHO3KR6Nla0yhHk1GTDaDYU"
+    },
+    "confirmation_method": "manual",
+    "created": 1730718154,
+    "currency": "usd",
+    "last_payment_error": null,
+    "livemode": false,
+    "metadata": {
+      "email": "cj+bob@tari.com",
+      "manual_entry": "false",
+      "order_id": "r7LxCEdHT3BNmVRm4gTb10HrR",
+      "order_transaction_id": "6887976009940",
+      "payments_charge_id": "2649824592084",
+      "shop_id": "70504906964",
+      "shop_name": "Tari Merch Testing Store",
+      "shopify_payments_next": "true"
+    },
+    "next_action": null,
+    "payment_method": "pm_1QHO3KR6Nla0yhHk0A7A72jQ",
+    "payment_method_types": [
+      "card"
+    ],
+    "source": null,
+    "status": "requires_capture"
+  },
+  "amount": "6.90",
+  "currency": "USD",
+  "payment_id": "r7LxCEdHT3BNmVRm4gTb10HrR",
+  "total_unsettled_set": {
+    "presentment_money": {
+      "amount": "6.9",
+      "currency": "USD"
+    },
+    "shop_money": {
+      "amount": "6.9",
+      "currency": "USD"
+    }
+  },
+  "manual_payment_gateway": false,
+  "admin_graphql_api_id": "gid://shopify/OrderTransaction/6887976009940"
+}

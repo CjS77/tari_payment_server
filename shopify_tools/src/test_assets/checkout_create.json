@@ -1,0 +1,372 @@
+{
+  "id": 5796499259604,
+  "admin_graphql_api_id": "gid://shopify/Order/5796499259604",
+  "app_id": 580111,
+  "browser_ip": "94.63.235.150",
+  "buyer_accepts_marketing": false,
+  "cancel_reason": null,
+  "cancelled_at": null,
+  "cart_token": "Z2NwLXVzLWVhc3QxOjAxSkJWREIzSFIySDU1Uko0MEpaWVNTTkcw",
+  "checkout_id": 36828373647572,
+  "checkout_token": "550c51c944eb28b9e2eb73a5d2028634",
+  "client_details": {
+    "accept_language": "en-US",
+    "browser_height": null,
+    "browser_ip": "94.63.235.150",
+    "browser_width": null,
+    "session_hash": null,
+    "user_agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:132.0) Gecko/20100101 Firefox/132.0"
+  },
+  "closed_at": null,
+  "confirmation_number": "87U59TQ4X",
+  "confirmed": true,
+  "contact_email": "cj+bob@tari.com",
+  "created_at": "2024-11-04T11:02:37+00:00",
+  "currency": "USD",
+  "current_subtotal_price": "0.00",
+  "current_subtotal_price_set": {
+    "shop_money": {
+      "amount": "0.00",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "0.00",
+      "currency_code": "USD"
+    }
+  },
+  "current_total_additional_fees_set": null,
+  "current_total_discounts": "8.00",
+  "current_total_discounts_set": {
+    "shop_money": {
+      "amount": "8.00",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "8.00",
+      "currency_code": "USD"
+    }
+  },
+  "current_total_duties_set": null,
+  "current_total_price": "6.90",
+  "current_total_price_set": {
+    "shop_money": {
+      "amount": "6.90",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "6.90",
+      "currency_code": "USD"
+    }
+  },
+  "current_total_tax": "0.00",
+  "current_total_tax_set": {
+    "shop_money": {
+      "amount": "0.00",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "0.00",
+      "currency_code": "USD"
+    }
+  },
+  "customer_locale": "en-US",
+  "device_id": null,
+  "discount_codes": [],
+  "email": "cj+bob@tari.com",
+  "estimated_taxes": false,
+  "financial_status": "authorized",
+  "fulfillment_status": null,
+  "landing_site": "/",
+  "landing_site_ref": null,
+  "location_id": null,
+  "merchant_of_record_app_id": null,
+  "name": "#1140",
+  "note": null,
+  "note_attributes": [],
+  "number": 140,
+  "order_number": 1140,
+  "order_status_url": "https://af2f05-9a.myshopify.com/70504906964/orders/b188fb34bd52cc8ddd450ce468d1e6e8/authenticate?key=cb308f1c254215faf4f2982acc092e56",
+  "original_total_additional_fees_set": null,
+  "original_total_duties_set": null,
+  "payment_gateway_names": [
+    "shopify_payments"
+  ],
+  "phone": null,
+  "po_number": null,
+  "presentment_currency": "USD",
+  "processed_at": "2024-11-04T11:02:33+00:00",
+  "reference": "815eb33370868b01fc2d3eead36cfaef",
+  "referring_site": "https://af2f05-9a.myshopify.com/",
+  "source_identifier": "815eb33370868b01fc2d3eead36cfaef",
+  "source_name": "web",
+  "source_url": null,
+  "subtotal_price": "0.00",
+  "subtotal_price_set": {
+    "shop_money": {
+      "amount": "0.00",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "0.00",
+      "currency_code": "USD"
+    }
+  },
+  "tags": "",
+  "tax_exempt": false,
+  "tax_lines": [],
+  "taxes_included": false,
+  "test": true,
+  "token": "b188fb34bd52cc8ddd450ce468d1e6e8",
+  "total_discounts": "8.00",
+  "total_discounts_set": {
+    "shop_money": {
+      "amount": "8.00",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "8.00",
+      "currency_code": "USD"
+    }
+  },
+  "total_line_items_price": "8.00",
+  "total_line_items_price_set": {
+    "shop_money": {
+      "amount": "8.00",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "8.00",
+      "currency_code": "USD"
+    }
+  },
+  "total_outstanding": "0.00",
+  "total_price": "6.90",
+  "total_price_set": {
+    "shop_money": {
+      "amount": "6.90",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "6.90",
+      "currency_code": "USD"
+    }
+  },
+  "total_shipping_price_set": {
+    "shop_money": {
+      "amount": "6.90",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "6.90",
+      "currency_code": "USD"
+    }
+  },
+  "total_tax": "0.00",
+  "total_tax_set": {
+    "shop_money": {
+      "amount": "0.00",
+      "currency_code": "USD"
+    },
+    "presentment_money": {
+      "amount": "0.00",
+      "currency_code": "USD"
+    }
+  },
+  "total_tip_received": "0.00",
+  "total_weight": 0,
+  "updated_at": "2024-11-04T11:02:38+00:00",
+  "user_id": null,
+  "billing_address": {
+    "first_name": null,
+    "address1": "1000 Steps Beach",
+    "phone": null,
+    "city": "Laguna Beach",
+    "zip": "92651",
+    "province": "California",
+    "country": "United States",
+    "last_name": "Bob",
+    "address2": null,
+    "company": null,
+    "latitude": null,
+    "longitude": null,
+    "name": "Bob",
+    "country_code": "US",
+    "province_code": "CA"
+  },
+  "customer": {
+    "id": 7390049927380,
+    "email": "cj+bob@tari.com",
+    "created_at": "2024-07-26T13:46:39+01:00",
+    "updated_at": "2024-11-04T11:02:37+00:00",
+    "first_name": null,
+    "last_name": "Bob",
+    "state": "disabled",
+    "note": null,
+    "verified_email": true,
+    "multipass_identifier": null,
+    "tax_exempt": false,
+    "phone": null,
+    "email_marketing_consent": {
+      "state": "not_subscribed",
+      "opt_in_level": "single_opt_in",
+      "consent_updated_at": null
+    },
+    "sms_marketing_consent": null,
+    "tags": "",
+    "currency": "USD",
+    "tax_exemptions": [],
+    "admin_graphql_api_id": "gid://shopify/Customer/7390049927380",
+    "default_address": {
+      "id": 9100299075796,
+      "customer_id": 7390049927380,
+      "first_name": null,
+      "last_name": "Bob",
+      "company": null,
+      "address1": "1000 Steps Beach",
+      "address2": null,
+      "city": "Laguna Beach",
+      "province": "California",
+      "country": "United States",
+      "zip": "92651",
+      "phone": null,
+      "name": "Bob",
+      "province_code": "CA",
+      "country_code": "US",
+      "country_name": "United States",
+      "default": true
+    }
+  },
+  "discount_applications": [
+    {
+      "target_type": "line_item",
+      "type": "automatic",
+      "value": "100.0",
+      "value_type": "percentage",
+      "allocation_method": "across",
+      "target_selection": "all",
+      "title": "Pay with Tari"
+    }
+  ],
+  "fulfillments": [],
+  "line_items": [
+    {
+      "id": 14231721443540,
+      "admin_graphql_api_id": "gid://shopify/LineItem/14231721443540",
+      "attributed_staffs": [],
+      "current_quantity": 1,
+      "fulfillable_quantity": 1,
+      "fulfillment_service": "manual",
+      "fulfillment_status": null,
+      "gift_card": false,
+      "grams": 0,
+      "name": "TA/RI Hat - S/M",
+      "price": "8.00",
+      "price_set": {
+        "shop_money": {
+          "amount": "8.00",
+          "currency_code": "USD"
+        },
+        "presentment_money": {
+          "amount": "8.00",
+          "currency_code": "USD"
+        }
+      },
+      "product_exists": true,
+      "product_id": 8494452965588,
+      "properties": [],
+      "quantity": 1,
+      "requires_shipping": true,
+      "sku": "TTL101_HAT_ROCK_SM",
+      "taxable": true,
+      "title": "TA/RI Hat",
+      "total_discount": "0.00",
+      "total_discount_set": {
+        "shop_money": {
+          "amount": "0.00",
+          "currency_code": "USD"
+        },
+        "presentment_money": {
+          "amount": "0.00",
+          "currency_code": "USD"
+        }
+      },
+      "variant_id": 45280626311380,
+      "variant_inventory_management": "shopify",
+      "variant_title": "S/M",
+      "vendor": "The TTL Store",
+      "tax_lines": [],
+      "duties": [],
+      "discount_allocations": [
+        {
+          "amount": "8.00",
+          "amount_set": {
+            "shop_money": {
+              "amount": "8.00",
+              "currency_code": "USD"
+            },
+            "presentment_money": {
+              "amount": "8.00",
+              "currency_code": "USD"
+            }
+          },
+          "discount_application_index": 0
+        }
+      ]
+    }
+  ],
+  "payment_terms": null,
+  "refunds": [],
+  "shipping_address": {
+    "first_name": null,
+    "address1": "1000 Steps Beach",
+    "phone": null,
+    "city": "Laguna Beach",
+    "zip": "92651",
+    "province": "California",
+    "country": "United States",
+    "last_name": "Bob",
+    "address2": null,
+    "company": null,
+    "latitude": 33.4979923,
+    "longitude": -117.7406857,
+    "name": "Bob",
+    "country_code": "US",
+    "province_code": "CA"
+  },
+  "shipping_lines": [
+    {
+      "id": 4669553344724,
+      "carrier_identifier": null,
+      "code": "Standard",
+      "discounted_price": "6.90",
+      "discounted_price_set": {
+        "shop_money": {
+          "amount": "6.90",
+          "currency_code": "USD"
+        },
+        "presentment_money": {
+          "amount": "6.90",
+          "currency_code": "USD"
+        }
+      },
+      "is_removed": false,
+      "phone": null,
+      "price": "6.90",
+      "price_set": {
+        "shop_money": {
+          "amount": "6.90",
+          "currency_code": "USD"
+        },
+        "presentment_money": {
+          "amount": "6.90",
+          "currency_code": "USD"
+        }
+      },
+      "requested_fulfillment_service_id": null,
+      "source": "shopify",
+      "title": "Standard",
+      "tax_lines": [],
+      "discount_allocations": []
+    }
+  ]
+}

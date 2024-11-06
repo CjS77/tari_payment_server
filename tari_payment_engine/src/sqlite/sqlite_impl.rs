@@ -9,7 +9,7 @@ use sqlx::{SqliteConnection, SqlitePool};
 use tari_common_types::tari_address::TariAddress;
 use tpg_common::MicroTari;
 
-use super::db::{accounts, auth, db_url, exchange_rates, new_pool, orders, transfers, wallet_auth};
+use super::db::{accounts, auth, db_url, exchange_rates, new_pool, orders, shopify, transfers, wallet_auth};
 use crate::{
     db_types::{
         AddressBalance,
@@ -30,6 +30,7 @@ use crate::{
         TransferStatus,
     },
     order_objects::{ModifyOrderRequest, OrderChanged, OrderQueryFilter},
+    shopify_types::{NewShopifyAuthorization, ShopifyAuthorization},
     sqlite::db::orders::{fetch_order_by_id_or_alt, fetch_order_by_order_id},
     tpe_api::{
         account_objects::{AddressHistory, CustomerHistory, Pagination},
@@ -48,6 +49,8 @@ use crate::{
         OrderMovedResult,
         PaymentGatewayDatabase,
         PaymentGatewayError,
+        ShopifyAuthorizationError,
+        ShopifyAuthorizations,
         WalletAuth,
         WalletAuthApiError,
         WalletInfo,
@@ -740,6 +743,31 @@ impl ExchangeRates for SqliteDatabase {
     async fn set_exchange_rate(&self, new_rate: &ExchangeRate) -> Result<(), ExchangeRateError> {
         let mut conn = self.pool.acquire().await.map_err(|e| ExchangeRateError::DatabaseError(e.to_string()))?;
         exchange_rates::set_exchange_rate(new_rate, &mut conn).await
+    }
+}
+
+impl ShopifyAuthorizations for SqliteDatabase {
+    async fn insert_new(
+        &self,
+        auth: NewShopifyAuthorization,
+    ) -> Result<ShopifyAuthorization, ShopifyAuthorizationError> {
+        let mut conn = self.pool.acquire().await?;
+        let result = shopify::insert_new_shopify_auth(auth, &mut conn).await?;
+        Ok(result)
+    }
+
+    async fn fetch_by_order_id(&self, order_id: i64) -> Result<Vec<ShopifyAuthorization>, ShopifyAuthorizationError> {
+        let mut conn = self.pool.acquire().await?;
+        shopify::fetch_auth_by_order_id(order_id, &mut conn).await
+    }
+
+    async fn capture(
+        &self,
+        order_id: i64,
+        capture: bool,
+    ) -> Result<Vec<ShopifyAuthorization>, ShopifyAuthorizationError> {
+        let mut conn = self.pool.acquire().await?;
+        shopify::capture_auth(order_id, capture, &mut conn).await
     }
 }
 

@@ -1,5 +1,6 @@
 mod microtari;
 
+pub mod helpers;
 pub mod op;
 mod secret;
 

@@ -7,13 +7,21 @@ use shopify_tools::{
     ShopifyApiError,
     ShopifyConfig as ShopifyApiConfig,
     ShopifyOrder,
+    ShopifyPaymentCapture,
+    ShopifyTransaction,
 };
 use tari_payment_engine::{
     db_types::{NewOrder, Order, OrderId},
     events::{EventHandlers, EventHooks, OrderAnnulledEvent},
     helpers::MemoSignatureError,
-    tpe_api::{exchange_objects::ExchangeRate, exchange_rate_api::ExchangeRateApi},
+    shopify_types::NewShopifyAuthorization,
+    tpe_api::{
+        exchange_objects::ExchangeRate,
+        exchange_rate_api::ExchangeRateApi,
+        shopify_tracker_api::ShopifyTrackerApi,
+    },
     traits::ExchangeRates,
+    SqliteDatabase,
 };
 use thiserror::Error;
 use tpg_common::TARI_CURRENCY_CODE;
@@ -76,6 +84,7 @@ pub async fn new_order_from_shopify_order<B: ExchangeRates>(
         address: None,
         created_at: timestamp,
         total_price,
+        amount_outstanding: Some(value.total_outstanding),
     };
     if let Err(e) = order.try_extract_address() {
         info!(
@@ -98,41 +107,20 @@ pub const SHOPIFY_EVENT_BUFFER_SIZE: usize = 25;
 /// 2. OrderAnnulledEvent - If an order is cancelled or expires, we send a REST request to the Shopify API to mark the
 ///    order as cancelled. If an order is expired from the Shopify Admin UI, then this REST call will be spurious, but
 ///    no harm will be done.
-pub fn create_shopify_event_handlers(config: ShopifyApiConfig) -> Result<EventHandlers, ShopifyApiError> {
+pub fn create_shopify_event_handlers(
+    config: ShopifyApiConfig,
+    tracker: ShopifyTrackerApi<SqliteDatabase>,
+) -> Result<EventHandlers, ShopifyApiError> {
     let mut hooks = EventHooks::default();
+    let must_capture_payment = config.capture_payments;
     let api = ShopifyApi::new(config)?;
-    let api_clone = api.clone();
-    // --- On OrderPaid Handler ---
-    hooks.on_order_paid(move |ev| {
-        let order = ev.order;
-        let order_id = match parse_shopify_order_id(&order) {
-            Some(value) => value,
-            None => return no_op(),
-        };
-        let Some(original_price) = order.original_price else {
-            error!(
-                "🛍️ The order that has just been marked as paid does not have an original price. Shopify orders \
-                 should
-            have populated this field. TODO: Calculate the original price from the prevailing Tari price. Order \
-                 details: {order:?}"
-            );
-            return no_op();
-        };
-        let api_clone = api_clone.clone();
-        Box::pin(async move {
-            match api_clone.mark_order_as_paid(order_id, original_price, order.currency).await {
-                Ok(tx) => info!(
-                    "🛍️ Order {order_id} marked as paid on Shopify. New status: {}. Tx id: {}. Errors (if any): {} {}",
-                    tx.status,
-                    tx.id,
-                    tx.error_code.unwrap_or_else(|| "None".to_string()),
-                    tx.message
-                ),
-                Err(e) => error!("🛍️ Error marking order {order_id} as paid on Shopify. {e}"),
-            }
-        })
-    });
-    // --- On OrderAnnulled Handler ---
+    on_order_paid_handler(&mut hooks, must_capture_payment, api.clone(), tracker.clone());
+    on_order_annulled_handler(&mut hooks, api);
+    let handlers = EventHandlers::new(SHOPIFY_EVENT_BUFFER_SIZE, hooks);
+    Ok(handlers)
+}
+
+fn on_order_annulled_handler(hooks: &mut EventHooks, api: ShopifyApi) {
     hooks.on_order_annulled(move |ev| {
         let OrderAnnulledEvent { order, status } = ev;
         let order_id = match parse_shopify_order_id(&order) {
@@ -152,8 +140,115 @@ pub fn create_shopify_event_handlers(config: ShopifyApiConfig) -> Result<EventHa
             }
         })
     });
-    let handlers = EventHandlers::new(SHOPIFY_EVENT_BUFFER_SIZE, hooks);
-    Ok(handlers)
+}
+
+fn on_order_paid_handler(
+    hooks: &mut EventHooks,
+    must_capture_payment: bool,
+    api: ShopifyApi,
+    tracker: ShopifyTrackerApi<SqliteDatabase>,
+) {
+    hooks.on_order_paid(move |ev| {
+        let order = ev.order;
+        let order_id = match parse_shopify_order_id(&order) {
+            Some(value) => value,
+            None => return no_op(),
+        };
+        let amount_to_pay = match (must_capture_payment, order.amount_outstanding.clone(), order.original_price.clone())
+        {
+            (false, _, Some(p)) => p,
+            (true, Some(p), _) => p,
+            (false, Some(p), None) => {
+                warn!(
+                    "🛍️ The order that has just been marked as paid does not have an original price. Used the \
+                     outstanding amount instead. {order:?}"
+                );
+                p
+            },
+            (true, None, Some(p)) => {
+                warn!(
+                    "🛍️ The order that has just been marked as paid does not have an outstanding amount, but we are \
+                     being asked to capture external payments. It's possible that this payment request will fail and \
+                     will require a manual override in the storefront. {order:?}"
+                );
+                p
+            },
+            (_, None, None) => {
+                error!(
+                    "🛍️ The order that has just been marked as paid does not have an original or an outstanding \
+                     amount. A manual override in the storefront is required. {order:?}"
+                );
+                return no_op();
+            },
+        };
+        let api_clone = api.clone();
+        let tracker_clone = tracker.clone();
+        Box::pin(async move {
+            if must_capture_payment {
+                #[allow(clippy::cast_possible_wrap)]
+                let oid = order_id as i64;
+                let auths = tracker_clone.fetch_payment_auth(oid).await.unwrap_or_else(|e| {
+                    error!(
+                        "🛍️ Error fetching payment authorizations for order {order_id} from the database. {e}. Manual \
+                         intervention is required."
+                    );
+                    vec![]
+                });
+                // If at least one authorisation is successful, we will update the database for all authorisations
+                // related to the order. There is manual intervention needed anyway, so prefer to handle
+                // all of this on the shopify side. Simple enough to change if this is not the desired
+                // behaviour.
+                let mut update_db = false;
+                for auth in auths {
+                    if !auth.captured {
+                        let capture = ShopifyPaymentCapture::from(auth);
+                        match api_clone.capture_payment(oid as i64, capture).await {
+                            Ok(t) => {
+                                info!(
+                                    "🛍️ Order {order_id} payment captured on Shopify. Tx: {} Order: {}. Kind: {}. {}",
+                                    t.id, t.order_id, t.kind, t.message
+                                );
+                                update_db = true;
+                            },
+                            Err(e) => {
+                                error!(
+                                    "🛍️ Error capturing payment for order {order_id} on Shopify. Manual intervention \
+                                     is required. {e}"
+                                );
+                            },
+                        }
+                    }
+                }
+                if update_db {
+                    match tracker_clone.set_capture_flag(oid, true).await {
+                        Ok(_) => info!("🛍️ Order {order_id} payment capture flag set in the database."),
+                        Err(e) => error!(
+                            "🛍️ Error setting payment capture flag for order {order_id} in the database. {e}. Manual \
+                             intervention is required."
+                        ),
+                    }
+                }
+            }
+            let due = parse_shopify_price(&amount_to_pay).unwrap_or(1);
+            if due == 0 {
+                info!(
+                    "🛍️ Order {order_id} has been marked as paid on the server, but the amount due is 0. No further \
+                     action required on the storefront."
+                );
+                return;
+            }
+            match api_clone.mark_order_as_paid(order_id, amount_to_pay, order.currency).await {
+                Ok(tx) => info!(
+                    "🛍️ Order {order_id} marked as paid on Shopify. New status: {}. Tx id: {}. Errors (if any): {} {}",
+                    tx.status,
+                    tx.id,
+                    tx.error_code.unwrap_or_else(|| "None".to_string()),
+                    tx.message
+                ),
+                Err(e) => error!("🛍️ Error marking order {order_id} as paid on Shopify. {e}"),
+            }
+        })
+    });
 }
 
 fn parse_shopify_order_id(order: &Order) -> Option<u64> {
@@ -171,4 +266,15 @@ fn parse_shopify_order_id(order: &Order) -> Option<u64> {
 
 fn no_op() -> BoxFuture<'static, ()> {
     Box::pin(async {})
+}
+
+pub fn shopify_auth_from_tx(tx: &ShopifyTransaction) -> NewShopifyAuthorization {
+    NewShopifyAuthorization {
+        id: tx.id,
+        order_id: tx.order_id,
+        amount: tx.amount.clone(),
+        currency: tx.currency.clone(),
+        test: tx.test,
+        captured: false,
+    }
 }

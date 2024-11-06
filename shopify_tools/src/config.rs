@@ -1,5 +1,5 @@
 use log::*;
-use tpg_common::Secret;
+use tpg_common::{helpers::parse_boolean_flag, Secret};
 
 #[derive(Debug, Clone, Default)]
 pub struct ShopifyConfig {
@@ -8,6 +8,7 @@ pub struct ShopifyConfig {
     pub storefront_access_token: Secret<String>,
     pub api_version: String,
     pub shared_secret: Secret<String>,
+    pub capture_payments: bool,
 }
 
 impl ShopifyConfig {
@@ -36,6 +37,14 @@ impl ShopifyConfig {
             );
             "00000000000000".to_string()
         }));
-        Self { shop, admin_access_token, api_version, shared_secret, storefront_access_token }
+        let external_shipping_payments = parse_boolean_flag(std::env::var("TPG_SHOPIFY_CAPTURE_PAYMENTS").ok(), false);
+        Self {
+            shop,
+            admin_access_token,
+            api_version,
+            shared_secret,
+            storefront_access_token,
+            capture_payments: external_shipping_payments,
+        }
     }
 }

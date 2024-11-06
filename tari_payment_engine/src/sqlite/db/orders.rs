@@ -41,8 +41,9 @@ async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<Or
                 total_price,
                 original_price,
                 currency,
-                created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                created_at,
+                amount_outstanding
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *;
         "#,
     )
@@ -54,6 +55,7 @@ async fn insert_order(order: NewOrder, conn: &mut SqliteConnection) -> Result<Or
     .bind(order.original_price)
     .bind(order.currency)
     .bind(order.created_at)
+    .bind(order.amount_outstanding)
     .fetch_one(conn)
     .await?;
     // The DB should trigger an automatic status entry for the order
@@ -248,6 +250,7 @@ pub(crate) async fn fetch_payable_orders_for_address(
             currency,
             orders.created_at as created_at,
             orders.updated_at as updated_at,
+            amount_outstanding,
             status
         FROM orders JOIN address_customer_id_link ON orders.customer_id = address_customer_id_link.customer_id
         WHERE

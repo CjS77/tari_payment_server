@@ -14,7 +14,11 @@ use log::*;
 use shopify_tools::ShopifyApi;
 use tari_payment_engine::{
     events::EventProducers,
-    tpe_api::{exchange_rate_api::ExchangeRateApi, wallet_api::WalletManagementApi},
+    tpe_api::{
+        exchange_rate_api::ExchangeRateApi,
+        shopify_tracker_api::ShopifyTrackerApi,
+        wallet_api::WalletManagementApi,
+    },
     AccountApi,
     AuthApi,
     OrderFlowApi,
@@ -72,7 +76,13 @@ use crate::{
         UpdatePriceRoute,
         UpdateRolesRoute,
     },
-    shopify_routes::{ShopifyOnProductUpdatedRoute, ShopifyWebhookRoute, UpdateShopifyExchangeRateRoute},
+    shopify_routes::{
+        webhook_noop,
+        ShopifyOnProductUpdatedRoute,
+        ShopifyTransactionCreateRoute,
+        ShopifyWebhookRoute,
+        UpdateShopifyExchangeRateRoute,
+    },
 };
 
 /// Defines the log format for the access log middleware.
@@ -95,7 +105,8 @@ pub async fn run_server(config: ServerConfig) -> Result<(), ServerError> {
     // configuration file.
     info!("🚦️ Configuring Shopify event handlers...");
     let shopify_config = config.shopify_config.shopify_api_config();
-    let shopify_handlers = create_shopify_event_handlers(shopify_config)
+    let shopify_tracker = ShopifyTrackerApi::new(db.clone());
+    let shopify_handlers = create_shopify_event_handlers(shopify_config, shopify_tracker)
         .map_err(|e| ServerError::InitializeError(format!("Failed to create Shopify event handlers: {e}")))?;
     let producers = shopify_handlers.producers();
     let srv = create_server_instance(config.clone(), db.clone(), producers.clone())?;
@@ -137,6 +148,7 @@ pub fn create_server_instance(
             config.shopify_config.hmac_secret.clone(),
             config.shopify_config.hmac_checks,
         );
+        let shopify_tracker = ShopifyTrackerApi::new(db.clone());
 
         let mut app = App::new()
             .wrap(Logger::new(LOG_FORMAT).log_target("access_log").exclude("/health"))
@@ -149,6 +161,7 @@ pub fn create_server_instance(
             .app_data(web::Data::new(wallet_manager))
             .app_data(web::Data::new(exchange_rates))
             .app_data(web::Data::new(proxy_config))
+            .app_data(web::Data::new(shopify_tracker))
             .app_data(web::Data::new(order_id_field));
         // Routes that require authentication
         let auth_scope = web::scope("/api")
@@ -202,6 +215,8 @@ pub fn create_server_instance(
             .wrap(hmac_middleware)
             .service(ShopifyWebhookRoute::<SqliteDatabase, SqliteDatabase>::new())
             .service(ShopifyOnProductUpdatedRoute::<SqliteDatabase>::new())
+            .service(ShopifyTransactionCreateRoute::<SqliteDatabase>::new())
+            .service(webhook_noop)
             .service(health);
         let wallet_scope = web::scope("/wallet")
             .service(GetAuthorizedAddressesRoute::<SqliteDatabase>::new())

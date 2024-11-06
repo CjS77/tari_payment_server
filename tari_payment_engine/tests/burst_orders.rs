@@ -15,7 +15,7 @@ use tari_payment_engine::{
     OrderFlowApi,
     SqliteDatabase,
 };
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Builder;
 use tpg_common::MicroTari;
 
 const NUM_BATCHES: usize = 20;

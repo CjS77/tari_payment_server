@@ -202,8 +202,12 @@ async fn install_webhooks(url: String) {
             return;
         },
     };
-    let params =
-        [("orders/create", make_address("checkout_create")), ("products/update", make_address("product_updated"))];
+    let params = [
+        ("orders/create", make_address("checkout_create")),
+        ("products/update", make_address("product_updated")),
+        ("order_transactions/create", make_address("transaction_create")),
+        ("orders/updated", make_address("no_op")),
+    ];
     for (topic, address) in params {
         match in_existing(topic, &existing_webhooks) {
             Some(webhook) => {

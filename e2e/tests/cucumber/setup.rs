@@ -32,6 +32,7 @@ fn seed_orders() -> [NewOrder; 5] {
             total_price: MicroTari::from_tari(100),
             original_price: None,
             created_at: Utc.with_ymd_and_hms(2024, 3, 10, 15, 0, 0).unwrap(),
+            amount_outstanding: Some("0.00".into()),
         },
         NewOrder {
             order_id: OrderId::new("2"),
@@ -43,6 +44,7 @@ fn seed_orders() -> [NewOrder; 5] {
             total_price: MicroTari::from_tari(200),
             original_price: None,
             created_at: Utc.with_ymd_and_hms(2024, 3, 10, 15, 30, 0).unwrap(),
+            amount_outstanding: Some("5.00".into()),
         },
         NewOrder {
             order_id: OrderId::new("3"),
@@ -54,6 +56,7 @@ fn seed_orders() -> [NewOrder; 5] {
             total_price: MicroTari::from_tari(65),
             original_price: None,
             created_at: Utc.with_ymd_and_hms(2024, 3, 11, 16, 0, 0).unwrap(),
+            amount_outstanding: None,
         },
         NewOrder {
             order_id: OrderId::new("4"),
@@ -65,6 +68,7 @@ fn seed_orders() -> [NewOrder; 5] {
             total_price: MicroTari::from_tari(350),
             original_price: None,
             created_at: Utc.with_ymd_and_hms(2024, 3, 11, 17, 0, 0).unwrap(),
+            amount_outstanding: Some("0.00".into()),
         },
         NewOrder {
             order_id: OrderId::new("5"),
@@ -76,6 +80,7 @@ fn seed_orders() -> [NewOrder; 5] {
             total_price: MicroTari::from_tari(25),
             original_price: None,
             created_at: Utc.with_ymd_and_hms(2024, 3, 12, 18, 0, 0).unwrap(),
+            amount_outstanding: None,
         },
     ]
 }
@@ -294,6 +299,7 @@ async fn server_configuration(world: &mut TPGWorld, step: &Step) {
             },
             "strict_mode" => world.config.strict_mode = value == "true",
             "price_field" => world.config.shopify_config.price_field = value.parse().expect("Invalid price field"),
+            "capture_payments" => world.config.shopify_config.capture_payments = value == "true",
             _ => warn!("Unknown configuration key: {key}"),
         }
     });

@@ -15,4 +15,10 @@ pub use data_objects::{ExchangeRate, ExchangeRates};
 pub use error::ShopifyApiError;
 pub use shopify_order::{Customer, EmailMarketingConsent, OrderBuilder, ShopifyOrder};
 pub use shopify_product::{ProductImage, ShopifyProduct, Variant};
-pub use shopify_transaction::{CurrencyExchangeAdjustment, OutstandingValue, ShopifyTransaction};
+pub use shopify_transaction::{
+    CaptureTransaction,
+    CurrencyExchangeAdjustment,
+    OutstandingValue,
+    ShopifyPaymentCapture,
+    ShopifyTransaction,
+};
