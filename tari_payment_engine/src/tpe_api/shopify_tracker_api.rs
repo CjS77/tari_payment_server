@@ -61,7 +61,7 @@ where B: ShopifyAuthorizations
 
     pub async fn set_capture_flag(&self, order_id: i64, capture_flag: bool) -> Result<(), ShopifyAuthorizationError> {
         trace!("📋️☑️ Setting capture flag for order {order_id} to {capture_flag}");
-        let _  = self.db.capture(order_id, capture_flag).await?;
+        let _ = self.db.capture(order_id, capture_flag).await?;
         Ok(())
     }
 }

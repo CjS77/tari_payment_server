@@ -138,6 +138,11 @@ TPS assumes that the following environment variables are set when making use of 
   Set to `1` to enable HMAC checks, and `0` to disable them. You **almost certainly want to enable this in production.**
 - `TPG_SHOPIFY_ORDER_ID_FIELD`. Specify which field should be used as the order id. Must be one of `name` or `id`. 
    Default is `id`.
+- `TPG_SHOPIFY_CAPTURE_PAYMENTS`. Indicates that TPS should capture authorizations rather than via the shopify app. 
+   You can choose to authorise payments made via Shopify Payments with Tari Payment Server. Any authorizations made 
+   on the site that are not automatically captured will be captured once the Tari payment has been received in full.
+   As usual, you should set Shopify to capture payments manually.  You can then use a discount to reduce the 
+   USD-based price of orders, and the balance will be configured to be paid by Tari.
   
 ## Configure webhooks to interact with your server.
 

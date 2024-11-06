@@ -194,9 +194,10 @@ fn on_order_paid_handler(
                     );
                     vec![]
                 });
-                // If at least one authorisation is successful, we will update the database for all authorisations related
-                // to the order. There is manual intervention needed anyway, so prefer to handle all of this on the shopify
-                // side. Simple enough to change if this is not the desired behaviour.
+                // If at least one authorisation is successful, we will update the database for all authorisations
+                // related to the order. There is manual intervention needed anyway, so prefer to handle
+                // all of this on the shopify side. Simple enough to change if this is not the desired
+                // behaviour.
                 let mut update_db = false;
                 for auth in auths {
                     if !auth.captured {
